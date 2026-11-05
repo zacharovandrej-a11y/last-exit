@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>LAST EXIT</title>
+<link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="theme-color" content="#0b0820"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+html,body{margin:0;height:100%;background:#0b0820;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;font-family:system-ui,sans-serif}
+canvas#c{display:block;width:100vw;height:100vh}
+#start{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:radial-gradient(circle at 50% 120%,#2b8a3e 0,#1b4d2a 22%,#0b0820 48%);color:#fff}
+#start h1{margin:0;font-size:min(64px,12vw);font-weight:900;color:#ffd43b;letter-spacing:2px;text-shadow:0 4px 0 #b35c00,0 8px 20px #000}
+#start .row{display:flex;align-items:center;gap:10px}
+#start input{font-size:20px;padding:10px 14px;border-radius:12px;border:3px solid #ffd43b;background:#1a1240;color:#fff;width:200px;text-align:center;font-weight:700;outline:none}
+#start button{font-size:26px;border:0;border-radius:14px;background:#ffd43b;color:#222;font-weight:900;padding:8px 18px;box-shadow:0 4px 0 #b35c00}
+#start #play{font-size:34px;padding:10px 48px}
+#pv{width:90px;height:90px}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="start">
+  <h1>LAST EXIT</h1>
+  <div class="row"><button id="prev">◀</button><canvas id="pv" width="180" height="180"></canvas><button id="next">▶</button></div>
+  <input id="name" maxlength="12" placeholder="Имя" autocomplete="off">
+  <button id="play">▶</button>
+</div>
+<script>
+/*SHARED*/
+/*CLIENT*/
+</script></body></html>

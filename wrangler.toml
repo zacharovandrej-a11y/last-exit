@@ -1,0 +1,13 @@
+# Cloudflare Worker «LAST EXIT». Разворачивается автоматически при push в main.
+name = "last-exit"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+workers_dev = true
+
+[[durable_objects.bindings]]
+name = "WORLD"
+class_name = "World"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["World"]
