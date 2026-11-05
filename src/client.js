@@ -650,6 +650,10 @@ function hud(now, meAlive, mePos) {
     if (lobbyNames.length === 1) { const rb = ui('restart'); btn(rb, '#ffd43b'); txt('↻', rb.x + rb.w / 2, rb.y + rb.h * .72, 26, '#ffd43b'); }
   }
   if (!ws || ws.readyState !== 1) { if (started) txt('📡 …', CX, H / 2, 30); }
+  if (('ontouchstart' in window) && H > W * 1.1) { // вертикально играть неудобно — просим повернуть
+    ctx.fillStyle = 'rgba(8,4,24,.88)'; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.translate(CX, CY - 20); ctx.rotate(Math.sin(now / 400) * .8 - .8); ctx.strokeStyle = '#ffd43b'; ctx.lineWidth = 5; rr(ctx, -28, -48, 56, 96, 10); ctx.stroke(); ctx.fillStyle = '#ffd43b'; ctx.fillRect(-6, 36, 12, 4); ctx.restore();
+    txt('↻', CX, CY + 80, 44, '#ffd43b'); }
   if (PERF) { ctx.font = '12px monospace'; ctx.textAlign = 'left'; ctx.fillStyle = '#0f0'; ctx.fillText(`${fps} fps · ${snapRate} snap/s · pend ${pending.length} · ents ${Object.keys(ents).length}`, 8, H - 8); }
 }
 function ghostStick(x, y) { ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 46, 0, 6.2832); ctx.stroke(); }
@@ -708,7 +712,9 @@ document.getElementById('play').onclick = () => {
   myName = (nameIn.value || '').trim().slice(0, 12) || 'Игрок' + Math.floor(Math.random() * 100);
   try { localStorage.setItem('le_name', myName); localStorage.setItem('le_char', myChar); } catch (e) { }
   nameIn.blur(); initSound(); document.getElementById('start').style.display = 'none'; started = true; connect();
-  try { if (touchUI || 'ontouchstart' in window) document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => { }); } catch (e) { }
+  // на телефоне: во весь экран и сразу горизонтально (Android); на iPhone — подсказка повернуть
+  try { if ('ontouchstart' in window) { const d = document.documentElement, fs = d.requestFullscreen || d.webkitRequestFullscreen; const lock = () => { try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => { }); } catch (e) { } };
+    if (fs) { const r = fs.call(d); r && r.then ? r.then(lock).catch(lock) : lock(); } else lock(); } } catch (e) { }
 };
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => { });
 resize(); layout(); G3.resize(W, H); requestAnimationFrame(frame);
