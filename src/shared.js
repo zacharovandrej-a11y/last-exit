@@ -26,14 +26,22 @@ const inMap = (p, m = 0) => Math.abs(p[0]) < HALF - m && Math.abs(p[1]) < HALF -
 
 // ===== Оружие =====
 // ammo: 0 лёгкие, 1 тяжёлые, 2 дробь, 3 снайперские
+// bloom — на сколько растёт разброс за выстрел, maxB — предел, rec — как быстро сходится (в секунду)
+// fall — сколько урона теряется к пределу дальности; zoom — насколько отдаляется камера с этим оружием
 const WEAPONS = [
   null,
-  { n: 'Пистолет', dmg: 22, rate: 2.6, mag: 12, rel: 1.1, range: 480, spread: .035, ammo: 0, pel: 1, auto: false },
-  { n: 'Автомат', dmg: 15, rate: 7, mag: 30, rel: 1.9, range: 560, spread: .075, ammo: 1, pel: 1, auto: true },
-  { n: 'Дробовик', dmg: 12, rate: 1, mag: 5, rel: 2.3, range: 270, spread: .30, ammo: 2, pel: 8, auto: false },
-  { n: 'Снайперка', dmg: 95, rate: .6, mag: 4, rel: 2.6, range: 1150, spread: .004, ammo: 3, pel: 1, auto: false },
-  { n: 'ПП', dmg: 11, rate: 10, mag: 35, rel: 1.6, range: 400, spread: .12, ammo: 0, pel: 1, auto: true },
+  { n: 'Пистолет', dmg: 22, rate: 3, mag: 12, rel: 1.1, range: 480, spread: .03, ammo: 0, pel: 1, bloom: .03, maxB: .12, rec: .5, fall: .3 },
+  { n: 'Автомат', dmg: 16, rate: 8, mag: 30, rel: 2, range: 600, spread: .045, ammo: 1, pel: 1, bloom: .018, maxB: .14, rec: .35, fall: .25 },
+  { n: 'Дробовик', dmg: 12, rate: 1.1, mag: 6, rel: 2.3, range: 280, spread: .30, ammo: 2, pel: 8, bloom: 0, maxB: 0, rec: 1, fall: .6 },
+  { n: 'Снайперка', dmg: 95, rate: .7, mag: 5, rel: 2.6, range: 1300, spread: .003, ammo: 3, pel: 1, bloom: .06, maxB: .1, rec: .3, fall: 0, zoom: 1.45 },
+  { n: 'ПП', dmg: 11, rate: 11, mag: 32, rel: 1.6, range: 420, spread: .085, ammo: 0, pel: 1, bloom: .012, maxB: .16, rec: .5, fall: .35 },
+  { n: 'Винтовка', dmg: 38, rate: 2.2, mag: 10, rel: 2.2, range: 950, spread: .012, ammo: 1, pel: 1, bloom: .03, maxB: .1, rec: .4, fall: 0, zoom: 1.2 },
+  { n: 'Пулемёт', dmg: 14, rate: 9, mag: 75, rel: 4, range: 650, spread: .07, ammo: 1, pel: 1, bloom: .01, maxB: .18, rec: .3, fall: .25 },
+  { n: 'Револьвер', dmg: 45, rate: 1.4, mag: 6, rel: 2.2, range: 520, spread: .02, ammo: 0, pel: 1, bloom: .05, maxB: .12, rec: .4, fall: .3 },
+  { n: 'Карабин', dmg: 13, rate: 9, mag: 30, rel: 1.8, range: 580, spread: .035, ammo: 0, pel: 1, bloom: .012, maxB: .1, rec: .45, fall: .25 },
 ];
+// текущий разброс (радианы): базовый + отдача; на бегу хуже, на месте точнее
+const curSpread = (W, bloom, moving) => (W.spread + (W.pel > 1 ? 0 : bloom)) * (moving && W.pel === 1 ? 1.7 : 1) + (moving && W.pel === 1 ? .015 : 0);
 const RARITY = ['#b8bcc4', '#51cf66', '#4dabf7', '#cc5de8', '#ffc61a']; // серое → золотое
 const RMULT = [1, 1.08, 1.16, 1.25, 1.35];
 const AMMO_COL = ['#ffd43b', '#ff922b', '#ff6b6b', '#74c0fc'];
@@ -92,7 +100,7 @@ const BIOMES = [
 // shape: 0 круг, 1 прямоугольник; pass — пули пролетают; nc — не мешает ходить
 const OT = {
   tree: { s: 0 }, pine: { s: 0 }, rock: { s: 0 }, hay: { s: 0 }, cactus: { s: 0 }, snowman: { s: 0 },
-  house: { s: 0 }, car: { s: 1 }, crate: { s: 0, hp: 45 }, wall: { s: 1 }, igloo: { s: 0 }, tent: { s: 1 },
+  house: { s: 0 }, car: { s: 1 }, truck: { s: 1 }, crate: { s: 0, hp: 45 }, wall: { s: 1 }, igloo: { s: 0 }, tent: { s: 1 },
   bw: { s: 1 }, furn: { s: 1, pass: 1 }, barrel: { s: 0 }, fence: { s: 1, pass: 1 }, bush: { s: 0, nc: 1, pass: 1 },
 };
 // здания: план из комнат (BSP-деление), двери между комнатами, окна (пули и взгляд проходят, человек — нет)
@@ -113,15 +121,15 @@ const BKIND = {
 const WIN = 30; // ширина окна
 function genWorld() {
   const rnd = mkRng(424242), objs = [], blds = [];
-  const free = (p, m) => { for (const o of objs) if (dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + b.rad) return false; return true; };
+  const free = (p, m) => { for (const o of objs) if (o.bid === undefined && dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + b.rad) return false; return true; };
   function putA(type, p, w, h, a) {
     const u = [Math.cos(a), Math.sin(a)];
     const o = { id: objs.length, type, p, a, u, v: perp(u), w, h, rad: Math.hypot(w, h) / 2, sh: OT[type].s };
     if (OT[type].hp) o.hp = OT[type].hp; if (OT[type].nc) o.nc = 1; if (OT[type].pass) o.pass = 1; objs.push(o); return o;
   }
   const put = (type, p, w, h) => putA(type, p, w, h, rnd() * 6.2832);
-  function many(type, cen, r, w, h, n, gap = 30) {
-    for (let i = 0; i < n; i++) { const p = cen ? nearPt(rnd, cen, r) : rndMap(rnd, 80); if (inMap(p, 60) && free(p, Math.max(w, h) / 2 + gap)) put(type, p, w, h); }
+  function many(type, cen, r, w, h, n, gap = 30, tries = 1) {
+    for (let i = 0; i < n; i++) for (let k = 0; k < tries; k++) { const p = cen ? nearPt(rnd, cen, r) : rndMap(rnd, 80); if (inMap(p, 60) && free(p, Math.max(w, h) / 2 + gap)) { put(type, p, w, h); break; } }
   }
   function building(kind, p) {
     const K = BKIND[kind], W2 = K.w / 2, H2 = K.h / 2, t = WALLT, D = DOOR, ED = K.door || DOOR;
@@ -206,7 +214,7 @@ function genWorld() {
   manyB(['lodge'], B[4].c, 480, 4); manyB(['adobe'], B[5].c, 380, 5);
   manyB(['house', 'villa', 'house', 'adobe', 'lodge'], null, 0, 16, 10); // одиночные дома по карте
   // улица: машины, бочки, заборы, кусты
-  many('car', B[0].c, 560, 46, 26, 16); many('car', B[3].c, 380, 46, 26, 20); many('barrel', B[1].c, 480, 18, 18, 24); many('barrel', B[3].c, 380, 18, 18, 10);
+  many('car', B[0].c, 620, 120, 52, 14, 12, 6); many('car', B[3].c, 440, 120, 52, 14, 12, 6); many('car', null, 0, 120, 52, 12, 20, 4); many('truck', B[1].c, 520, 170, 62, 6, 14, 6); many('truck', B[2].c, 520, 170, 62, 3, 14, 6); many('barrel', B[1].c, 520, 18, 18, 24, 12, 3); many('barrel', B[3].c, 380, 18, 18, 10);
   many('wall', B[1].c, 480, 90, 18, 12); many('tent', B[1].c, 480, 60, 50, 8);
   many('hay', B[2].c, 500, 30, 30, 26); many('fence', B[2].c, 500, 90, 6, 18);
   many('pine', B[4].c, 520, 40, 40, 80); many('snowman', B[4].c, 500, 24, 24, 14);

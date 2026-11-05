@@ -125,7 +125,7 @@ export class World {
   }
   randLoot(rnd, rich) {
     const x = rnd();
-    if (x < .38) { const w = [1, 2, 2, 3, 3, 4, 5, 5][Math.floor(rnd() * 8)]; const rr = rnd(); const r = rr < .4 ? 0 : rr < .68 ? 1 : rr < .86 ? 2 : rr < .96 ? 3 : 4; return { k: 0, x: w, r: Math.min(4, r + (rich ? 1 : 0)), n: WEAPONS[w].mag }; }
+    if (x < .38) { const WL = [1, 1, 2, 2, 3, 3, 4, 5, 5, 6, 7, 8, 9, 9], w = WL[Math.floor(rnd() * WL.length)]; const rr = rnd(); const r = rr < .4 ? 0 : rr < .68 ? 1 : rr < .86 ? 2 : rr < .96 ? 3 : 4; return { k: 0, x: w, r: Math.min(4, r + (rich ? 1 : 0)), n: WEAPONS[w].mag }; }
     if (x < .70) { const a = Math.floor(rnd() * 4); return { k: 1, x: a, r: 0, n: AMMO_PACK[a] }; }
     if (x < .88) return { k: 2, x: 0, r: 0, n: 1 };
     return { k: 3, x: 0, r: 0, n: 100 };
@@ -158,7 +158,7 @@ export class World {
       else { const k = p.inputs.length > 4 ? 2 : 1; for (let i = 0; i < k && p.inputs.length; i++) this.applyInput(p, p.inputs.shift()); }
       if (!p.alive || p.air) continue;
       // шаги: раз в ~0.35 с, если бежит
-      const mvd = p.lastP ? dist(p.p, p.lastP) : 0; if (mvd > 1.5) { p.mvDir = norm(sub(p.p, p.lastP)); p.stepT = (p.stepT || 0) + DT; if (p.stepT >= .35) { p.stepT = 0; p.step = 1; p.stepN = (p.stepN || 0) + 1; } } p.lastP = p.p;
+      const mvd = p.lastP ? dist(p.p, p.lastP) : 0; p.moving = mvd > 2; { const s_ = p.slots[p.cur]; p.bloom = Math.max(0, (p.bloom || 0) - (s_ ? WEAPONS[s_.w].rec : .5) * DT * (p.moving ? .5 : 1)); } if (mvd > 1.5) { p.mvDir = norm(sub(p.p, p.lastP)); p.stepT = (p.stepT || 0) + DT; if (p.stepT >= .35) { p.stepT = 0; p.step = 1; p.stepN = (p.stepN || 0) + 1; } } p.lastP = p.p;
       // огонь
       if (outZone(p.p, this.z)) { const d = zoneDps(this.z) * DT; this.damage(p, d, null, 0, true); p.fireAcc = (p.fireAcc || 0) + d; if (p.fireAcc >= 5) { p.hm.push([p.id, Math.round(p.fireAcc)]); p.fireAcc = 0; } }
       // автоподбор
@@ -214,16 +214,17 @@ export class World {
     let rt = this.tick;
     if (!p.bot) { let v = (this.tick & ~0xffff) + vt; if (v > this.tick) v -= 65536; rt = Math.max(this.tick - 6, Math.min(this.tick, v)); }
     const side = perp(p.aim);
-    const sk = p.bot ? (1.8 + (1 - p.skill) * 2.6) : 1;
+    const sk = p.bot ? (1.8 + (1 - p.skill) * 2.6) : 1, spr = curSpread(W, p.bloom || 0, p.moving);
     for (let k = 0; k < W.pel; k++) {
-      const sp = W.spread * sk * (W.pel > 1 ? (k / (W.pel - 1) - .5) * 2 + (this.rnd() - .5) * .3 : (this.rnd() - .5) * 2);
+      const sp = spr * sk * (W.pel > 1 ? (k / (W.pel - 1) - .5) * 2 + (this.rnd() - .5) * .3 : (this.rnd() - .5) * 2);
       const d = norm(add(p.aim, side, sp));
       const h = this.hitscan(p, d, W.range, rt);
       this.shots.push([p.id, s.w | (s.r << 4), h.end, p.p]);
-      const dmg = W.dmg * RMULT[s.r] * (W.pel > 1 ? Math.max(.35, 1 - h.dist / W.range * .6) : 1);
+      const dmg = W.dmg * RMULT[s.r] * (1 - W.fall * Math.max(0, (h.dist / W.range - .4) / .6)); // дальше — слабее
       if (h.pl) this.damage(h.pl, dmg, p, s.w);
       else if (h.obj && h.obj.hp) { h.obj.hp -= dmg; p.hm.push([255, Math.round(dmg)]); if (h.obj.hp <= 0) this.breakCrate(h.obj); }
     }
+    p.bloom = Math.min(W.maxB, (p.bloom || 0) + W.bloom); // отдача: следующий выстрел менее точный
     if (s.mag <= 0) this.startReload(p);
   }
   hitscan(p, d, range, rt) {
@@ -358,7 +359,7 @@ export class World {
       const sh = [];
       if (cam) { const heard = new Set(); for (const s of shots) { if (seen.has(s[0])) { if (dist(s[2], cam.p) < VIEWD + 300) sh.push(s); } else if (!heard.has(s[0]) && dist(s[3], cam.p) < HEAR * 1.8) { heard.add(s[0]); noise.push([2, s[3], [0, 0]]); } } }
       const hm = me ? me.hm.splice(0) : [];
-      const buf = new ArrayBuffer(42 + ents.length * 10 + sh.length * 6 + hm.length * 2 + noise.length * 7), dv = new DataView(buf); let o = 0;
+      const buf = new ArrayBuffer(46 + ents.length * 10 + sh.length * 6 + hm.length * 2 + noise.length * 7), dv = new DataView(buf); let o = 0;
       const u8 = v => dv.setUint8(o++, Math.max(0, Math.min(255, Math.round(v))));
       const u16 = v => { dv.setUint16(o, v, true); o += 2; };
       const v2 = p => { dv.setInt16(o, q16(p[0]), true); dv.setInt16(o + 2, q16(p[1]), true); o += 4; };
@@ -371,8 +372,8 @@ export class World {
         u8(P.hp); u8(P.armor); u8(P.cur);
         for (let i = 0; i < 2; i++) { const s = P.slots[i]; u8(s ? s.w | (s.r << 4) : 0); u8(s ? s.mag : 0); }
         for (let a = 0; a < 4; a++) u8(P.ammo[a]); u8(P.meds); u8((P.relT > 0 ? 1 : 0) | (P.healT > 0 ? 2 : 0));
-        const s = P.slots[P.cur]; u8(P.relT > 0 && s ? 255 * (1 - P.relT / WEAPONS[s.w].rel) : P.healT > 0 ? 255 * (1 - P.healT / 2.5) : 0); u8(P.kills);
-      } else o += 15;
+        const s = P.slots[P.cur]; u8(P.relT > 0 && s ? 255 * (1 - P.relT / WEAPONS[s.w].rel) : P.healT > 0 ? 255 * (1 - P.healT / 2.5) : 0); u8(P.kills); u8((P.bloom || 0) * 1000); u8(P.moving ? 1 : 0);
+      } else o += 17;
       u8(ents.length);
       for (const p of ents) { u8(p.id); v2(p.p); dv.setInt8(o++, i8(p.aim[0])); dv.setInt8(o++, i8(p.aim[1])); u8(p.hp); u8(1 | (p.armor > 0 ? 2 : 0) | (p.relT > 0 ? 4 : 0) | (p.healT > 0 ? 8 : 0) | (p.air << 4)); const s = p.slots[p.cur]; u8(s ? s.w | (s.r << 4) : 0); }
       u8(sh.length); for (const s of sh) { u8(s[0]); u8(s[1]); v2(s[2]); }

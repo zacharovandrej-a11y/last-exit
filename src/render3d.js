@@ -133,8 +133,11 @@ void main(){
     bunker: (w, h) => [[geo.box, 0x82827a, M(0, 13, 0, w, 26, h)], [geo.box, 0x6e6e66, M(0, 28, 0, w * .9, 4, h * .9)], [geo.box, 0x151515, M(0, 17, h / 2 + .6, w * .5, 4, 1)], [geo.box, 0xa8966e, M(0, 4, h / 2 + 4, w * 1.05, 8, 7)], [geo.box, 0x9c8a64, M(0, 11, h / 2 + 3.5, w * .9, 6, 6)]],
     barn: (w, h) => [[geo.box, 0x72302a, M(0, 23, 0, w, 46, h)], [geo.roof, 0x4e535a, M(0, 46, 0, w * 1.05, 28, h * 1.1)], [geo.box, 0xd6d2c8, M(0, 16, h / 2 + .6, 32, 32, 1.2)], [geo.box, 0x5a2520, M(0, 16, h / 2 + .9, 28, 28, 1.2)]],
     market: (w, h) => [[geo.box, 0xcfcac0, M(0, 26, 0, w, 52, h)], [geo.box, 0x7a2e38, M(0, 46, h / 2 + 1, w * .98, 9, 2)], [geo.box, 0x77726a, M(0, 53, 0, w * 1.01, 3, h * 1.01)], [geo.box, 0x34474f, M(0, 18, h / 2 + .6, w * .7, 22, 1.5)], [geo.box, 0x8e8a82, M(w * .3, 58, 0, 22, 9, 16)]],
-    car: (w, h) => [[geo.box, 'car', M(0, 8, 0, w, 9, h)], [geo.box, 'car', M(-w * .06, 15.5, 0, w * .52, 7, h * .9)], [geo.box, 0x26323a, M(-w * .06, 15.5, 0, w * .54, 5.4, h * .92)],
-      [geo.cyl10, 0x1c1c1c, MX(w * .3, 4.5, 0, 4.5, h * 1.02, 4.5)], [geo.cyl10, 0x1c1c1c, MX(-w * .3, 4.5, 0, 4.5, h * 1.02, 4.5)]],
+    car: (w, h) => [[geo.box, 'car', M(0, 15, 0, w, 16, h)], [geo.box, 'car', M(-w * .08, 30, 0, w * .5, 14, h * .86)], [geo.box, 0x26323a, M(-w * .08, 30, 0, w * .52, 9, h * .88)], [geo.box, 'car', M(-w * .08, 37.5, 0, w * .48, 1.5, h * .84)],
+      [geo.box, 0x1e1e1e, M(w / 2, 10, 0, 3, 7, h * .96)], [geo.box, 0x1e1e1e, M(-w / 2, 10, 0, 3, 7, h * .96)], [geo.box, 0xf2edd0, M(w / 2 + .6, 18, h * .3, 1, 4, 9)], [geo.box, 0xf2edd0, M(w / 2 + .6, 18, -h * .3, 1, 4, 9)], [geo.box, 0x9a1c1c, M(-w / 2 - .6, 18, h * .32, 1, 4, 8)], [geo.box, 0x9a1c1c, M(-w / 2 - .6, 18, -h * .32, 1, 4, 8)],
+      [geo.cyl10, 0x1c1c1c, MX(w * .32, 9, 0, 9, h * 1.04, 9)], [geo.cyl10, 0x1c1c1c, MX(-w * .3, 9, 0, 9, h * 1.04, 9)]],
+    truck: (w, h) => [[geo.box, 0x3d4a2a, M(w * .32, 24, 0, w * .3, 34, h)], [geo.box, 0x26323a, M(w * .45, 32, 0, w * .06, 12, h * .9)], [geo.box, 0x4a5233, M(-w * .15, 30, 0, w * .66, 40, h * 1.02)], [geo.box, 0x3a4228, M(-w * .15, 51, 0, w * .66, 3, h * 1.02)],
+      [geo.box, 0x1e1e1e, M(0, 9, 0, w, 6, h * .7)], [geo.cyl10, 0x1c1c1c, MX(w * .32, 10, 0, 10, h * 1.04, 10)], [geo.cyl10, 0x1c1c1c, MX(-w * .05, 10, 0, 10, h * 1.04, 10)], [geo.cyl10, 0x1c1c1c, MX(-w * .35, 10, 0, 10, h * 1.04, 10)]],
     crate: () => [[geo.box, 'crate', M(0, 13, 0, 26, 26, 26)]],
     furn: (w, h, o) => { const k = o.fk;
       if (k === 'bed') return [[geo.box, 0x5a4632, M(0, 5, 0, w, 10, h)], [geo.box, 0xcfc8b8, M(0, 11, h * .05, w * .9, 3, h * .8)], [geo.box, 0x6b7a5a, M(0, 11.5, h * .12, w * .92, 3, h * .5)], [geo.box, 0xe8e4da, M(0, 12.5, -h * .38, w * .7, 3, h * .14)]];
@@ -303,6 +306,10 @@ void main(){
     else if (w === 3) { b(METAL, 0, 0, 2, 2.4, 3, 8); tube(METAL, 0, .8, 13, .9, 16); tube(METAL, 0, -.9, 11, .8, 12); b(WOOD, 0, -.9, 11, 2.4, 2.4, 6); b(WOOD, 0, -.6, -6, 2.2, 3.8, 9); } // дробовик
     else if (w === 4) { b(METAL, 0, 0, 2, 2.4, 3, 10); tube(METAL, 0, .4, 17, .7, 20); tube(0x111111, 0, 3.2, 3, 1.4, 10); b(WOOD, 0, -.5, -7, 2.4, 4.2, 10); b(WOOD, 0, -1, 9, 2.6, 2.8, 6); b(METAL, 0, -3.4, 2, 1.8, 3, 2.4); } // снайперка
     else if (w === 5) { b(METAL, 0, 0, 2.5, 2.4, 3.6, 8); tube(METAL, 0, .6, 9, .7, 5); b(METAL, 0, -5, 3, 1.8, 8, 2.2, .1); b(METAL, 0, 0, -4, .8, 2.6, 6); b(POLY, 0, -3, -.5, 1.8, 4, 2.2, -.3); } // ПП
+    else if (w === 6) { b(METAL, 0, 0, 2, 2.4, 3, 10); tube(METAL, 0, .4, 14, .7, 14); tube(0x111111, 0, 3, 3, 1.1, 7); b(WOOD, 0, -.5, -6.5, 2.4, 4, 9); b(WOOD, 0, -.6, 9, 2.6, 2.6, 7); b(METAL, 0, -4, 3.5, 1.8, 5, 2.4, .2); } // винтовка
+    else if (w === 7) { b(POLY, 0, 0, 3, 3, 4, 12); tube(METAL, 0, .6, 15, .9, 12); b(0x3d4a2a, 2.4, -3, 4, 3.4, 5, 6); b(POLY, 0, -.3, -6, 2.4, 3.8, 8); b(METAL, 0, -4, 13, .6, 7, .6, .5); b(POLY, 0, 2.6, 6, 2, 1.4, 6); } // пулемёт
+    else if (w === 8) { b(METAL, 0, 1.4, 5, 1.6, 1.6, 8); tube(0x3a3a3a, 0, .6, 1.5, 1.6, 3.2); b(WOOD, 0, -2.4, -.5, 1.8, 5, 2.4, -.35); } // револьвер
+    else if (w === 9) { b(0x1e1e1e, 0, 0, 3, 2.4, 3.2, 9); b(0x1e1e1e, 0, 0, 10, 2.6, 2.6, 6); tube(METAL, 0, .4, 15, .6, 6); b(0x1e1e1e, 0, -3.8, 4, 1.8, 5, 2.6, .25); b(0x1e1e1e, 0, 0, -4.5, 2, 3, 6); b(0x111111, 0, 2.6, 3, 1.4, 2, 2.6); b(0xff3030, 0, 3.8, 3, .5, .5, .5); } // карабин
     if (rar > 0) b(new T.Color(RARITY[rar]).getHex(), 0, 0, band, 2.7, 3.2, 1.2); // полоска редкости
     return g;
   }
@@ -402,6 +409,12 @@ void main(){
   function plane() { const g = new T.Group(); const m = (gg, c, x, y, z, sx, sy, sz) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); g.add(o); return o; };
     const f = m(geo.cyl10, 0xdee2e6, 0, 0, 0, 14, 110, 14); f.rotation.x = Math.PI / 2; m(geo.box, 0xadb5bd, 0, 0, 5, 130, 3, 24); m(geo.box, 0xadb5bd, 0, 8, -48, 40, 3, 12); m(geo.box, 0xe03131, 0, 16, -50, 3, 22, 14); const n = m(geo.cone7, 0x4dabf7, 0, 0, 61, 13, 14, 13); n.rotation.x = Math.PI / 2;
     for (const s of [-1, 1]) { const e = m(geo.cyl10, 0x495057, s * 34, -6, 8, 6, 22, 6); e.rotation.x = Math.PI / 2; } return g; }
+  // метка под своим солдатом — тонкое кольцо на земле, видно и за стеной
+  const meRing = new T.Mesh(new T.RingGeometry(15, 17.5, 32), new T.MeshBasicMaterial({ color: 0xe9f5dc, transparent: true, opacity: .45, depthTest: false, depthWrite: false })); meRing.rotation.x = -Math.PI / 2; meRing.renderOrder = 5; meRing.visible = false; scene.add(meRing);
+  // пыль/искры там, куда попала пуля
+  const puffs = []; for (let i = 0; i < 30; i++) { const s = new T.Sprite(new T.SpriteMaterial({ map: smokeTex, depthWrite: false, transparent: true, color: 0xd8ccb0 })); s.visible = false; s.userData = { t: 9 }; scene.add(s); puffs.push(s); }
+  let puffI = 0; function puffAt(v) { const s = puffs[puffI++ % puffs.length]; s.position.copy(v); s.userData.t = 0; s.visible = true; }
+  let zoomCur = 1;
   const transport = plane(); transport.scale.setScalar(1.3); transport.traverse(o => { if (o.isMesh) o.castShadow = true; }); scene.add(transport);
   // ===== превью персонажа на старте =====
   let pvR = null, pvScene = null, pvCam = null, pvChar = null, pvCh = -1;
@@ -417,10 +430,10 @@ void main(){
   const VIEW = 470; // сколько единиц карты видно по короткой стороне экрана
   function resize(w, h) {
     W3 = w; H3 = h; renderer.setPixelRatio(HD ? Math.min(devicePixelRatio || 1, lowEnd ? 1.25 : 1.75) : Math.min(devicePixelRatio || 1, PIXH / Math.min(w, h))); renderer.setSize(w, h, false);
-    const asp = w / h; let hh, hw; if (asp >= 1) { hh = VIEW / 2; hw = hh * asp; } else { hw = VIEW / 2; hh = hw / asp; }
-    camera.left = -hw; camera.right = hw; camera.top = hh; camera.bottom = -hh; camera.updateProjectionMatrix();
+    applyFrustum();
   }
   const bufV = new T.Vector2(), SIN_EL = CAM_OFF.y / CAM_OFF.length();
+  function applyFrustum() { const asp = W3 / H3, v = VIEW * zoomCur; let hh, hw; if (asp >= 1) { hh = v / 2; hw = hh * asp; } else { hw = v / 2; hh = hw / asp; } camera.left = -hw; camera.right = hw; camera.top = hh; camera.bottom = -hh; camera.updateProjectionMatrix(); }
   function setCam(p) {
     // камеру двигаем шагами ровно в один пиксель картинки — так низкое разрешение не «дрожит» при движении
     if (!HD) { renderer.getDrawingBufferSize(bufV); const px = (camera.top - camera.bottom) / Math.max(1, bufV.y), a = Math.round(dot(p, CAM_R) / px) * px, b = Math.round(dot(p, CAM_F) / (px / SIN_EL)) * (px / SIN_EL); p = add(mul(CAM_R, a), CAM_F, b); }
@@ -439,7 +452,9 @@ void main(){
     return [tmpA.x + (tmpB.x - tmpA.x) * t, tmpA.z + (tmpB.z - tmpA.z) * t];
   }
   function frame(st) {
-    const { now, dt, objs, zone, plan, matchT, phase, loot, list, tracers, shipS, shipD, camP, inB } = st;
+    const { now, dt, objs, zone, plan, matchT, phase, loot, list, tracers, shipS, shipD, camP, inB, me, zoom } = st;
+    { const z = zoom || 1; if (Math.abs(z - zoomCur) > .002) { zoomCur += (z - zoomCur) * Math.min(1, dt * 4); applyFrustum(); } }
+    meRing.visible = !!me; if (me) meRing.position.set(me[0], 1, me[1]);
     if (worldBuilt !== objs) { buildWorld(objs); worldBuilt = objs; }
     setInside(inB ?? -1);
     setCam(camP);
@@ -468,9 +483,10 @@ void main(){
       if (ti >= tracerPool.length) break; const l = tracerPool[ti++]; const a = l.geometry.attributes.position;
       a.setXYZ(0, t.from[0], 24, t.from[1]); a.setXYZ(1, t.end[0], 24, t.end[1]);
       a.needsUpdate = true; l.material.opacity = Math.max(0, 1 - t.t / .12); l.material.color.set((t.wb & 15) === 4 ? 0xffffff : 0xffe066); l.visible = true;
-      if (t.t < dt * 1.5) flashAt(at(t.end, 24), 14);
+      if (t.t < dt * 1.5) { flashAt(at(t.end, 24), 10); puffAt(at(t.end, 22)); }
     }
     for (; ti < tracerPool.length; ti++) tracerPool[ti].visible = false;
+    for (const s of puffs) { if (!s.visible) continue; s.userData.t += dt; const k = s.userData.t / .45; if (k >= 1) { s.visible = false; continue; } s.scale.setScalar(6 + k * 18); s.material.opacity = .8 * (1 - k); s.position.y += dt * 12; }
     for (const s of flashes) { if (!s.visible) continue; s.userData.t += dt; const k = 1 - s.userData.t / .09; if (k <= 0) s.visible = false; else s.scale.setScalar(s.userData.size * (.6 + .4 * k)); }
     // языки пламени вдоль фронта — только рядом с камерой
     let fi = 0;

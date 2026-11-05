@@ -22,11 +22,11 @@ function blob(g, x, y, r, col) { g.fillStyle = col; g.beginPath(); g.arc(x, y, r
 function rr(g, x, y, w, h, r) { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); }
 const FLAME = mk(24, 30, g => { const gr = g.createRadialGradient(0, 4, 1, 0, 2, 13); gr.addColorStop(0, '#fff3bf'); gr.addColorStop(.35, '#ffd43b'); gr.addColorStop(.7, '#ff6b1a'); gr.addColorStop(1, 'rgba(255,60,0,0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(0, -14); g.quadraticCurveTo(10, 0, 0, 13); g.quadraticCurveTo(-10, 0, 0, -14); g.fill(); });
 function gunShape(g, w, len, col) {
-  const L = [0, .9, 1.6, 1.45, 2.1, 1.15][w] * len, T = w === 3 ? .34 : .26;
+  const L = [0, .9, 1.6, 1.45, 2.1, 1.15, 1.9, 1.8, 1.0, 1.4][w] * len, T = w === 3 || w === 7 ? .34 : .26;
   g.fillStyle = '#2b2b2b'; g.fillRect(len * .35, -len * T / 2, L, len * T);
   g.fillStyle = col; g.fillRect(len * .35, -len * T / 2, L * .35, len * T);
   if (w === 4) { g.fillStyle = '#111'; g.fillRect(len * .7, -len * .22, len * .55, len * .14); }
-  if (w === 2 || w === 5) { g.fillStyle = '#2b2b2b'; g.fillRect(len * .9, len * .1, len * .2, len * .35); }
+  if (w === 2 || w === 5 || w === 7 || w === 9) { g.fillStyle = '#2b2b2b'; g.fillRect(len * .9, len * .1, len * .2, len * .35); }
 }
 let VIG = null; // затемнение по краям экрана
 function resize() { dpr = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; CX = W / 2; CY = H / 2;
@@ -122,9 +122,9 @@ function sfx(type, vol = 1) {
   if (sound.last[type] && now - sound.last[type] < .03) return; sound.last[type] = now;
   try {
     const g = A.createGain(); g.connect(A.destination);
-    if (type >= 1 && type <= 5) { // выстрелы
-      const s = A.createBufferSource(); s.buffer = sound.noise; const f = A.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = [0, 2600, 1700, 900, 3800, 3200][type];
-      s.connect(f); f.connect(g); const d = [0, .09, .1, .22, .35, .06][type]; g.gain.setValueAtTime(.35 * vol, now); g.gain.exponentialRampToValueAtTime(.001, now + d); s.start(now); s.stop(now + d);
+    if (type >= 1 && type <= 9) { // выстрелы
+      const s = A.createBufferSource(); s.buffer = sound.noise; const f = A.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = [0, 2600, 1700, 900, 3800, 3200, 2000, 1500, 1200, 2400][type];
+      s.connect(f); f.connect(g); const d = [0, .09, .1, .22, .35, .06, .2, .09, .18, .08][type]; g.gain.setValueAtTime(.35 * vol, now); g.gain.exponentialRampToValueAtTime(.001, now + d); s.start(now); s.stop(now + d);
     } else { const o = A.createOscillator(); o.type = type === 'hit' ? 'square' : 'sine'; o.connect(g);
       const [f0, f1, d, v] = { hit: [900, 600, .05, .06], kill: [660, 1320, .25, .15], pick: [520, 880, .1, .08], dead: [400, 80, .6, .15], win: [520, 1560, .8, .15] }[type];
       o.frequency.setValueAtTime(f0, now); o.frequency.exponentialRampToValueAtTime(f1, now + d); g.gain.setValueAtTime(v * vol, now); g.gain.exponentialRampToValueAtTime(.001, now + d); o.start(now); o.stop(now + d); }
@@ -166,7 +166,7 @@ function onSnap(buf) {
   const tick = dv.getUint32(o, true); o += 4; const ph = u8(); const tm = dv.getUint16(o, true); o += 2;
   const ack = dv.getUint16(o, true); o += 2;
   const mid = u8(), cid = u8(), an = u8();
-  const pv = { hp: u8(), armor: u8(), cur: u8(), s: [[u8(), u8()], [u8(), u8()]], ammo: [u8(), u8(), u8(), u8()], meds: u8(), st: u8(), prog: u8(), kills: u8() };
+  const pv = { hp: u8(), armor: u8(), cur: u8(), s: [[u8(), u8()], [u8(), u8()]], ammo: [u8(), u8(), u8(), u8()], meds: u8(), st: u8(), prog: u8(), kills: u8(), bl: u8() / 1000, mv: u8() };
   phase = ph; timer = tm; aliveN = an; myId = mid; camId = cid; priv = pv;
   if (ph === 1) { const st = tm / 10; if (Math.abs(st - matchT) > .6) matchT = st; else matchT += (st - matchT) * .08; } // плавно, без рывков
   // часы сервера
@@ -309,7 +309,8 @@ function render(dt, now) {
   fx = fx.filter(f => f.t < 3);
   for (const t of tracers) { t.t += dt; if (!t.from) { const e = t.sid === myId && predP ? predP : ents[t.sid] && ents[t.sid].disp; t.from = e || t.end; if (ents[t.sid]) ents[t.sid].fireT = .1; } }
   const inB = phase >= 1 && target && !(meIn && myAir) ? bldAt(objs.blds, target) : -1;
-  G3.frame({ now, dt, objs, zone, plan, matchT, phase, loot, list, tracers, shipS, shipD, camP, inB });
+  const cw = meAlive && priv ? priv.s[priv.cur][0] & 15 : 0, zoom = cw && WEAPONS[cw].zoom || 1; // снайперка и винтовка — камера дальше
+  G3.frame({ now, dt, objs, zone, plan, matchT, phase, loot, list, tracers, shipS, shipD, camP, inB, me: meAlive ? target : null, zoom });
   tracers = tracers.filter(t => t.t < .12);
   // ===== 2D поверх 3D =====
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
@@ -334,13 +335,11 @@ function render(dt, now) {
     else if (m.k === 2 && m.t < 1.4) { const k = m.t / 1.4; ctx.globalAlpha = 1 - k; ctx.strokeStyle = '#ff922b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 8 + k * 34, 0, 6.2832); ctx.stroke();
       if (x < 0 || x > W || y < 0 || y > H) { const a = Math.atan2(y - CY, x - CX), r = Math.min(W, H) * .44; txt('💥', CX + Math.cos(a) * r, CY + Math.sin(a) * r + 6, 18); } else txt('💥', x, y + 6, 16); ctx.globalAlpha = 1; } }
   marks = marks.filter(m => m.t < 3);
-  // метка «я» под ногами — видно даже за стеной
-  if (meAlive) { const [x, y] = G3.project(target, 0); ctx.strokeStyle = 'rgba(105,219,124,.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(x, y, 16, 9, 0, 0, 6.2832); ctx.stroke(); }
   // цифры урона
   for (const n of nums) { n.t += dt; if (!n.p && ents[n.tid] && ents[n.tid].disp) n.p = ents[n.tid].disp; if (!n.p) continue; const [x, y, v] = G3.project(n.p, 60 + n.t * 50); if (!v) continue; ctx.globalAlpha = Math.max(0, 1 - n.t / .8); txt(String(n.d), x + 16, y, n.crate ? 13 : 18, n.tid === myId ? '#ff6b6b' : n.crate ? '#ffd8a8' : n.d >= 50 ? '#ffd43b' : '#fff'); ctx.globalAlpha = 1; }
   nums = nums.filter(n => n.t < .8);
   // прицельная линия (сенсор)
-  if (meAlive && (sticks.R || sticks.F) && myAim && priv) { const s = priv.s[priv.cur]; const w = s[0] & 15; if (w) { const a = G3.project(target, 24), b = G3.project(add(target, myAim, WEAPONS[w].range), 24); ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.setLineDash([6, 8]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.setLineDash([]); } }
+  if (meAlive && sticks.F && stickVec(sticks.F)[2] > .3 && myAim && priv) { const s = priv.s[priv.cur]; const w = s[0] & 15; if (w) { const a = G3.project(target, 24), b = G3.project(add(target, myAim, WEAPONS[w].range), 24); ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.setLineDash([6, 8]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.setLineDash([]); } }
   // пепел рядом с огнём
   if (phase >= 1 && !zone.pre && dist(camP, zone.c) > zone.rho - 220) { while (ash.length < 40) ash.push({ x: Math.random() * W, y: Math.random() * H, s: 1 + Math.random() * 2.5, v: 20 + Math.random() * 30 });
     for (const a of ash) { a.y += a.v * dt; a.x += Math.sin(now / 700 + a.s * 5) * 15 * dt; if (a.y > H) { a.y = -5; a.x = Math.random() * W; } ctx.fillStyle = a.s > 2.5 ? 'rgba(255,140,60,.8)' : 'rgba(200,200,200,.55)'; ctx.fillRect(a.x, a.y, a.s, a.s); } } else ash = [];
@@ -372,7 +371,7 @@ function hud(now, meAlive, mePos) {
   // лента убийств
   feed.forEach((f, i) => { const age = (now - f.t) / 1000; if (age > 7) return; ctx.globalAlpha = Math.min(1, 7 - age); const y = 74 + i * 21; const a = f.k >= 0 ? (names[f.k] ? names[f.k].n : '?') : '🔥', b = names[f.v] ? names[f.v].n : '?';
     let x = 10; const seg = (s, c) => { txt(s, x, y, 14, c, 'left', 800); x += ctx.measureText(s).width + 4; };
-    seg(a, f.k >= 0 ? COLORS[names[f.k] ? names[f.k].ch : 0] : '#ffa94d'); seg(f.w ? ['', '🔫', '🔫', '💥', '🎯', '🔫'][f.w] : '🔥', '#fff'); seg(b, COLORS[names[f.v] ? names[f.v].ch : 0]); ctx.globalAlpha = 1; });
+    seg(a, f.k >= 0 ? COLORS[names[f.k] ? names[f.k].ch : 0] : '#ffa94d'); seg(f.w ? ['', '🔫', '🔫', '💥', '🎯', '🔫', '🎯', '🔫', '🔫', '🔫'][f.w] : '🔥', '#fff'); seg(b, COLORS[names[f.v] ? names[f.v].ch : 0]); ctx.globalAlpha = 1; });
   // свой интерфейс
   if (meAlive && priv) {
     const bw = Math.min(260, W * .42), bx = CX - bw / 2, by = H - 24;
@@ -406,7 +405,8 @@ function hud(now, meAlive, mePos) {
       const fb = ui('fire'), fs = sticks.F, v = fs ? stickVec(fs) : [0, 0, 0], fx_ = fb.cx + v[0] * 26, fy_ = fb.cy - v[1] * 26;
       ctx.fillStyle = fs ? 'rgba(255,80,60,.75)' : 'rgba(0,0,0,.45)'; ctx.beginPath(); ctx.arc(fx_, fy_, fb.r, 0, 6.2832); ctx.fill(); ctx.strokeStyle = fs ? '#fff' : 'rgba(255,107,107,.9)'; ctx.lineWidth = 3; ctx.stroke();
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(fx_, fy_, fb.r * .38, 0, 6.2832); for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(fx_ + a * fb.r * .18, fy_ + b * fb.r * .18); ctx.lineTo(fx_ + a * fb.r * .62, fy_ + b * fb.r * .62); } ctx.stroke(); }
-    if (mouse.used && !touchUI) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 9, 0, 6.2832); ctx.moveTo(mouse.x - 14, mouse.y); ctx.lineTo(mouse.x - 5, mouse.y); ctx.moveTo(mouse.x + 5, mouse.y); ctx.lineTo(mouse.x + 14, mouse.y); ctx.moveTo(mouse.x, mouse.y - 14); ctx.lineTo(mouse.x, mouse.y - 5); ctx.moveTo(mouse.x, mouse.y + 5); ctx.lineTo(mouse.x, mouse.y + 14); ctx.stroke(); }
+    if (mouse.used && !touchUI) { const cw = priv.s[priv.cur][0] & 15, me2 = G3.project(mePos, 24), dpx = Math.hypot(mouse.x - me2[0], mouse.y - me2[1]), cr = cw ? Math.max(7, Math.min(70, Math.tan(curSpread(WEAPONS[cw], priv.bl, priv.mv)) * dpx)) : 9;
+      ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(mouse.x, mouse.y, cr, 0, 6.2832); ctx.stroke(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 2, 0, 6.2832); ctx.moveTo(mouse.x - 14, mouse.y); ctx.lineTo(mouse.x - 5, mouse.y); ctx.moveTo(mouse.x + 5, mouse.y); ctx.lineTo(mouse.x + 14, mouse.y); ctx.moveTo(mouse.x, mouse.y - 14); ctx.lineTo(mouse.x, mouse.y - 5); ctx.moveTo(mouse.x, mouse.y + 5); ctx.lineTo(mouse.x, mouse.y + 14); ctx.stroke(); }
   }
   // экраны
   if (phase === 0 && started) {
