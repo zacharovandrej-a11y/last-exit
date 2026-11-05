@@ -97,10 +97,10 @@ const OT = {
   tree: { s: 0, col: '#2f9e44', c2: '#237a33' }, pine: { s: 0, col: '#2b8a3e', c2: '#1b5e2a' },
   rock: { s: 0, col: '#8d8f96', c2: '#6e7078' }, hay: { s: 0, col: '#e7c14a', c2: '#c79f2c' },
   cactus: { s: 0, col: '#5c940d', c2: '#3f6b08' }, snowman: { s: 0, col: '#ffffff', c2: '#ced4da' },
-  house: { s: 1, col: '#e8e2d0', c2: '#d9534f' }, house2: { s: 1, col: '#f2d7a0', c2: '#3d7ec7' },
+  house: { s: 0, col: '#e8e2d0', c2: '#d9534f' }, house2: { s: 1, col: '#f2d7a0', c2: '#3d7ec7' },
   bunker: { s: 1, col: '#6b7048', c2: '#4e5334' }, barn: { s: 1, col: '#b5442e', c2: '#7a2b1c' },
   market: { s: 1, col: '#d6dbe0', c2: '#e94e77' }, car: { s: 1, col: '#3d8bd9', c2: '#2a6ab0' },
-  crate: { s: 1, col: '#c08a45', c2: '#7b5528', hp: 45 }, wall: { s: 1, col: '#868e96', c2: '#5c636a' },
+  crate: { s: 0, col: '#c08a45', c2: '#7b5528', hp: 45 }, wall: { s: 1, col: '#868e96', c2: '#5c636a' },
   igloo: { s: 0, col: '#e7f5ff', c2: '#a5d8ff' }, tent: { s: 1, col: '#c9a26b', c2: '#8f6d3e' },
 };
 function genWorld() {
