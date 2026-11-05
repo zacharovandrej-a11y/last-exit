@@ -43,15 +43,40 @@ const AMMO_COL = ['#ffd43b', '#ff922b', '#ff6b6b', '#74c0fc'];
 const AMMO_PACK = [24, 30, 10, 6];
 const AMMO_MAX = [200, 200, 60, 40];
 
-// ===== Волна кометы =====
-const COMET_T0 = 25; // секунд спокойствия до удара
-const WAVE = [[.5, 18, 14], [1.0, 18, 14], [1.57, 18, 14], [2.1, 18, 12], [2.55, 16, 12], [2.88, 14, 10], [3.06, 12, 8], [Math.PI, 12, 0]];
-function waveTheta(t) {
-  t -= COMET_T0; if (t < 0) return 0; let th = 0;
-  for (const [to, dur, pause] of WAVE) { if (t < dur) return th + (to - th) * t / dur; t -= dur; th = to; if (t < pause) return th; t -= pause; }
-  return Math.PI;
+// ===== Высадка и зона =====
+const DROP_T = 14;   // секунд летит транспорт над планетой
+const SHIP_V = 210;  // скорость транспорта
+const FALL_T = 2.6;  // секунд на парашюте
+const COMET_T0 = 32; // удар кометы (от начала матча)
+// этапы: [угловой радиус безопасной зоны, секунд движения, пауза]
+const ZONE = [[2.64, 18, 14], [2.14, 18, 14], [1.57, 18, 14], [1.04, 18, 12], [.6, 16, 12], [.28, 14, 10], [.09, 12, 8], [0, 12, 0]];
+// центры зон: первые три — точка напротив удара, дальше каждый круг смещается внутри прошлого
+function makePlan(rnd, comet) {
+  let c = mul(comet, -1); const cs = [];
+  for (let k = 0; k < ZONE.length; k++) {
+    if (k >= 3 && k < ZONE.length - 1) {
+      const d = (ZONE[k - 1][0] - ZONE[k][0]) * (.35 + .55 * rnd()), u = anyTang(c), v = cross(c, u), a = rnd() * 6.2832;
+      c = moveOn(c, norm(add(mul(u, Math.cos(a)), v, Math.sin(a))), d * R)[0];
+    }
+    cs.push(c);
+  }
+  return cs;
 }
-const waveDps = th => 4 + th * 5;
+function zoneAt(t, comet, cs) {
+  let c = mul(comet, -1), rho = Math.PI; t -= COMET_T0;
+  if (t < 0 || !cs) return { c, rho, k: 0, mv: 0, left: -t, pre: 1 };
+  for (let k = 0; k < ZONE.length; k++) {
+    const [r, dur, pause] = ZONE[k];
+    if (t < dur) { const f = t / dur; return { c: slerpN(c, cs[k], f), rho: rho + (r - rho) * f, k, mv: 1, left: dur - t }; }
+    t -= dur; c = cs[k]; rho = r;
+    if (t < pause) return { c, rho, k: k + 1, mv: 0, left: pause - t };
+    t -= pause;
+  }
+  return { c, rho: 0, k: ZONE.length, mv: 0, left: 0 };
+}
+const zoneDps = rho => 5 + (Math.PI - rho) * 5;
+const outZone = (p, z) => z.rho < Math.PI && angDist(p, z.c) > z.rho;
+const shipPos = (S, D, t) => moveOn(S, D, SHIP_V * Math.max(0, Math.min(DROP_T, t)), D);
 
 // ===== Мир (одинаковый у сервера и клиента) =====
 const BIOMES = [
