@@ -35,6 +35,24 @@ function capPath(c, th, n = 72) {
   return pts;
 }
 function poly(pts) { ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); }
+let MB = null, MKB = null, RT = null;
+const BC = BIOMES.map(b => { const n = parseInt(b.col.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255, Math.cos(b.r)]; });
+function buildMasks() {
+  const cell = Math.max(5, Math.ceil(Math.max(W, H) / 150)), mw = Math.ceil(W / cell), mh = Math.ceil(H / cell);
+  if (!MB || MB.width !== mw || MB.height !== mh) { MB = document.createElement('canvas'); MKB = document.createElement('canvas'); MB.width = MKB.width = mw; MB.height = MKB.height = mh; MB.g = MB.getContext('2d'); MKB.g = MKB.getContext('2d'); MB.im = MB.g.createImageData(mw, mh); MKB.im = MKB.g.createImageData(mw, mh); }
+  if (!RT || RT.hr !== HR) { RT = new Float32Array(513); RT.hr = HR; let a = 0; for (let i = 0; i <= 512; i++) { const r = i / 512 * HR; while (a < AH && rhoA(a) * Z < r) a += AH / 4000; RT[i] = Math.min(a, AH); } }
+  const bd = MB.im.data, kd = MKB.im.data, burn = phase >= 1 && zone.rho < Math.PI, zc = zone.c, cz = Math.cos(zone.rho);
+  const cb = BIOMES.map(b => dot(b.c, CP) > Math.cos(AH + b.r + .05));
+  for (let j = 0; j < mh; j++) for (let i = 0; i < mw; i++) {
+    const o = (j * mw + i) * 4, dx = (i + .5) * cell - CX, dy = CY - (j + .5) * cell, rr = Math.hypot(dx, dy);
+    bd[o + 3] = 0; kd[o + 3] = 0; if (rr > HR + cell) continue;
+    const a = RT[Math.min(512, Math.round(rr / HR * 512))], sa = Math.sin(a), ca = Math.cos(a), ux = rr ? dx / rr : 0, uy = rr ? dy / rr : 0;
+    const q0 = CP[0] * ca + (CR[0] * ux + CF[0] * uy) * sa, q1 = CP[1] * ca + (CR[1] * ux + CF[1] * uy) * sa, q2 = CP[2] * ca + (CR[2] * ux + CF[2] * uy) * sa;
+    for (let k = 0; k < BC.length; k++) { if (!cb[k]) continue; const b = BIOMES[k].c; if (q0 * b[0] + q1 * b[1] + q2 * b[2] > BC[k][3]) { bd[o] = BC[k][0]; bd[o + 1] = BC[k][1]; bd[o + 2] = BC[k][2]; bd[o + 3] = 255; break; } }
+    if (burn && q0 * zc[0] + q1 * zc[1] + q2 * zc[2] < cz) { kd[o] = 28; kd[o + 1] = 10; kd[o + 2] = 8; kd[o + 3] = 205; }
+  }
+  MB.g.putImageData(MB.im, 0, 0); MKB.g.putImageData(MKB.im, 0, 0);
+}
 function inPoly(pts, x, y) { let c = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const a = pts[i], b = pts[j]; if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; }
 // заливка «шапки» сферы (центр c, угловой радиус th): контур прижат к горизонту, сторону выбираем по пробной точке
 function fillRegion(pts, cx, cy, r, tp, style) {
@@ -176,7 +194,7 @@ function drawBill(img, x, y, wpx, ay, rot, alpha, shw) {
 }
 function drawCharArt(g, x, y, r, ang, ch, wb, o = {}) {
   const im = CHV[ch % 10], h = r * 4.3, w = h * im.width / im.height;
-  const flip = !o.dead && Math.cos(ang) < 0, walk = o.walk || 0;
+  const flip = o.flip !== undefined ? o.flip : (!o.dead && Math.cos(ang) < 0), walk = o.walk || 0;
   const bob = Math.abs(Math.sin(walk)) * r * .22, tl = Math.sin(walk) * .07;
   g.save(); g.translate(x, y); g.rotate(o.rot || 0); if (o.scale) g.scale(o.scale, o.scale);
   g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(0, 0, w * .42, r * .5, 0, 0, 6.2832); g.fill();
@@ -273,6 +291,7 @@ function layout() {
     { id: 'pick', x: CX - s * .7, y: by - s * 1.85, w: s * 1.4, h: s * .95 },
     { id: 'map', x: W - 130, y: 6, w: 124, h: 124 },
     { id: 'spec', x: CX + 90, y: H - 64, w: 56, h: 44 },
+    { id: 'restart', x: CX - 146, y: H - 64, w: 56, h: 44 },
     { id: 'jump', x: CX - 50, y: H - 110, w: 100, h: 80 },
   ];
 }
@@ -284,6 +303,7 @@ function uiHit(x, y) {
     if (b.id === 'jump' && myAir === 1 && phase === 1 && !dead) { wantJump = true; return true; }
     const alive = myId !== 255 && ents[myId] && phase === 1 && !dead && !myAir;
     if (b.id === 'spec' && !alive && phase === 1) { specNext(); return true; }
+    if (b.id === 'restart' && !alive && phase >= 1 && lobbyNames.length === 1) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'restart' })); return true; }
     if (!alive) continue;
     if (b.id === 'slot0') wantSlot = 0; else if (b.id === 'slot1') wantSlot = 1; else if (b.id === 'heal') wantHeal = true; else if (b.id === 'reload') wantReload = true; else if (b.id === 'pick') { if (!pickShow) continue; wantPick = true; }
     return true;
@@ -471,7 +491,7 @@ function render(dt, now) {
     const k = 190 / IMG.grass.width; GPAT.setTransform(new DOMMatrix([k * Z, 0, 0, k * Z, CX + gOff[0] * Z, CY + gOff[1] * Z]));
     ctx.fillStyle = GPAT; ctx.fillRect(0, 0, W, H); }
   lastCam = camP; lastCR = CR; lastCF = CF;
-  for (const b of BIOMES) if (dot(b.c, CP) > Math.cos(AH + b.r)) { fillCap(b.c, b.r, b.col); ctx.strokeStyle = b.col; ctx.globalAlpha = .5; ctx.lineWidth = 14 * Z; ctx.beginPath(); poly(capPath(b.c, b.r)); ctx.stroke(); ctx.globalAlpha = 1; }
+  buildMasks(); ctx.imageSmoothingEnabled = true; ctx.drawImage(MB, 0, 0, W, H);
   // декор
   for (const d of deco) { if (dot(d.p, CP) < visCos || (GPATCH && d.t === 'tuft')) continue; const q = P(d.p); if (!q) continue; const s = q[3] / SS; const sp = decoSpr(d.t, d.v); ctx.drawImage(sp, q[0] - sp.width * s / 2, q[1] - sp.height * s / 2, sp.width * s, sp.height * s); }
   // лут
@@ -492,7 +512,7 @@ function render(dt, now) {
   ctx.fillStyle = rim; ctx.fillRect(0, 0, W, H);
   // ===== огонь кометы =====
   if (zone.rho < Math.PI) {
-    fillCap(mul(zone.c, -1), Math.PI - zone.rho, 'rgba(28,10,8,.8)');
+    ctx.drawImage(MKB, 0, 0, W, H);
     ctx.globalCompositeOperation = 'lighter';
     for (const d of deco) { if (d.v === 1 || dot(d.p, CP) < visCos || !outZone(d.p, zone)) continue; const q = P(d.p); if (!q) continue; const s = q[3] / SS * 1.4, ew = EMBER.width * s; ctx.globalAlpha = .5 + .5 * Math.sin(now / 400 + d.a * 9); ctx.drawImage(EMBER, q[0] - ew / 2, q[1] - ew / 2, ew, ew); }
     ctx.globalAlpha = 1;
@@ -557,7 +577,8 @@ function render(dt, now) {
     if (air === 2) { bills.push({ y: sp[1] + 1e4, f: () => drawChute(sp[0], sp[1], r, ang, names[id] ? names[id].ch : +id, now) }); continue; }
     bills.push({ y: sp[1], f: () => {
     if (+id === myId) { ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(sp[0], sp[1] + (artReady ? 0 : r * .2), r * 1.55, artReady ? r * .7 : r * 1.35, 0, 0, 6.2832); ctx.stroke(); }
-    drawChar(ctx, sp[0], sp[1], r, ang, names[id] ? names[id].ch : +id, s.wb, { rot: artReady ? tilt(sp[0], sp[1]) : 0, walk: e.walk, hit: e.hitT > 0, armor: s.fl & 2, blink: ((blinkT + +id * 1.3) % 3.2) < .12 });
+    { const cs = Math.cos(ang); if (e.flip === undefined) e.flip = cs < 0; else if (cs < -.25) e.flip = true; else if (cs > .25) e.flip = false; }
+    drawChar(ctx, sp[0], sp[1], r, ang, names[id] ? names[id].ch : +id, s.wb, { flip: e.flip, rot: artReady ? tilt(sp[0], sp[1]) : 0, walk: e.walk, hit: e.hitT > 0, armor: s.fl & 2, blink: ((blinkT + +id * 1.3) % 3.2) < .12 });
     if (s.fl & 8) { ctx.strokeStyle = '#ff6b6b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(sp[0], sp[1], r * 1.6, -1.57, -1.57 + 6.2832 * ((now / 1000) % 1)); ctx.stroke(); }
     if (+id !== myId || !meAlive) { const nm = names[id] ? names[id].n : ''; ctx.font = `bold ${Math.round(11 * Math.max(.8, sp[3]))}px system-ui`; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillText(nm, sp[0] + 1, sp[1] - hh - 11); ctx.fillStyle = '#fff'; ctx.fillText(nm, sp[0], sp[1] - hh - 12);
       ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(sp[0] - r, sp[1] - hh - 8, r * 2, 4); ctx.fillStyle = s.hp > 40 ? '#51cf66' : '#ff6b6b'; ctx.fillRect(sp[0] - r, sp[1] - hh - 8, r * 2 * s.hp / 100, 4); }
@@ -681,8 +702,10 @@ function hud(now, meAlive, mePos) {
       if (w) { ctx.save(); ctx.translate(b.x + b.w * .12, b.y + b.h * .38); gunShape(ctx, w, b.h * .36, RARITY[r]); ctx.restore();
         const Wp = WEAPONS[w]; txt(s[1] + ' / ' + priv.ammo[Wp.ammo], b.x + b.w / 2, b.y + b.h - 6, 12, s[1] ? '#fff' : '#ff6b6b', 'center', 800); }
     }
+    if (!touchUI) { for (let i = 0; i < 2; i++) { const b = ui('slot' + i); txt(String(i + 1), b.x + 9, b.y + 15, 12, '#ffd43b', 'center', 800); } }
     const hb = ui('heal'); btn(hb, priv.meds ? '#ff6b6b' : null); txt('✚' + priv.meds, hb.x + hb.w / 2, hb.y + hb.h * .66, 18, priv.meds ? '#ff8787' : '#666');
     const rb = ui('reload'); btn(rb, null); txt('⟳', rb.x + rb.w / 2, rb.y + rb.h * .7, 24, '#fff');
+    if (!touchUI) { txt('Q', hb.x + 9, hb.y + 15, 12, '#ffd43b', 'center', 800); txt('R', rb.x + 9, rb.y + 15, 12, '#ffd43b', 'center', 800); }
     if (priv.st) { const k = priv.prog / 255; ctx.strokeStyle = priv.st & 2 ? '#ff6b6b' : '#fff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(CX, CY, 30, -1.57, -1.57 + 6.2832 * k); ctx.stroke(); }
     // кнопка подобрать
     pickShow = null; let bd = 1e9; for (const it of loot.values()) { const d = angDist(it.p, mePos) * R; if (d < PR + 30 && d < bd && it.k === 0) { bd = d; pickShow = it; } }
@@ -711,7 +734,7 @@ function hud(now, meAlive, mePos) {
   if (meIn && myAir === 2) { drawStick(sticks.L, 'rgba(255,255,255,.65)'); if (touchUI && !sticks.L) ghostStick(W * .16, H * .68); }
   if (phase >= 1 && !meAlive && !(meIn && myAir)) {
     if (dead && (now - dead.t) < 2600) { const k = Math.min(1, (now - dead.t) / 300); ctx.fillStyle = `rgba(30,0,0,${.45 * k})`; ctx.fillRect(0, 0, W, H); txt('💀 #' + dead.place, CX, H * .42, 56 * k); }
-    else if (!endInfo) { txt('👁 ' + (names[camId] ? names[camId].n : ''), CX, H - 34, 18); const b = ui('spec'); btn(b, '#fff'); txt('⏭', b.x + b.w / 2, b.y + b.h * .7, 22); if (dead) txt('#' + dead.place, 40, H - 30, 22, '#ffd43b'); }
+    else if (!endInfo) { txt('👁 ' + (names[camId] ? names[camId].n : ''), CX, H - 34, 18); const b = ui('spec'); btn(b, '#fff'); txt('⏭', b.x + b.w / 2, b.y + b.h * .7, 22); if (lobbyNames.length === 1) { const rb = ui('restart'); btn(rb, '#ffd43b'); txt('↻', rb.x + rb.w / 2, rb.y + rb.h * .72, 26, '#ffd43b'); } if (dead) txt('#' + dead.place, 40, H - 30, 22, '#ffd43b'); }
   }
   if (endInfo) {
     const t = (now - endInfo.t) / 1000, k = Math.min(1, t / .5);
@@ -719,6 +742,7 @@ function hud(now, meAlive, mePos) {
     const win = endInfo.w === myId && myId !== 255;
     txt(win ? '🚀 ПОБЕДА!' : '🚀 ' + (names[endInfo.w] ? names[endInfo.w].n : ''), CX, H * .35, (win ? 58 : 40) * k, win ? '#ffd43b' : '#fff');
     if (!win && dead) txt('#' + dead.place, CX, H * .35 + 50, 30 * k);
+    if (lobbyNames.length === 1) { const rb = ui('restart'); btn(rb, '#ffd43b'); txt('↻', rb.x + rb.w / 2, rb.y + rb.h * .72, 26, '#ffd43b'); }
   }
   if (!ws || ws.readyState !== 1) { if (started) txt('📡 …', CX, H / 2, 30); }
   if (PERF) { ctx.font = '12px monospace'; ctx.textAlign = 'left'; ctx.fillStyle = '#0f0'; ctx.fillText(`${fps} fps · ${snapRate} snap/s · pend ${pending.length} · ents ${Object.keys(ents).length}`, 8, H - 8); }

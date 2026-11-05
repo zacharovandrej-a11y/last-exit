@@ -59,6 +59,8 @@ export class World {
         this.send(c, JSON.stringify({ t: 'hi' }));
         if (this.phase > 0) this.send(c, JSON.stringify(this.matchMsg()));
         this.lobbyList();
+      } else if (m.t === 'restart' && this.phase !== 0 && [...this.clients].filter(x => x.name).length === 1) { // один человек — можно перезапустить сразу
+        this.toLobby(); this.lobbyT = 3 * TICK; this.sendAll({ t: 'lobby' }); this.lobbyList();
       } else if (m.t === 'spec' && !(c.pl && c.pl.alive)) {
         const alive = this.players.filter(p => p.alive); if (alive.length) { const i = alive.findIndex(p => p.id === c.spec); c.spec = alive[(i + 1) % alive.length].id; }
       }
@@ -127,7 +129,7 @@ export class World {
     this.tick++;
     if (this.phase === 0) {
       const n = [...this.clients].filter(c => c.name).length;
-      if (n > 0) { if (this.lobbyT < 0) this.lobbyT = 15 * TICK; if (n >= MAXP) this.lobbyT = Math.min(this.lobbyT, 4 * TICK); if (--this.lobbyT <= 0) this.startMatch(); }
+      if (n > 0) { if (this.lobbyT < 0) this.lobbyT = (n === 1 ? 5 : 15) * TICK; if (n >= MAXP) this.lobbyT = Math.min(this.lobbyT, 4 * TICK); if (--this.lobbyT <= 0) this.startMatch(); }
       else this.lobbyT = -1;
     } else if (this.phase === 1) this.play();
     else if (this.phase === 2) { if (--this.endT <= 0) { this.toLobby(); this.sendAll({ t: 'lobby' }); this.lobbyList(); } }
@@ -184,7 +186,7 @@ export class World {
     else {
       const empty = p.slots.findIndex(s => !s);
       if (empty >= 0) { p.slots[empty] = { w: it.x, r: it.r, mag: it.n }; p.cur = empty; p.relT = 0; }
-      else if (manual) { const old = p.slots[p.cur]; p.slots[p.cur] = { w: it.x, r: it.r, mag: it.n }; p.relT = 0; this.delLoot(it); this.dropNear({ k: 0, x: old.w, r: old.r, n: old.mag }, p.p, this.rnd); return; }
+      else if (manual) { const old = p.slots[p.cur]; p.slots[p.cur] = { w: it.x, r: it.r, mag: it.n }; p.relT = 0; this.delLoot(it); this.dropNear({ k: 0, x: old.w, r: old.r, n: old.mag, by: p.id }, p.p, this.rnd); return; }
       else return;
     }
     this.delLoot(it);
@@ -203,7 +205,7 @@ export class World {
     let rt = this.tick;
     if (!p.bot) { let v = (this.tick & ~0xffff) + vt; if (v > this.tick) v -= 65536; rt = Math.max(this.tick - 6, Math.min(this.tick, v)); }
     const side = cross(p.aim, p.p);
-    const sk = p.bot ? (1 + (1 - p.skill) * 2.2) : 1;
+    const sk = p.bot ? (1.8 + (1 - p.skill) * 2.6) : 1;
     for (let k = 0; k < W.pel; k++) {
       const sp = W.spread * sk * (W.pel > 1 ? (k / (W.pel - 1) - .5) * 2 + (this.rnd() - .5) * .3 : (this.rnd() - .5) * 2);
       const d = norm(add(p.aim, side, sp));
@@ -262,24 +264,24 @@ export class World {
       b.think = 4 + Math.floor(rnd() * 4);
       let best = null, bd = 1e9;
       for (const q of this.players) if (q.alive && q !== b && !q.air) { const d = angDist(q.p, b.p) * R; if (d < bd) { bd = d; best = q; } }
-      b.target = best && bd < 560 ? best : null; b.tdist = bd;
+      const early = this.t < COMET_T0 + 25, eng = early ? 220 + b.skill * 120 : 380 + b.skill * 120; // в начале боты больше собирают лут, чем дерутся
+      const nt = best && bd < eng ? best : null; if (nt && nt !== b.target) b.react = Math.round((.5 + (1 - b.skill) * .8) * TICK); b.target = nt; b.tdist = bd;
       if (b.target) { const h = this.hitscan(b, tang(b.p, b.target.p), Math.min(bd + 10, 900), this.tick); b.los = h.pl === b.target; }
       // лучшее оружие по ситуации
-      let bs = b.cur, bv = -1;
-      b.slots.forEach((s, i) => { if (!s) return; const X = WEAPONS[s.w]; if (s.mag <= 0 && b.ammo[X.ammo] <= 0) return; const v = (bd < X.range ? 1 : .3) * X.dmg * X.pel * X.rate * RMULT[s.r]; if (v > bv) { bv = v; bs = i; } });
-      if (bs !== b.cur && b.slots[bs]) { b.cur = bs; b.relT = 0; b.cdT = .3; }
+      const val = s => { if (!s) return -1; const X = WEAPONS[s.w]; if (s.mag <= 0 && b.ammo[X.ammo] <= 0) return 0; return (bd < X.range * .9 ? 1 : .3) * X.dmg * X.pel * X.rate * RMULT[s.r]; };
+      const o = 1 - b.cur; if (b.slots[o] && this.t > (b.swT || 0) && val(b.slots[o]) > val(b.slots[b.cur]) * 1.3) { b.cur = o; b.relT = 0; b.cdT = .3; b.swT = this.t + 3; }
       // цель-лут
       b.goal = null;
       if (!b.target || !b.los) {
         let gd = 1e9;
         for (const it of this.loot.values()) {
           const d = angDist(it.p, b.p) * R; if (d > 650 || d > gd) continue;
-          const want = it.k === 0 ? (!b.slots[1] || it.r > Math.min(...b.slots.map(s => s ? s.r : -1))) : it.k === 1 ? b.ammo[it.x] < 40 && b.slots.some(s => s && WEAPONS[s.w].ammo === it.x) : it.k === 2 ? b.meds < 3 : b.armor < 50;
+          const want = it.by === b.id ? false : it.k === 0 ? (!b.slots[1] || it.r > Math.min(...b.slots.map(s => s ? s.r : -1))) : it.k === 1 ? b.ammo[it.x] < 40 && b.slots.some(s => s && WEAPONS[s.w].ammo === it.x) : it.k === 2 ? b.meds < 3 : b.armor < 50;
           if (want && !(this.z.rho < Math.PI && angDist(it.p, this.z.c) > this.z.rho - .1)) { gd = d; b.goal = it; }
         }
       }
     }
-    const t = b.target && b.target.alive ? b.target : null;
+    const t = b.target && b.target.alive && b.los ? b.target : null; // не видит — не гонится, а занимается своим
     let mv = null, fire = false;
     const z = this.z, nz = !z.mv && z.k < ZONE.length && !z.pre ? { c: this.plan[z.k], rho: ZONE[z.k][0] } : z;
     const danger = z.rho < Math.PI && angDist(b.p, z.c) > z.rho - .2;
@@ -288,8 +290,9 @@ export class World {
       const to = tang(b.p, t.p); const err = (1 - b.skill) * .25 * Math.sin(this.t * 2.3 + b.id);
       b.aim = norm(add(to, cross(to, b.p), err));
       const range = W ? W.range : 300;
-      if (!danger) { const sd = cross(to, b.p); const want = range * .55; mv = norm(add(mul(to, b.tdist > want ? 1 : -.4), sd, b.side * .9)); if (rnd() < .01) b.side *= -1; }
-      if (W && b.los && b.tdist < range * .95 && rnd() < .55 + b.skill * .4) fire = true;
+      if (!danger) { if (!b.los) mv = to; else { const sd = cross(to, b.p); const want = range * .55; mv = norm(add(mul(to, b.tdist > want ? 1 : -.4), sd, b.side * .7)); if (rnd() < .006) b.side *= -1; } }
+      if (b.react > 0) b.react--;
+      else if (W && b.los && b.tdist < range * .95 && rnd() < (this.t < COMET_T0 + 25 ? .16 : .22) + b.skill * .25) fire = true;
     } else if (!danger && b.goal) { if (this.loot.has(b.goal.id)) { mv = tang(b.p, b.goal.p); if (angDist(b.goal.p, b.p) * R < PR + 26) this.pickup(b, b.goal, true); } else b.think = 0; }
     else if (!mv) { if (!b.wp || angDist(b.wp, b.p) < .05 || rnd() < .004) b.wp = nearPt(rnd, z.rho < Math.PI ? nz.c : b.p, Math.min(.7, Math.max(.05, nz.rho * .7))); mv = tang(b.p, b.wp); }
     if (!t && b.hp < 60 && b.meds > 0 && !danger) { this.startHeal(b); mv = null; }
@@ -299,7 +302,7 @@ export class World {
       const np = stepMove(this.objs, b.p, mv, (b.healT > 0 ? .5 : .92));
       if (angDist(np, b.p) * R < SPEED * DT * .3) b.stuck = 12; b.p = np;
     }
-    if (!t) b.aim = mv ? tang(b.p, mv) : tang(b.p, b.aim); else b.aim = tang(b.p, b.aim);
+    if (!t) b.aim = mv ? tang(b.p, slerpN(b.aim, tang(b.p, mv), .15)) : tang(b.p, b.aim); else b.aim = tang(b.p, b.aim);
     if (fire) this.fire(b, 0);
   }
   // ===== Рассылка =====

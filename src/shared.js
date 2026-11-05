@@ -31,11 +31,11 @@ function nearPt(rnd, c, r) { const u = anyTang(c), v = cross(c, u); const a = rn
 // ammo: 0 лёгкие, 1 тяжёлые, 2 дробь, 3 снайперские
 const WEAPONS = [
   null,
-  { n: 'Пистолет', dmg: 17, rate: 3.2, mag: 12, rel: 1.1, range: 480, spread: .035, ammo: 0, pel: 1, auto: false },
-  { n: 'Автомат', dmg: 12, rate: 9, mag: 30, rel: 1.9, range: 560, spread: .075, ammo: 1, pel: 1, auto: true },
-  { n: 'Дробовик', dmg: 9, rate: 1.1, mag: 5, rel: 2.3, range: 270, spread: .30, ammo: 2, pel: 8, auto: false },
-  { n: 'Снайперка', dmg: 82, rate: .75, mag: 4, rel: 2.6, range: 1150, spread: .004, ammo: 3, pel: 1, auto: false },
-  { n: 'ПП', dmg: 9, rate: 13, mag: 35, rel: 1.6, range: 400, spread: .11, ammo: 0, pel: 1, auto: true },
+  { n: 'Пистолет', dmg: 14, rate: 2.6, mag: 12, rel: 1.1, range: 480, spread: .035, ammo: 0, pel: 1, auto: false },
+  { n: 'Автомат', dmg: 9, rate: 7, mag: 30, rel: 1.9, range: 560, spread: .075, ammo: 1, pel: 1, auto: true },
+  { n: 'Дробовик', dmg: 7, rate: 1, mag: 5, rel: 2.3, range: 270, spread: .30, ammo: 2, pel: 8, auto: false },
+  { n: 'Снайперка', dmg: 66, rate: .6, mag: 4, rel: 2.6, range: 1150, spread: .004, ammo: 3, pel: 1, auto: false },
+  { n: 'ПП', dmg: 7, rate: 10, mag: 35, rel: 1.6, range: 400, spread: .12, ammo: 0, pel: 1, auto: true },
 ];
 const RARITY = ['#b8bcc4', '#51cf66', '#4dabf7', '#cc5de8', '#ffc61a']; // серое → золотое
 const RMULT = [1, 1.08, 1.16, 1.25, 1.35];
