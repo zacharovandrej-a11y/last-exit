@@ -1,6 +1,6 @@
 'use strict';
 // ===== LAST EXIT — клиент =====
-const PERF = location.hash === '#perf';
+let PERF = location.hash === '#perf'; addEventListener('hashchange', () => { PERF = location.hash === '#perf'; });
 const COLORS = ['#ff6b6b', '#4dabf7', '#ffd43b', '#69db7c', '#da77f2', '#ff922b', '#3bc9db', '#f783ac', '#a9e34b', '#e9ecef'];
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 let W = 0, H = 0, dpr = 1, CX = 0, CY = 0;
@@ -446,7 +446,10 @@ function hud(now, meAlive, mePos) {
     ctx.fillStyle = 'rgba(8,4,24,.88)'; ctx.fillRect(0, 0, W, H);
     ctx.save(); ctx.translate(CX, CY - 20); ctx.rotate(Math.sin(now / 400) * .8 - .8); ctx.strokeStyle = '#ffd43b'; ctx.lineWidth = 5; rr(ctx, -28, -48, 56, 96, 10); ctx.stroke(); ctx.fillStyle = '#ffd43b'; ctx.fillRect(-6, 36, 12, 4); ctx.restore();
     txt('↻', CX, CY + 80, 44, '#ffd43b'); }
-  if (PERF) { ctx.font = '12px monospace'; ctx.textAlign = 'left'; ctx.fillStyle = '#0f0'; ctx.fillText(`${fps} fps · ${snapRate} snap/s · pend ${pending.length} · ents ${Object.keys(ents).length}`, 8, H - 8); }
+  // FPS: крупно слева сверху (под ✕), если #perf; в меню ✕ — всегда
+  const fpsCol = fps >= 45 ? '#69db7c' : fps >= 28 ? '#ffd43b' : '#ff6b6b';
+  if (PERF && started) { txt(fps + ' FPS', 12, 78, 20, fpsCol, 'left'); txt(snapRate + ' snap/s', 12, 98, 12, '#ccc', 'left', 700); }
+  if (menuOpen) txt(fps + ' FPS', CX, CY + 80, 26, fpsCol);
 }
 function ghostStick(x, y, icon) { ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 46, 0, 6.2832); ctx.stroke(); if (icon) { ctx.globalAlpha = .35; txt(icon, x, y + 7, 20); ctx.globalAlpha = 1; } }
 function drawStick(s, col) { if (!s) return; ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(s.x0, s.y0, 55, 0, 6.2832); ctx.stroke(); const v = stickVec(s); blob(ctx, s.x0 + v[0] * 55, s.y0 - v[1] * 55, 24, col); }
