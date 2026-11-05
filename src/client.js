@@ -28,7 +28,10 @@ function gunShape(g, w, len, col) {
   if (w === 4) { g.fillStyle = '#111'; g.fillRect(len * .7, -len * .22, len * .55, len * .14); }
   if (w === 2 || w === 5) { g.fillStyle = '#2b2b2b'; g.fillRect(len * .9, len * .1, len * .2, len * .35); }
 }
-function resize() { dpr = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; CX = W / 2; CY = H / 2; }
+let VIG = null; // затемнение по краям экрана
+function resize() { dpr = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; CX = W / 2; CY = H / 2;
+  VIG = document.createElement('canvas'); VIG.width = 256; VIG.height = Math.max(64, Math.round(256 * H / W)); const g = VIG.getContext('2d'), gr = g.createRadialGradient(128, VIG.height / 2, VIG.height * .35, 128, VIG.height / 2, 150);
+  gr.addColorStop(0, 'rgba(20,12,4,0)'); gr.addColorStop(1, 'rgba(20,12,4,.42)'); g.fillStyle = gr; g.fillRect(0, 0, 256, VIG.height); }
 addEventListener('resize', () => { resize(); layout(); G3.resize(W, H); });
 
 // ===== ввод =====
@@ -291,6 +294,7 @@ function render(dt, now) {
   tracers = tracers.filter(t => t.t < .12);
   // ===== 2D поверх 3D =====
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  if (VIG) ctx.drawImage(VIG, 0, 0, W, H);
   ctx.textAlign = 'center';
   for (const l of labels) {
     const [x, y, v] = G3.project(l.p, 66 + l.alt); if (!v) continue;

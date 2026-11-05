@@ -3,27 +3,42 @@ const G3 = (() => {
   const T = THREE;
   const glc = document.getElementById('g');
   const lowEnd = Math.min(screen.width, screen.height) < 500;
-  const renderer = new T.WebGLRenderer({ canvas: glc, antialias: !lowEnd, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, lowEnd ? 1.25 : 1.75));
-  const scene = new T.Scene(); scene.background = new T.Color(0x1b5d86);
+  // стиль «как в 90-х»: рендер в низком разрешении + растягивание по пикселям (#hd — чёткая картинка)
+  const HD = /hd/.test(location.hash), PIXH = 360;
+  const renderer = new T.WebGLRenderer({ canvas: glc, antialias: HD, powerPreference: 'high-performance' });
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFShadowMap;
+  if (!HD) glc.style.imageRendering = 'pixelated';
+  const scene = new T.Scene(); scene.background = new T.Color(0x2a4b58);
   // ортогональная камера под постоянным углом (изометрия): карта не вращается, «вверх» на экране — всегда одно направление
   const camera = new T.OrthographicCamera(-1, 1, 1, -1, -3000, 8000);
-  const CAM_OFF = new T.Vector3(1, 1.25, 1).normalize().multiplyScalar(2500);
+  const CAM_OFF = new T.Vector3(1, 1, 1).normalize().multiplyScalar(2500);
   const at = (p, h = 0) => new T.Vector3(p[0], h, p[1]);
-  scene.add(new T.AmbientLight(0xffffff, .58));
-  const sun = new T.DirectionalLight(0xfff4e0, .8); sun.position.set(-.45, 1, .3); scene.add(sun);
+  scene.add(new T.AmbientLight(0xdfe6ff, .5));
+  // солнце с настоящими тенями; область теней ездит за камерой
+  const SUN_DIR = new T.Vector3(-.55, 1, .25).normalize();
+  const sun = new T.DirectionalLight(0xffe6c4, .95); scene.add(sun); scene.add(sun.target);
+  sun.castShadow = true; sun.shadow.mapSize.set(lowEnd ? 1024 : 2048, lowEnd ? 1024 : 2048);
+  Object.assign(sun.shadow.camera, { left: -800, right: 800, top: 800, bottom: -800, near: 10, far: 4000 }); sun.shadow.bias = -.0006;
+  // общий «цветокор»: приглушённые цвета, чуть тёплый оттенок
+  const GRADE = 'float lum_=dot(gl_FragColor.rgb,vec3(.299,.587,.114));gl_FragColor.rgb=mix(vec3(lum_),gl_FragColor.rgb,.62)*vec3(1.03,1.,.88);';
   // общие параметры огня — их используют земля и все объекты (обугливание)
   const U = { zc: { value: new T.Vector2(0, 0) }, zrho: { value: 1e5 }, nc: { value: new T.Vector2(0, 0) }, nrho: { value: -1 }, t: { value: 0 } };
   function charrable(mat) { // объекты темнеют в огне
     mat.onBeforeCompile = sh => {
       sh.uniforms.zc = U.zc; sh.uniforms.zrho = U.zrho;
       sh.vertexShader = 'varying vec3 vWP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n#ifdef USE_INSTANCING\nvWP=(modelMatrix*instanceMatrix*vec4(transformed,1.)).xyz;\n#else\nvWP=(modelMatrix*vec4(transformed,1.)).xyz;\n#endif');
-      sh.fragmentShader = 'varying vec3 vWP;uniform vec2 zc;uniform float zrho;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\nif(length(vWP.xz-zc)>zrho)gl_FragColor.rgb=gl_FragColor.rgb*.16+vec3(.05,.02,.01);');
+      sh.fragmentShader = 'varying vec3 vWP;uniform vec2 zc;uniform float zrho;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\n'+GRADE+'if(length(vWP.xz-zc)>zrho)gl_FragColor.rgb=gl_FragColor.rgb*.16+vec3(.05,.02,.01);');
     };
     return mat;
   }
+  // «грязь» на всех поверхностях — потёртости вместо плоского цвета
+  const grunge = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#e8e8e8'; g.fillRect(0, 0, 128, 128); const rnd = mkRng(77);
+    for (let i = 0; i < 2600; i++) { const v = 150 + rnd() * 105 | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(rnd() * 128 | 0, rnd() * 128 | 0, 1 + (rnd() * 2 | 0), 1 + (rnd() * 2 | 0)); }
+    for (let i = 0; i < 14; i++) { g.fillStyle = `rgba(60,50,40,${.05 + rnd() * .1})`; g.beginPath(); g.arc(rnd() * 128, rnd() * 128, 6 + rnd() * 22, 0, 6.2832); g.fill(); }
+    g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, 124, 128, 4); g.fillRect(0, 0, 128, 2);
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; })();
   const matCache = {};
-  const lam = (col, opt = {}) => { const k = col + JSON.stringify(opt); return matCache[k] || (matCache[k] = charrable(new T.MeshLambertMaterial(Object.assign({ color: col }, opt)))); };
+  const lam = (col, opt = {}) => { const k = col + JSON.stringify(opt); return matCache[k] || (matCache[k] = charrable(new T.MeshLambertMaterial(Object.assign({ color: col, map: grunge }, opt)))); };
 
   // ===== земля =====
   const loader = new T.TextureLoader();
@@ -32,9 +47,13 @@ const G3 = (() => {
   const crateTex = typeof ART === 'object' && ART.crate ? loader.load(ART.crate) : null;
   const gsize = HALF * 2 + 4000, gg = new T.PlaneGeometry(gsize, gsize, 1, 1); gg.rotateX(-Math.PI / 2);
   const ground = new T.Mesh(gg, new T.ShaderMaterial({
-    uniforms: Object.assign({ grass: { value: grassTex }, hasGrass: { value: grassTex ? 1 : 0 }, bc: { value: BIOMES.map(b => new T.Vector2(b.c[0], b.c[1])) }, bcol: { value: BIOMES.map(b => new T.Color(b.col)) }, brad: { value: BIOMES.map(b => b.r) } }, U),
-    vertexShader: 'varying vec2 vP;void main(){vec4 w=modelMatrix*vec4(position,1.);vP=w.xz;gl_Position=projectionMatrix*viewMatrix*w;}',
+    uniforms: Object.assign(T.UniformsUtils.clone(T.UniformsLib.lights), { grass: { value: grassTex }, hasGrass: { value: grassTex ? 1 : 0 }, bc: { value: BIOMES.map(b => new T.Vector2(b.c[0], b.c[1])) }, bcol: { value: BIOMES.map(b => new T.Color(b.col)) }, brad: { value: BIOMES.map(b => b.r) } }, U),
+    lights: true,
+    vertexShader: '#include <common>\n#include <shadowmap_pars_vertex>\nvarying vec2 vP;void main(){vec3 transformedNormal=normalMatrix*vec3(0.,1.,0.);vec4 worldPosition=modelMatrix*vec4(position,1.);vP=worldPosition.xz;gl_Position=projectionMatrix*viewMatrix*worldPosition;\n#include <shadowmap_vertex>\n}',
     fragmentShader: `
+#include <common>
+#include <packing>
+#include <shadowmap_pars_fragment>
 uniform vec2 zc;uniform float zrho;uniform vec2 nc;uniform float nrho;uniform float t;
 uniform vec2 bc[6];uniform vec3 bcol[6];uniform float brad[6];uniform sampler2D grass;uniform float hasGrass;
 varying vec2 vP;
@@ -43,12 +62,17 @@ float noise(vec2 x){vec2 i=floor(x);vec2 f=fract(x);f=f*f*(3.-2.*f);return mix(m
 void main(){
  vec3 col=hasGrass>.5?texture2D(grass,vP/170.).rgb:vec3(.42,.74,.29);
  col*=.88+.24*noise(vP*.012);
+ col=mix(vec3(dot(col,vec3(.3,.59,.11))),col,.72)*vec3(.93,.9,.7); // оливковая трава
  float nb=noise(vP*.04);
+ // вытоптанная земля и грязь пятнами
+ float dn=noise(vP*.005)*.7+noise(vP*.021)*.45;
+ col=mix(col,vec3(.47,.38,.27)*(.8+.35*nb),smoothstep(.72,.86,dn)*.85);
+ col=mix(col,col*vec3(.78,.74,.6),smoothstep(.45,.7,noise(vP*.009)));
  for(int i=0;i<6;i++){float e=smoothstep(brad[i]+12.,brad[i]-12.,length(vP-bc[i])+(nb-.5)*30.);col=mix(col,bcol[i]*(.9+.18*nb),e);}
  // берег и вода по краю карты
  float e=max(abs(vP.x),abs(vP.y))-${HALF.toFixed(1)}+(noise(vP*.02)-.5)*40.;
  col=mix(col,vec3(.93,.84,.62)*(.92+.12*nb),smoothstep(-55.,-45.,e));
- vec3 water=vec3(.13,.45,.66)+.05*sin(t*1.5+vP.x*.03+vP.y*.02)+.06*smoothstep(10.,0.,e);
+ vec3 water=vec3(.17,.37,.45)+.05*sin(t*1.5+vP.x*.03+vP.y*.02)+.06*smoothstep(10.,0.,e);
  col=mix(col,water,smoothstep(-6.,6.,e));
  float a=length(vP-zc);
  float burn=smoothstep(zrho-2.,zrho+4.,a);
@@ -60,10 +84,17 @@ void main(){
  col+=vec3(1.,.5,.1)*exp(-d*d/180.)*(1.3+.4*sin(t*9.+vP.x*.08+vP.y*.05));
  col+=vec3(.6,.15,0.)*exp(-pow(max(d,0.)/60.,2.))*.5*burn;
  if(nrho>=0.){float dd=abs(length(vP-nc)-nrho);float dash=step(.5,fract((vP.x+vP.y)*.02));col=mix(col,vec3(1.),smoothstep(6.,2.5,dd)*dash*.85);}
- gl_FragColor=vec4(col*1.05,1.);
+ gl_FragColor=vec4(col,1.);
+ ${GRADE}
+ float sh=1.;
+ #if NUM_DIR_LIGHT_SHADOWS > 0
+ DirectionalLightShadow s0=directionalLightShadows[0];
+ sh=getShadow(directionalShadowMap[0],s0.shadowMapSize,s0.shadowBias,s0.shadowRadius,vDirectionalShadowCoord[0]);
+ #endif
+ gl_FragColor.rgb*=.58+.42*sh;
 }`
   }));
-  scene.add(ground);
+  ground.receiveShadow = true; scene.add(ground);
 
   // ===== объекты мира (instanced) =====
   const geo = {
@@ -114,7 +145,7 @@ void main(){
     for (const key in plan) {
       const { g, col, items } = plan[key];
       const mat = col === 'crate' ? lam(0xfffffe, crateTex ? { map: crateTex } : {}) : lam(0xffffff); // цвет — у каждого экземпляра
-      const mesh = new T.InstancedMesh(g, mat, items.length); mesh.frustumCulled = false;
+      const mesh = new T.InstancedMesh(g, mat, items.length); mesh.frustumCulled = false; mesh.castShadow = true;
       items.forEach(([o, lm], i) => {
         const m = basisAt(o).multiply(lm); mesh.setMatrixAt(i, m);
         mesh.setColorAt(i, new T.Color(typeof col === 'string' ? (VAR[col] ? VAR[col][o.id % VAR[col].length] : 0xffffff) : col));
@@ -124,11 +155,6 @@ void main(){
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       scene.add(mesh); inst[key] = { mesh };
     }
-    // тени-пятна (солнце слева-сзади → тень вправо-вперёд)
-    const sh = objs.filter(o => PARTS[o.type] && o.type !== 'tent');
-    const shm = new T.InstancedMesh(new T.CircleGeometry(1, 16), new T.MeshBasicMaterial({ color: 0, transparent: true, opacity: .22, depthWrite: false }), sh.length); shm.frustumCulled = false;
-    sh.forEach((o, i) => { const m = new T.Matrix4().compose(new T.Vector3(o.p[0] + 6, .8, o.p[1] - 4), new T.Quaternion().setFromEuler(new T.Euler(-Math.PI / 2, 0, o.sh ? o.a : 0)), new T.Vector3(o.w * .58, (o.sh ? o.h : o.w) * .58, 1)); shm.setMatrixAt(i, m); (objIdx[o.id] = objIdx[o.id] || []).push([shm, i]); if (o.dead) shm.setMatrixAt(i, zero); });
-    scene.add(shm); inst.shadow = { mesh: shm };
   }
   function killObj(id) { for (const [mesh, i] of objIdx[id] || []) { mesh.setMatrixAt(i, zero); mesh.instanceMatrix.needsUpdate = true; } }
 
@@ -162,7 +188,7 @@ void main(){
   }
   function makeChar(ch) {
     const g = new T.Group(), body = new T.Group(); g.add(body);
-    const mats = { shirt: new T.MeshLambertMaterial({ color: SHIRT[ch % 10] }), skin: new T.MeshLambertMaterial({ color: SKIN[ch % 10] }), pants: new T.MeshLambertMaterial({ color: PANTS[ch % 10] }) };
+    const mats = { shirt: charrable(new T.MeshLambertMaterial({ color: SHIRT[ch % 10] })), skin: charrable(new T.MeshLambertMaterial({ color: SKIN[ch % 10] })), pants: charrable(new T.MeshLambertMaterial({ color: PANTS[ch % 10] })) };
     const part = (gg, mat, x, y, z, sx, sy, sz, par = body) => { const o = new T.Mesh(gg, mat); o.position.set(x, y, z); o.scale.set(sx, sy, sz); par.add(o); return o; };
     const legL = new T.Group(), legR = new T.Group(); legL.position.set(-5, 15, 0); legR.position.set(5, 15, 0); body.add(legL, legR);
     part(geo.box, mats.pants, 0, -7, 0, 6.5, 14, 7, legL); part(geo.box, mats.pants, 0, -7, 0, 6.5, 14, 7, legR);
@@ -180,6 +206,7 @@ void main(){
     armL.rotation.x = -1.25; armR.rotation.x = -1.35; armL.rotation.z = -.35;
     const gunHold = new T.Group(); gunHold.position.set(4, 27, 13); body.add(gunHold);
     const shadow = new T.Mesh(new T.CircleGeometry(15, 16), new T.MeshBasicMaterial({ color: 0, transparent: true, opacity: .3, depthWrite: false })); shadow.rotation.x = -Math.PI / 2; shadow.position.y = .6; g.add(shadow);
+    shadow.material.opacity = .22; body.traverse(o => { if (o.isMesh) o.castShadow = true; });
     g.userData = { body, legL, legR, armL, armR, head, torso, vest, gunHold, gunKey: '', mats, shadow };
     return g;
   }
@@ -229,7 +256,7 @@ void main(){
   function plane() { const g = new T.Group(); const m = (gg, c, x, y, z, sx, sy, sz) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); g.add(o); return o; };
     const f = m(geo.cyl10, 0xdee2e6, 0, 0, 0, 14, 110, 14); f.rotation.x = Math.PI / 2; m(geo.box, 0xadb5bd, 0, 0, 5, 130, 3, 24); m(geo.box, 0xadb5bd, 0, 8, -48, 40, 3, 12); m(geo.box, 0xe03131, 0, 16, -50, 3, 22, 14); const n = m(geo.cone7, 0x4dabf7, 0, 0, 61, 13, 14, 13); n.rotation.x = Math.PI / 2;
     for (const s of [-1, 1]) { const e = m(geo.cyl10, 0x495057, s * 34, -6, 8, 6, 22, 6); e.rotation.x = Math.PI / 2; } return g; }
-  const transport = plane(); transport.scale.setScalar(1.3); scene.add(transport);
+  const transport = plane(); transport.scale.setScalar(1.3); transport.traverse(o => { if (o.isMesh) o.castShadow = true; }); scene.add(transport);
   // ===== превью персонажа на старте =====
   let pvR = null, pvScene = null, pvCam = null, pvChar = null, pvCh = -1;
   function preview(canvas, ch) {
@@ -243,11 +270,13 @@ void main(){
   const tmpV = new T.Vector3(), tmpA = new T.Vector3(), tmpB = new T.Vector3();
   const VIEW = 470; // сколько единиц карты видно по короткой стороне экрана
   function resize(w, h) {
-    W3 = w; H3 = h; renderer.setSize(w, h, false);
+    W3 = w; H3 = h; renderer.setPixelRatio(HD ? Math.min(devicePixelRatio || 1, lowEnd ? 1.25 : 1.75) : Math.min(devicePixelRatio || 1, PIXH / Math.min(w, h))); renderer.setSize(w, h, false);
     const asp = w / h; let hh, hw; if (asp >= 1) { hh = VIEW / 2; hw = hh * asp; } else { hw = VIEW / 2; hh = hw / asp; }
     camera.left = -hw; camera.right = hw; camera.top = hh; camera.bottom = -hh; camera.updateProjectionMatrix();
   }
-  function setCam(p) { camera.position.set(p[0] + CAM_OFF.x, CAM_OFF.y, p[1] + CAM_OFF.z); camera.lookAt(p[0], 0, p[1]); camera.updateMatrixWorld(); }
+  function setCam(p) { camera.position.set(p[0] + CAM_OFF.x, CAM_OFF.y, p[1] + CAM_OFF.z); camera.lookAt(p[0], 0, p[1]); camera.updateMatrixWorld();
+    // тень считаем вокруг камеры; шаг привязки к текселю — чтобы тени не дрожали
+    const sx = Math.round(p[0] / 4) * 4, sz = Math.round(p[1] / 4) * 4; sun.target.position.set(sx, 0, sz); sun.position.set(sx + SUN_DIR.x * 1500, SUN_DIR.y * 1500, sz + SUN_DIR.z * 1500); sun.target.updateMatrixWorld(); }
   // направления «вверх» и «вправо» экрана на карте
   const CAM_F = norm([-CAM_OFF.x, -CAM_OFF.z]), CAM_R = [-CAM_F[1], CAM_F[0]];
   // экранные координаты точки на высоте h
