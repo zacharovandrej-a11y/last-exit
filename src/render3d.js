@@ -1,82 +1,69 @@
-// ===== LAST EXIT — 3D-мир (Three.js, low-poly) =====
+// ===== LAST EXIT — 3D-мир (Three.js, low-poly), изометрическая камера над плоской картой =====
 const G3 = (() => {
   const T = THREE;
   const glc = document.getElementById('g');
   const lowEnd = Math.min(screen.width, screen.height) < 500;
   const renderer = new T.WebGLRenderer({ canvas: glc, antialias: !lowEnd, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, lowEnd ? 1.25 : 1.75));
-  const scene = new T.Scene(); scene.background = new T.Color(0x0b0820);
-  const camera = new T.PerspectiveCamera(55, 1, 4, 8000);
-  const V = a => new T.Vector3(a[0], a[1], a[2]);
-  const at = (p, h) => new T.Vector3(p[0] * (R + h), p[1] * (R + h), p[2] * (R + h));
-  // свет: «солнце» всегда светит в районе игрока
-  scene.add(new T.AmbientLight(0xffffff, .55));
-  const sun = new T.DirectionalLight(0xfff4e0, .85); scene.add(sun); scene.add(sun.target);
+  const scene = new T.Scene(); scene.background = new T.Color(0x1b5d86);
+  // ортогональная камера под постоянным углом (изометрия): карта не вращается, «вверх» на экране — всегда одно направление
+  const camera = new T.OrthographicCamera(-1, 1, 1, -1, -3000, 8000);
+  const CAM_OFF = new T.Vector3(1, 1.25, 1).normalize().multiplyScalar(2500);
+  const at = (p, h = 0) => new T.Vector3(p[0], h, p[1]);
+  scene.add(new T.AmbientLight(0xffffff, .58));
+  const sun = new T.DirectionalLight(0xfff4e0, .8); sun.position.set(-.45, 1, .3); scene.add(sun);
   // общие параметры огня — их используют земля и все объекты (обугливание)
-  const U = { zc: { value: new T.Vector3(0, 0, 1) }, zrho: { value: 4 }, nc: { value: new T.Vector3(0, 0, 1) }, nrho: { value: -1 }, t: { value: 0 }, sunDir: { value: new T.Vector3(0, 0, 1) } };
+  const U = { zc: { value: new T.Vector2(0, 0) }, zrho: { value: 1e5 }, nc: { value: new T.Vector2(0, 0) }, nrho: { value: -1 }, t: { value: 0 } };
   function charrable(mat) { // объекты темнеют в огне
     mat.onBeforeCompile = sh => {
       sh.uniforms.zc = U.zc; sh.uniforms.zrho = U.zrho;
       sh.vertexShader = 'varying vec3 vWP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n#ifdef USE_INSTANCING\nvWP=(modelMatrix*instanceMatrix*vec4(transformed,1.)).xyz;\n#else\nvWP=(modelMatrix*vec4(transformed,1.)).xyz;\n#endif');
-      sh.fragmentShader = 'varying vec3 vWP;uniform vec3 zc;uniform float zrho;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\nif(zrho<3.14){float a=acos(clamp(dot(normalize(vWP),zc),-1.,1.));if(a>zrho)gl_FragColor.rgb=gl_FragColor.rgb*.16+vec3(.05,.02,.01);}');
+      sh.fragmentShader = 'varying vec3 vWP;uniform vec2 zc;uniform float zrho;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\nif(length(vWP.xz-zc)>zrho)gl_FragColor.rgb=gl_FragColor.rgb*.16+vec3(.05,.02,.01);');
     };
     return mat;
   }
   const matCache = {};
   const lam = (col, opt = {}) => { const k = col + JSON.stringify(opt); return matCache[k] || (matCache[k] = charrable(new T.MeshLambertMaterial(Object.assign({ color: col }, opt)))); };
 
-  // ===== планета =====
+  // ===== земля =====
   const loader = new T.TextureLoader();
   const grassTex = typeof ART === 'object' && ART.grass ? loader.load(ART.grass) : null;
   if (grassTex) { grassTex.wrapS = grassTex.wrapT = T.MirroredRepeatWrapping; }
   const crateTex = typeof ART === 'object' && ART.crate ? loader.load(ART.crate) : null;
-  const bc = BIOMES.map(b => V(b.c)), bcol = BIOMES.map(b => new T.Color(b.col)), brad = BIOMES.map(b => b.r);
-  const ground = new T.Mesh(new T.IcosahedronGeometry(R, 48), new T.ShaderMaterial({
-    uniforms: Object.assign({ grass: { value: grassTex }, hasGrass: { value: grassTex ? 1 : 0 }, bc: { value: bc }, bcol: { value: bcol }, bc1: { value: brad.map(r => Math.cos(r + .012)) }, bc2: { value: brad.map(r => Math.cos(r - .012)) } }, U),
-    vertexShader: 'varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+  const gsize = HALF * 2 + 4000, gg = new T.PlaneGeometry(gsize, gsize, 1, 1); gg.rotateX(-Math.PI / 2);
+  const ground = new T.Mesh(gg, new T.ShaderMaterial({
+    uniforms: Object.assign({ grass: { value: grassTex }, hasGrass: { value: grassTex ? 1 : 0 }, bc: { value: BIOMES.map(b => new T.Vector2(b.c[0], b.c[1])) }, bcol: { value: BIOMES.map(b => new T.Color(b.col)) }, brad: { value: BIOMES.map(b => b.r) } }, U),
+    vertexShader: 'varying vec2 vP;void main(){vec4 w=modelMatrix*vec4(position,1.);vP=w.xz;gl_Position=projectionMatrix*viewMatrix*w;}',
     fragmentShader: `
-uniform vec3 zc;uniform float zrho;uniform vec3 nc;uniform float nrho;uniform float t;uniform vec3 sunDir;
-uniform vec3 bc[6];uniform vec3 bcol[6];uniform float bc1[6];uniform float bc2[6];uniform sampler2D grass;uniform float hasGrass;
-varying vec3 vP;
-float hash(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
-float noise(vec3 x){vec3 i=floor(x);vec3 f=fract(x);f=f*f*(3.-2.*f);
-return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}
-vec3 tri(vec3 p,vec3 n){vec3 w=pow(abs(n),vec3(4.));w/=w.x+w.y+w.z;float s=1./170.;
-return texture2D(grass,p.yz*s).rgb*w.x+texture2D(grass,p.xz*s).rgb*w.y+texture2D(grass,p.xy*s).rgb*w.z;}
+uniform vec2 zc;uniform float zrho;uniform vec2 nc;uniform float nrho;uniform float t;
+uniform vec2 bc[6];uniform vec3 bcol[6];uniform float brad[6];uniform sampler2D grass;uniform float hasGrass;
+varying vec2 vP;
+float hash(vec2 p){p=fract(p*vec2(.1031,.1030));p+=dot(p,p.yx+33.33);return fract((p.x+p.y)*p.x);}
+float noise(vec2 x){vec2 i=floor(x);vec2 f=fract(x);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),f.x),f.y);}
 void main(){
- vec3 n=normalize(vP);
- vec3 col=hasGrass>.5?tri(vP,n):vec3(.42,.74,.29);
+ vec3 col=hasGrass>.5?texture2D(grass,vP/170.).rgb:vec3(.42,.74,.29);
  col*=.88+.24*noise(vP*.012);
  float nb=noise(vP*.04);
- for(int i=0;i<6;i++){float e=smoothstep(bc1[i],bc2[i],dot(n,bc[i]));col=mix(col,bcol[i]*(.9+.18*nb),e);}
- if(zrho<3.14){
-   float a=acos(clamp(dot(n,zc),-1.,1.));
-   float burn=smoothstep(zrho-.002,zrho+.004,a);
-   float cr=noise(vP*.05)*1.5;
-   float lava=smoothstep(.86,.92,cr)*(1.-smoothstep(.95,1.02,cr));
-   vec3 bcl=vec3(.1,.05,.04)*(.7+.5*nb)+vec3(1.,.38,.06)*lava*(.65+.35*sin(t*2.5+cr*30.));
-   col=mix(col,bcl,burn);
-   float d=(a-zrho)*${R.toFixed(1)};
-   col+=vec3(1.,.5,.1)*exp(-d*d/180.)*(1.3+.4*sin(t*9.+vP.x*.08+vP.z*.05));
-   col+=vec3(.6,.15,0.)*exp(-pow(max(d,0.)/60.,2.))*.5*burn;
- }
- if(nrho>=0.){float a=acos(clamp(dot(n,nc),-1.,1.));float d=abs(a-nrho)*${R.toFixed(1)};float dash=step(.5,fract((vP.x+vP.y-vP.z)*.025));
-   col=mix(col,vec3(1.),smoothstep(5.,2.,d)*dash*.85);}
- float l=.62+.5*max(dot(n,sunDir),0.);
- gl_FragColor=vec4(col*l,1.);
+ for(int i=0;i<6;i++){float e=smoothstep(brad[i]+12.,brad[i]-12.,length(vP-bc[i])+(nb-.5)*30.);col=mix(col,bcol[i]*(.9+.18*nb),e);}
+ // берег и вода по краю карты
+ float e=max(abs(vP.x),abs(vP.y))-${HALF.toFixed(1)}+(noise(vP*.02)-.5)*40.;
+ col=mix(col,vec3(.93,.84,.62)*(.92+.12*nb),smoothstep(-55.,-45.,e));
+ vec3 water=vec3(.13,.45,.66)+.05*sin(t*1.5+vP.x*.03+vP.y*.02)+.06*smoothstep(10.,0.,e);
+ col=mix(col,water,smoothstep(-6.,6.,e));
+ float a=length(vP-zc);
+ float burn=smoothstep(zrho-2.,zrho+4.,a);
+ float cr=noise(vP*.05)*1.5;
+ float lava=smoothstep(.86,.92,cr)*(1.-smoothstep(.95,1.02,cr));
+ vec3 bcl=vec3(.1,.05,.04)*(.7+.5*nb)+vec3(1.,.38,.06)*lava*(.65+.35*sin(t*2.5+cr*30.));
+ col=mix(col,bcl,burn);
+ float d=a-zrho;
+ col+=vec3(1.,.5,.1)*exp(-d*d/180.)*(1.3+.4*sin(t*9.+vP.x*.08+vP.y*.05));
+ col+=vec3(.6,.15,0.)*exp(-pow(max(d,0.)/60.,2.))*.5*burn;
+ if(nrho>=0.){float dd=abs(length(vP-nc)-nrho);float dash=step(.5,fract((vP.x+vP.y)*.02));col=mix(col,vec3(1.),smoothstep(6.,2.5,dd)*dash*.85);}
+ gl_FragColor=vec4(col*1.05,1.);
 }`
   }));
   scene.add(ground);
-  // атмосфера
-  const atm = new T.Mesh(new T.SphereGeometry(R * 1.018, 48, 32), new T.ShaderMaterial({
-    side: T.BackSide, transparent: true, depthWrite: false, blending: T.AdditiveBlending,
-    vertexShader: 'varying vec3 vN;varying vec3 vV;void main(){vN=normalize(normalMatrix*normal);vec4 mv=modelViewMatrix*vec4(position,1.);vV=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}',
-    fragmentShader: 'varying vec3 vN;varying vec3 vV;void main(){float f=pow(1.-abs(dot(vN,vV)),5.);gl_FragColor=vec4(.45,.75,1.,1.)*f*.9;}'
-  }));
-  scene.add(atm);
-  // звёзды
-  { const g = new T.BufferGeometry(), n = 1500, a = new Float32Array(n * 3); const rnd = mkRng(5); for (let i = 0; i < n; i++) { const p = rndSphere(rnd), d = 5200 + rnd() * 1500; a[i * 3] = p[0] * d; a[i * 3 + 1] = p[1] * d; a[i * 3 + 2] = p[2] * d; }
-    g.setAttribute('position', new T.BufferAttribute(a, 3)); scene.add(new T.Points(g, new T.PointsMaterial({ color: 0xffffff, size: 2.2, sizeAttenuation: false }))); }
 
   // ===== объекты мира (instanced) =====
   const geo = {
@@ -109,19 +96,18 @@ void main(){
     wall: (w, h) => [[geo.box, 0x868e96, M(0, 11, 0, w, 22, h)]],
     tent: (w, h) => [[geo.roof, 0x8f7a4a, M(0, 0, 0, w, 32, h)]],
   };
-  const inst = {}; // key -> {mesh, n, list}
-  const objIdx = []; // id -> [[mesh, index, matrix]]
-  const tmpM = new T.Matrix4(), zero = new T.Matrix4().makeScale(0, 0, 0);
-  function basisAt(o) { const y = V(o.p), x = V(o.u), z = new T.Vector3().crossVectors(x, y); const m = new T.Matrix4().makeBasis(x, y, z); m.setPosition(at(o.p, 0)); return m; }
+  const inst = {}; // key -> {mesh}
+  const objIdx = []; // id -> [[mesh, index]]
+  const zero = new T.Matrix4().makeScale(0, 0, 0);
+  const basisAt = o => new T.Matrix4().compose(new T.Vector3(o.p[0], 0, o.p[1]), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -o.a), new T.Vector3(1, 1, 1));
   function buildWorld(objs) {
-    for (const k in inst) { scene.remove(inst[k].mesh); }
-    for (const k in inst) delete inst[k];
+    for (const k in inst) { scene.remove(inst[k].mesh); delete inst[k]; }
     objIdx.length = 0;
     const plan = {};
     for (const o of objs) {
       const f = PARTS[o.type]; if (!f) continue; const parts = f(o.w, o.h);
       parts.forEach(([g, col, lm], pi) => {
-        const key = o.type + '|' + pi + '|' + g.uuid + '|' + (typeof col === 'string' ? col : col);
+        const key = o.type + '|' + pi + '|' + g.uuid + '|' + col;
         (plan[key] = plan[key] || { g, col, items: [] }).items.push([o, lm]);
       });
     }
@@ -132,16 +118,16 @@ void main(){
       items.forEach(([o, lm], i) => {
         const m = basisAt(o).multiply(lm); mesh.setMatrixAt(i, m);
         mesh.setColorAt(i, new T.Color(typeof col === 'string' ? (VAR[col] ? VAR[col][o.id % VAR[col].length] : 0xffffff) : col));
-        (objIdx[o.id] = objIdx[o.id] || []).push([mesh, i, m]);
+        (objIdx[o.id] = objIdx[o.id] || []).push([mesh, i]);
         if (o.dead) mesh.setMatrixAt(i, zero);
       });
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       scene.add(mesh); inst[key] = { mesh };
     }
-    // тени-пятна под деревьями и домами
+    // тени-пятна (солнце слева-сзади → тень вправо-вперёд)
     const sh = objs.filter(o => PARTS[o.type] && o.type !== 'tent');
     const shm = new T.InstancedMesh(new T.CircleGeometry(1, 16), new T.MeshBasicMaterial({ color: 0, transparent: true, opacity: .22, depthWrite: false }), sh.length); shm.frustumCulled = false;
-    sh.forEach((o, i) => { const m = basisAt(o).multiply(new T.Matrix4().makeRotationX(-Math.PI / 2)).multiply(new T.Matrix4().compose(new T.Vector3(4, -4, .8), new T.Quaternion(), new T.Vector3(o.w * .55, (o.sh ? o.h : o.w) * .55, 1))); shm.setMatrixAt(i, m); (objIdx[o.id] = objIdx[o.id] || []).push([shm, i, m]); if (o.dead) shm.setMatrixAt(i, zero); });
+    sh.forEach((o, i) => { const m = new T.Matrix4().compose(new T.Vector3(o.p[0] + 6, .8, o.p[1] - 4), new T.Quaternion().setFromEuler(new T.Euler(-Math.PI / 2, 0, o.sh ? o.a : 0)), new T.Vector3(o.w * .58, (o.sh ? o.h : o.w) * .58, 1)); shm.setMatrixAt(i, m); (objIdx[o.id] = objIdx[o.id] || []).push([shm, i]); if (o.dead) shm.setMatrixAt(i, zero); });
     scene.add(shm); inst.shadow = { mesh: shm };
   }
   function killObj(id) { for (const [mesh, i] of objIdx[id] || []) { mesh.setMatrixAt(i, zero); mesh.instanceMatrix.needsUpdate = true; } }
@@ -202,9 +188,7 @@ void main(){
     u.gunHold.clear(); const w = wb & 15; if (w) u.gunHold.add(gunMesh(w, wb >> 4));
   }
   function poseChar(c, p, aim, walk, opt = {}) {
-    const y = V(p), z = V(tang(p, aim)), x = new T.Vector3().crossVectors(y, z);
-    const m = new T.Matrix4().makeBasis(x, y, z); c.quaternion.setFromRotationMatrix(m);
-    c.position.copy(at(p, opt.alt || 0));
+    c.position.set(p[0], opt.alt || 0, p[1]); c.rotation.set(0, Math.atan2(aim[0], aim[1]), 0);
     const u = c.userData, s = Math.sin(walk), moving = opt.moving;
     u.legL.rotation.x = moving ? s * .7 : 0; u.legR.rotation.x = moving ? -s * .7 : 0;
     u.body.position.y = moving ? Math.abs(Math.cos(walk)) * 2 : 0;
@@ -224,37 +208,28 @@ void main(){
     else if (it.k === 1) { const b = new T.Mesh(geo.box, lam(0x495057)); b.scale.set(11, 7, 8); item.add(b); for (let i = -1; i <= 1; i++) { const c = new T.Mesh(geo.cyl6, lam(new T.Color(col).getHex())); c.scale.set(1.4, 5, 1.4); c.position.set(i * 3.3, 5, 0); item.add(c); } }
     else if (it.k === 2) { const b = new T.Mesh(geo.box, lam(0xffffff)); b.scale.set(13, 9, 10); item.add(b); const c1 = new T.Mesh(geo.box, lam(0xe03131)); c1.scale.set(3, 9.4, 7); item.add(c1); const c2 = new T.Mesh(geo.box, lam(0xe03131)); c2.scale.set(9, 9.4, 3); item.add(c2); }
     else { const b = new T.Mesh(geo.box, lam(0x1c7ed6)); b.scale.set(13, 15, 5); item.add(b); }
-    g.userData.item = item;
-    const y = V(it.p), x = V(anyTang(it.p)), z = new T.Vector3().crossVectors(x, y); g.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(x, y, z)); g.position.copy(at(it.p, 0));
+    g.userData.item = item; g.position.set(it.p[0], 0, it.p[1]);
     return g;
   }
   function syncLoot(loot, now) {
     for (const [id, g] of lootG) if (!loot.has(id)) { scene.remove(g); lootG.delete(id); }
     for (const it of loot.values()) { let g = lootG.get(it.id); if (!g) { g = lootMesh(it); lootG.set(it.id, g); scene.add(g); } const i = g.userData.item; i.rotation.y = now / 700 + it.id; i.position.y = 9 + Math.sin(now / 300 + it.id) * 2; }
   }
-  // ===== трассеры, огонь, спрайты =====
-  const tracerPool = []; for (let i = 0; i < 40; i++) { const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(new Float32Array(8 * 3), 3)); const l = new T.Line(g, new T.LineBasicMaterial({ color: 0xffe066, transparent: true, blending: T.AdditiveBlending })); l.visible = false; l.frustumCulled = false; scene.add(l); tracerPool.push(l); }
+  // ===== трассеры, огонь =====
+  const tracerPool = []; for (let i = 0; i < 40; i++) { const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(new Float32Array(2 * 3), 3)); const l = new T.Line(g, new T.LineBasicMaterial({ color: 0xffe066, transparent: true, blending: T.AdditiveBlending })); l.visible = false; l.frustumCulled = false; scene.add(l); tracerPool.push(l); }
   function cvTex(w, h, f) { const c = document.createElement('canvas'); c.width = w; c.height = h; f(c.getContext('2d'), w, h); return new T.CanvasTexture(c); }
   const flameTex = cvTex(64, 96, (g, w, h) => { const gr = g.createRadialGradient(w / 2, h * .7, 2, w / 2, h * .6, w * .55); gr.addColorStop(0, '#fff3bf'); gr.addColorStop(.35, '#ffd43b'); gr.addColorStop(.7, '#ff6b1a'); gr.addColorStop(1, 'rgba(255,60,0,0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(w / 2, 4); g.quadraticCurveTo(w, h * .6, w / 2, h - 2); g.quadraticCurveTo(0, h * .6, w / 2, 4); g.fill(); });
   const glowTex = cvTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.3, 'rgba(255,220,120,.8)'); gr.addColorStop(1, 'rgba(255,120,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
   const smokeTex = cvTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(70,65,65,.55)'); gr.addColorStop(1, 'rgba(70,65,65,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
-  const flames = []; for (let i = 0; i < 70; i++) { const s = new T.Sprite(new T.SpriteMaterial({ map: flameTex, blending: T.AdditiveBlending, depthWrite: false, transparent: true })); s.center.set(.5, .05); s.visible = false; scene.add(s); flames.push(s); }
+  const flames = []; for (let i = 0; i < 90; i++) { const s = new T.Sprite(new T.SpriteMaterial({ map: flameTex, blending: T.AdditiveBlending, depthWrite: false, transparent: true })); s.center.set(.5, .05); s.visible = false; scene.add(s); flames.push(s); }
   const smokes = []; for (let i = 0; i < 40; i++) { const s = new T.Sprite(new T.SpriteMaterial({ map: smokeTex, depthWrite: false, transparent: true })); s.visible = false; s.userData = { t: 9 }; scene.add(s); smokes.push(s); }
   const flashes = []; for (let i = 0; i < 20; i++) { const s = new T.Sprite(new T.SpriteMaterial({ map: glowTex, blending: T.AdditiveBlending, depthWrite: false, transparent: true })); s.visible = false; s.userData = { t: 9 }; scene.add(s); flashes.push(s); }
   let flashI = 0; function flashAt(v, size) { const s = flashes[flashI++ % flashes.length]; s.position.copy(v); s.scale.setScalar(size); s.userData.t = 0; s.userData.size = size; s.visible = true; }
-  // ===== транспорт, корабль, комета =====
+  // ===== транспорт =====
   function plane() { const g = new T.Group(); const m = (gg, c, x, y, z, sx, sy, sz) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); g.add(o); return o; };
     const f = m(geo.cyl10, 0xdee2e6, 0, 0, 0, 14, 110, 14); f.rotation.x = Math.PI / 2; m(geo.box, 0xadb5bd, 0, 0, 5, 130, 3, 24); m(geo.box, 0xadb5bd, 0, 8, -48, 40, 3, 12); m(geo.box, 0xe03131, 0, 16, -50, 3, 22, 14); const n = m(geo.cone7, 0x4dabf7, 0, 0, 61, 13, 14, 13); n.rotation.x = Math.PI / 2;
     for (const s of [-1, 1]) { const e = m(geo.cyl10, 0x495057, s * 34, -6, 8, 6, 22, 6); e.rotation.x = Math.PI / 2; } return g; }
   const transport = plane(); transport.scale.setScalar(1.3); scene.add(transport);
-  function rocket() { const g = new T.Group(); const m = (gg, c, x, y, z, sx, sy, sz) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); g.add(o); return o; };
-    m(geo.cyl10, 0xf1f3f5, 0, 40, 0, 16, 70, 16); m(geo.cone7, 0xe03131, 0, 88, 0, 16, 26, 16); m(geo.sph, 0x4dabf7, 0, 55, 15, 6, 6, 3);
-    for (let i = 0; i < 3; i++) { const a = i / 3 * 6.283; const fin = m(geo.box, 0xe03131, Math.cos(a) * 17, 12, Math.sin(a) * 17, 3, 24, 14); fin.rotation.y = -a; } return g; }
-  const ship = rocket(); ship.visible = false; scene.add(ship);
-  const beacon = new T.Mesh(new T.TorusGeometry(46, 2.5, 6, 32), new T.MeshBasicMaterial({ color: 0x69db7c, transparent: true, opacity: .7 })); beacon.visible = false; scene.add(beacon);
-  const shipFlame = new T.Sprite(new T.SpriteMaterial({ map: flameTex, blending: T.AdditiveBlending, depthWrite: false, transparent: true })); shipFlame.center.set(.5, .95); shipFlame.visible = false; scene.add(shipFlame);
-  const cometM = new T.Mesh(new T.IcosahedronGeometry(30, 1), new T.MeshBasicMaterial({ color: 0xffe8a3 })); cometM.visible = false; scene.add(cometM);
-  const cometGlow = new T.Sprite(new T.SpriteMaterial({ map: glowTex, blending: T.AdditiveBlending, depthWrite: false, transparent: true })); cometGlow.scale.setScalar(260); cometGlow.visible = false; scene.add(cometGlow);
   // ===== превью персонажа на старте =====
   let pvR = null, pvScene = null, pvCam = null, pvChar = null, pvCh = -1;
   function preview(canvas, ch) {
@@ -264,33 +239,34 @@ void main(){
   }
   // ===== кадр =====
   const chars = {}; // id -> group
-  let worldBuilt = null;
-  const tmpV = new T.Vector3();
-  function resize(w, h) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
-  function setCam(p, f) {
-    const asp = camera.aspect, hgt = asp < 1 ? 330 : 250, back = asp < 1 ? 200 : 175;
-    const pos = add(mul(p, R + hgt), f, -back), look = add(mul(p, R), f, 70);
-    camera.position.set(pos[0], pos[1], pos[2]); camera.up.set(p[0], p[1], p[2]); camera.lookAt(look[0], look[1], look[2]);
-    const rgt = cross(f, p), sd = norm(add(add(mul(p, 1), rgt, -.45), f, -.35));
-    U.sunDir.value.set(sd[0], sd[1], sd[2]);
-    sun.position.set(p[0] * R + sd[0] * 600, p[1] * R + sd[1] * 600, p[2] * R + sd[2] * 600); sun.target.position.set(p[0] * R, p[1] * R, p[2] * R); sun.target.updateMatrixWorld();
+  let worldBuilt = null, W3 = 1, H3 = 1;
+  const tmpV = new T.Vector3(), tmpA = new T.Vector3(), tmpB = new T.Vector3();
+  const VIEW = 470; // сколько единиц карты видно по короткой стороне экрана
+  function resize(w, h) {
+    W3 = w; H3 = h; renderer.setSize(w, h, false);
+    const asp = w / h; let hh, hw; if (asp >= 1) { hh = VIEW / 2; hw = hh * asp; } else { hw = VIEW / 2; hh = hw / asp; }
+    camera.left = -hw; camera.right = hw; camera.top = hh; camera.bottom = -hh; camera.updateProjectionMatrix();
   }
-  // экранные координаты точки на высоте h над поверхностью
-  function project(p, h = 0) { tmpV.copy(at(p, h)).project(camera); const vis = tmpV.z < 1 && Math.abs(tmpV.x) < 1.3 && Math.abs(tmpV.y) < 1.3 && dot(p, camPU) > -.2; return [(tmpV.x + 1) / 2 * W, (1 - tmpV.y) / 2 * H, vis]; }
-  let camPU = [0, 0, 1];
-  // луч из камеры через точку экрана → точка на планете
+  function setCam(p) { camera.position.set(p[0] + CAM_OFF.x, CAM_OFF.y, p[1] + CAM_OFF.z); camera.lookAt(p[0], 0, p[1]); camera.updateMatrixWorld(); }
+  // направления «вверх» и «вправо» экрана на карте
+  const CAM_F = norm([-CAM_OFF.x, -CAM_OFF.z]), CAM_R = [-CAM_F[1], CAM_F[0]];
+  // экранные координаты точки на высоте h
+  function project(p, h = 0) { tmpV.set(p[0], h, p[1]).project(camera); const vis = Math.abs(tmpV.x) < 1.15 && Math.abs(tmpV.y) < 1.15; return [(tmpV.x + 1) / 2 * W3, (1 - tmpV.y) / 2 * H3, vis]; }
+  // луч из камеры через точку экрана → точка на карте на высоте h
   function screenToGround(sx, sy, h = 20) {
-    tmpV.set(sx / W * 2 - 1, -(sy / H * 2 - 1), .5).unproject(camera).sub(camera.position).normalize();
-    const o = camera.position, rr = R + h, b = o.dot(tmpV), c = o.lengthSq() - rr * rr, d = b * b - c; if (d < 0) return null;
-    const t = -b - Math.sqrt(d); if (t < 0) return null; const q = o.clone().addScaledVector(tmpV, t); return norm([q.x, q.y, q.z]);
+    const x = sx / W3 * 2 - 1, y = -(sy / H3 * 2 - 1);
+    tmpA.set(x, y, -1).unproject(camera); tmpB.set(x, y, 1).unproject(camera);
+    const dy = tmpB.y - tmpA.y; if (Math.abs(dy) < 1e-6) return null; const t = (h - tmpA.y) / dy;
+    return [tmpA.x + (tmpB.x - tmpA.x) * t, tmpA.z + (tmpB.z - tmpA.z) * t];
   }
   function frame(st) {
-    const { now, dt, objs, zone, plan, matchT, phase, loot, list, tracers, comet, shipS, shipD, endInfo, camP, camF } = st;
+    const { now, dt, objs, zone, plan, matchT, phase, loot, list, tracers, shipS, shipD, camP } = st;
     if (worldBuilt !== objs) { buildWorld(objs); worldBuilt = objs; }
-    camPU = camP; setCam(camP, camF);
+    setCam(camP);
     U.t.value = now / 1000;
-    if (phase >= 1 && zone.rho < Math.PI) { U.zc.value.set(zone.c[0], zone.c[1], zone.c[2]); U.zrho.value = zone.rho; } else U.zrho.value = 4;
-    if (phase === 1 && plan && !zone.pre && !zone.mv && zone.k < ZONE.length) { const c = plan[zone.k]; U.nc.value.set(c[0], c[1], c[2]); U.nrho.value = ZONE[zone.k][0]; } else U.nrho.value = -1;
+    if (phase >= 1 && !zone.pre) { U.zc.value.set(zone.c[0], zone.c[1]); U.zrho.value = zone.rho; } else U.zrho.value = 1e5;
+    const nz = phase === 1 ? nextZone(zone, plan) : null;
+    if (nz) { U.nc.value.set(nz.c[0], nz.c[1]); U.nrho.value = nz.rho; } else U.nrho.value = -1;
     // персонажи
     const seen = new Set();
     for (const e of list) {
@@ -298,34 +274,33 @@ void main(){
       if (!c || c.userData.ch !== e.ch) { if (c) scene.remove(c); c = chars[e.id] = makeChar(e.ch); c.userData.ch = e.ch; scene.add(c); }
       c.visible = true; setGun(c, e.wb); poseChar(c, e.p, e.aim, e.walk, e);
       if (e.fire) { const tip = c.userData.gunHold.localToWorld(new T.Vector3(0, 0, 18)); flashAt(tip, 22); }
-      if (e.dead) { c.userData.body.rotation.z = Math.min(1.57, e.deadT * 5) * (e.id % 2 ? 1 : -1); c.userData.body.position.y = 0; c.traverse(o => { if (o.material && o.material.opacity !== undefined && o !== c.userData.shadow) { } }); }
+      if (e.dead) { c.userData.body.rotation.z = Math.min(1.57, e.deadT * 5) * (e.id % 2 ? 1 : -1); c.userData.body.position.y = 0; }
       else c.userData.body.rotation.z = 0;
       // парашют
       if (e.alt) { if (!c.userData.chute) { const ch = new T.Group(); for (let i = 0; i < 6; i++) { const seg = new T.Mesh(new T.SphereGeometry(24, 6, 4, i * Math.PI / 3, Math.PI / 3, 0, Math.PI / 2), lam(i % 2 ? 0xffffff : SHIRT[e.ch % 10])); ch.add(seg); } ch.position.y = 64; c.add(ch); c.userData.chute = ch; } c.userData.chute.visible = true; }
       else if (c.userData.chute) c.userData.chute.visible = false;
     }
     for (const id in chars) if (!seen.has(+id)) chars[id].visible = false;
-    // лут
     syncLoot(loot, now);
     // трассеры
     let ti = 0;
     for (const t of tracers) {
       if (ti >= tracerPool.length) break; const l = tracerPool[ti++]; const a = l.geometry.attributes.position;
-      for (let i = 0; i < 8; i++) { const q = slerpN(t.from, t.end, i / 7); const v = at(q, 24); a.setXYZ(i, v.x, v.y, v.z); }
+      a.setXYZ(0, t.from[0], 24, t.from[1]); a.setXYZ(1, t.end[0], 24, t.end[1]);
       a.needsUpdate = true; l.material.opacity = Math.max(0, 1 - t.t / .12); l.material.color.set((t.wb & 15) === 4 ? 0xffffff : 0xffe066); l.visible = true;
-      if (t.t < dt * 1.5 && t.hitFx !== false) flashAt(at(t.end, 24), 14);
+      if (t.t < dt * 1.5) flashAt(at(t.end, 24), 14);
     }
     for (; ti < tracerPool.length; ti++) tracerPool[ti].visible = false;
     for (const s of flashes) { if (!s.visible) continue; s.userData.t += dt; const k = 1 - s.userData.t / .09; if (k <= 0) s.visible = false; else s.scale.setScalar(s.userData.size * (.6 + .4 * k)); }
     // языки пламени вдоль фронта — только рядом с камерой
     let fi = 0;
-    if (phase >= 1 && zone.rho < Math.PI && zone.rho > .005) {
-      const c = zone.c, u = anyTang(c), v = cross(c, u), N = 360;
+    if (phase >= 1 && !zone.pre && zone.rho > 2) {
+      const c = zone.c, N = Math.min(4000, Math.max(16, Math.ceil(zone.rho * 6.2832 / 24)));
       for (let i = 0; i < N && fi < flames.length; i++) {
-        const a = i / N * 6.2832, q = add(mul(c, Math.cos(zone.rho)), add(mul(u, Math.cos(a)), v, Math.sin(a)), Math.sin(zone.rho));
-        if (dot(q, camP) < Math.cos(.75)) continue;
+        const a = i / N * 6.2832, q = [c[0] + Math.cos(a) * zone.rho, c[1] + Math.sin(a) * zone.rho];
+        if (Math.abs(q[0] - camP[0]) > 650 || Math.abs(q[1] - camP[1]) > 650) continue;
         const s = flames[fi++], f = .75 + .35 * Math.sin(now / 90 + i * 1.7) + .2 * Math.sin(now / 37 + i * 3.1);
-        s.position.copy(at(q, 0)); s.scale.set(26 * f, 46 * f, 1); s.visible = true;
+        s.position.set(q[0], 0, q[1]); s.scale.set(26 * f, 46 * f, 1); s.visible = true;
         if (Math.random() < .01) { const sm = smokes.find(x => x.userData.t > 2.5); if (sm) { sm.userData.t = 0; sm.userData.p = q; sm.visible = true; } }
       }
     }
@@ -333,20 +308,8 @@ void main(){
     for (const s of smokes) { if (!s.visible) continue; s.userData.t += dt; const k = s.userData.t / 2.5; if (k >= 1) { s.visible = false; continue; } s.position.copy(at(s.userData.p, 30 + k * 90)); s.scale.setScalar(30 + k * 70); s.material.opacity = .9 * (1 - k); }
     // транспорт
     transport.visible = phase === 1 && matchT < DROP_T + 4;
-    if (transport.visible) { const [sp, sd] = moveOn(shipS, shipD, SHIP_V * matchT, shipD); const y = V(sp), z = V(sd), x = new T.Vector3().crossVectors(y, z); transport.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(x, y, z)); transport.position.copy(at(sp, 250)); }
-    // корабль эвакуации
-    ship.visible = beacon.visible = phase >= 1 && !!plan && zone.k >= 5;
-    shipFlame.visible = false;
-    if (ship.visible) {
-      const fp = plan[ZONE.length - 1], y = V(fp), x = V(anyTang(fp)), z = new T.Vector3().crossVectors(x, y), q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(x, y, z));
-      const lt = endInfo ? Math.max(0, (now - endInfo.t) / 1000 - 1.2) : 0, lift = lt * lt * 180;
-      ship.quaternion.copy(q); ship.position.copy(at(fp, lift)); beacon.quaternion.copy(q).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), Math.PI / 2)); beacon.position.copy(at(fp, 2)); beacon.scale.setScalar(1 + .08 * Math.sin(now / 250));
-      if (lt > 0) { shipFlame.visible = true; shipFlame.position.copy(at(fp, lift)); shipFlame.scale.set(40, 90 + 20 * Math.sin(now / 40), 1); }
-    }
-    // комета летит
-    cometM.visible = cometGlow.visible = phase === 1 && matchT < COMET_T0 && matchT > 2;
-    if (cometM.visible) { const k = matchT / COMET_T0, side = anyTang(comet), pos = add(mul(comet, R + 3500 * (1 - k) * (1 - k)), side, 2500 * (1 - k)); cometM.position.set(pos[0], pos[1], pos[2]); cometGlow.position.copy(cometM.position); cometGlow.scale.setScalar(160 + 200 * k); }
+    if (transport.visible) { const sp = add(shipS, shipD, SHIP_V * matchT); transport.position.set(sp[0], 250, sp[1]); transport.rotation.set(0, Math.atan2(shipD[0], shipD[1]), 0); }
     renderer.render(scene, camera);
   }
-  return { frame, resize, project, screenToGround, killObj, preview, renderer };
+  return { frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R };
 })();
