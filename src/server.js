@@ -1,6 +1,7 @@
 // ===== LAST EXIT — сервер (Cloudflare Worker + Durable Object) =====
 /*SHARED*/
 const INDEX_HTML = __INDEX_HTML__;
+const THREE_JS = __THREE__;
 const ICONS = { 192: '__ICON192__', 512: '__ICON512__' };
 const b64bin = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 
@@ -20,6 +21,7 @@ export default {
     }), { headers: { 'content-type': 'application/manifest+json' } });
     if (url.pathname === '/icon-192.png' || url.pathname === '/icon-512.png')
       return new Response(b64bin(ICONS[url.pathname.includes('512') ? 512 : 192]), { headers: { 'content-type': 'image/png', 'cache-control': 'max-age=86400' } });
+    if (url.pathname === '/three.min.js') return new Response(THREE_JS, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=604800' } });
     if (url.pathname === '/sw.js') return new Response("self.addEventListener('fetch',()=>{});", { headers: { 'content-type': 'text/javascript' } });
     return new Response('not found', { status: 404 });
   }

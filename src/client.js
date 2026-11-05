@@ -181,7 +181,7 @@ function onArt() {
     g.globalCompositeOperation = 'destination-in'; const gr = g.createRadialGradient(S / 2, S / 2, S * .22, S / 2, S / 2, S / 2); gr.addColorStop(0, '#000'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, S, S);
     // точки равномерно по сфере (спираль Фибоначчи), кроме особых локаций
     const N = 2200; gpts = []; for (let i = 0; i < N; i++) { const z = 1 - 2 * (i + .5) / N, rr = Math.sqrt(1 - z * z), a = i * 2.39996; const p = [rr * Math.cos(a), rr * Math.sin(a), z]; if (BIOMES.some(b => angDist(p, b.c) < b.r - .03)) continue; gpts.push({ p, a: (i * 1.7) % 6.28 }); } }
-  artReady = true; drawPv();
+  artReady = true;
 }
 // «маленькая планета»: у края экрана объекты наклоняются наружу, будто стоят на шаре
 function tilt(x, y) { const dx = x - CX, dy = y - CY, d = Math.hypot(dx, dy) || 1, t = Math.min(1, (d / HR) ** 2) * .9; const ux = dx / d * t, uy = -(1 - t) + dy / d * t; return Math.atan2(ux, -uy); }
@@ -261,7 +261,7 @@ function resize() {
   const at = g.createRadialGradient(CX, CY, HR * .97, CX, CY, HR * 1.14); at.addColorStop(0, 'rgba(130,210,255,.75)'); at.addColorStop(1, 'rgba(130,210,255,0)'); g.fillStyle = at; g.beginPath(); g.arc(CX, CY, HR * 1.14, 0, 6.2832); g.fill();
   rim = ctx.createRadialGradient(CX, CY, HR * .55, CX, CY, HR); rim.addColorStop(0, 'rgba(0,10,30,0)'); rim.addColorStop(1, 'rgba(0,10,40,.42)');
 }
-addEventListener('resize', () => { resize(); layout(); });
+addEventListener('resize', () => { resize(); layout(); G3.resize(W, H); });
 
 // ===== ввод =====
 const keys = {}; let mouse = { x: 0, y: 0, down: false, used: false }, sticks = { L: null, R: null }, touchUI = false;
@@ -345,11 +345,11 @@ function onJson(m) {
     comet = m.comet; antip = mul(comet, -1); plan = m.plan; shipS = m.ship[0]; shipD = m.ship[1]; myAir = 1; smoke = []; ents = {}; pending = []; predP = null; dead = null; endInfo = null; feed = []; fx = []; myKills = 0;
     if (m.mt < 1) { flash = 0; }
   } else if (m.t === 'l') { if (m.a) for (const a of m.a) addLootArr(a); if (m.d) for (const id of m.d) loot.delete(id); }
-  else if (m.t === 'cr') { const o = objs[m.id]; if (o) { o.dead = true; fx.push({ type: 'crate', p: o.p, t: 0 }); sfx(3, vol(o.p) * .7); } }
+  else if (m.t === 'cr') { const o = objs[m.id]; if (o) { o.dead = true; G3.killObj(m.id); fx.push({ type: 'crate', p: o.p, t: 0 }); sfx(3, vol(o.p) * .7); } }
   else if (m.t === 'k') {
     feed.unshift({ t: performance.now(), k: m.k, v: m.v, w: m.w }); feed.length = Math.min(feed.length, 5);
     const e = ents[m.v]; const p = e ? e.disp || e.h[e.h.length - 1].p : null;
-    if (p) fx.push({ type: 'death', p, t: 0, ch: names[m.v] ? names[m.v].ch : 0, spin: Math.random() < .5 ? 1 : -1 });
+    if (p) fx.push({ type: 'death', p, v: m.v, aim: e && e.h.length ? e.h[e.h.length - 1].aim : null, t: 0, ch: names[m.v] ? names[m.v].ch : 0, spin: Math.random() < .5 ? 1 : -1 });
     if (m.k === myId && myId !== 255) { myKills++; sfx('kill'); }
     delete ents[m.v];
   } else if (m.t === 'dead') { dead = { place: m.place, by: m.by, t: performance.now() }; sfx('dead'); }
@@ -417,7 +417,7 @@ function localTick() {
   const mv = add(mul(CRm, mx), camF, my);
   let aim = null, fire = false;
   if (sticks.R) { const v = stickVec(sticks.R); if (v[2] > .2) aim = add(mul(CRm, v[0]), camF, v[1]); fire = v[2] > .6; }
-  else if (mouse.used && !touchUI) { const ax = mouse.x - CX, ay = -(mouse.y - CY); if (ax || ay) aim = add(mul(CRm, ax), camF, ay); fire = mouse.down || !!keys.Space; }
+  else if (mouse.used && !touchUI) { const g = G3.screenToGround(mouse.x, mouse.y, 24); if (g && angDist(g, predP) > .002) aim = add(g, predP, -1); fire = mouse.down || !!keys.Space; }
   if (aim) myAim = tang(predP, aim);
   let fl = (fire ? 1 : 0) | (wantReload ? 2 : 0) | (wantPick ? 4 : 0) | (wantHeal ? 8 : 0);
   if (wantSlot >= 0) fl |= 16 | (wantSlot << 5);
@@ -458,18 +458,17 @@ function interp(e, rt) {
 // ===== кадр =====
 let fps = 0, fc = 0, ft = 0, last = performance.now(), blinkT = 0;
 function frame(now) {
-  const dt = Math.min(.05, (now - last) / 1000); last = now; fc++; ft += dt; if (ft >= .5) { fps = Math.round(fc / ft); snapRate = Math.round(snapCount / ft); fc = 0; ft = 0; snapCount = 0; }
+  const rdt = (now - last) / 1000, dt = Math.min(.05, rdt); last = now; fc++; ft += rdt; if (ft >= .5) { fps = Math.round(fc / ft); snapRate = Math.round(snapCount / ft); fc = 0; ft = 0; snapCount = 0; }
   if (started) {
     tickAcc += dt; let k = 0; while (tickAcc >= DT && k < 3) { tickAcc -= DT; k++; localTick(); } if (tickAcc > .2) tickAcc = 0;
     if (phase === 1) matchT += dt;
     localCd -= dt;
   }
-  render(dt, now);
+  if (!started) G3.preview(pv, myChar); else render(dt, now);
   requestAnimationFrame(frame);
 }
 function render(dt, now) {
   const rt = renderTick();
-  // камера
   zone = phase >= 1 ? zoneAt(matchT, comet, plan) : zoneAt(0, comet, null);
   const meIn = phase === 1 && myId !== 255 && !dead;
   const meAlive = meIn && !myAir && predP;
@@ -481,142 +480,48 @@ function render(dt, now) {
   if (target) camP = angDist(target, camP) * R > 300 ? target : slerpN(camP, target, meAlive || (meIn && myAir) ? 1 : Math.min(1, dt * 8));
   else { const [np, nf] = moveOn(camP, camF, 25 * dt, camF); camP = np; camF = nf; }
   camF = tang(camP, camF); CP = camP; CF = camF; CR = cross(CF, CP);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  if (shake > 0) { shake -= dt; ctx.translate((Math.random() - .5) * 14 * shake, (Math.random() - .5) * 14 * shake); }
-  ctx.drawImage(bg, 0, 0, W, H);
-  ctx.save(); ctx.beginPath(); ctx.arc(CX, CY, HR, 0, 6.2832); ctx.fillStyle = groundCol; ctx.fill(); ctx.clip();
-  const visCos = Math.cos(AH) - .03;
-  if (GPAT) { // трава — одна заливка текстурой, сдвигаем вместе с камерой
-    if (lastCam) { const d = add(camP, lastCam, -1); gOff[0] -= dot(d, lastCR) * R; gOff[1] += dot(d, lastCF) * R; }
-    const k = 190 / IMG.grass.width; GPAT.setTransform(new DOMMatrix([k * Z, 0, 0, k * Z, CX + gOff[0] * Z, CY + gOff[1] * Z]));
-    ctx.fillStyle = GPAT; ctx.fillRect(0, 0, W, H); }
-  lastCam = camP; lastCR = CR; lastCF = CF;
-  buildMasks(); ctx.imageSmoothingEnabled = true; ctx.drawImage(MB, 0, 0, W, H);
-  // декор
-  for (const d of deco) { if (dot(d.p, CP) < visCos || (GPATCH && d.t === 'tuft')) continue; const q = P(d.p); if (!q) continue; const s = q[3] / SS; const sp = decoSpr(d.t, d.v); ctx.drawImage(sp, q[0] - sp.width * s / 2, q[1] - sp.height * s / 2, sp.width * s, sp.height * s); }
-  // лут
-  const bob = Math.sin(now / 300) * 2;
-  for (const it of loot.values()) { if (dot(it.p, CP) < visCos) continue; const q = P(it.p); if (!q) continue; const sp = lootSpr(it.k, it.x, it.r), s = q[3] / SS; ctx.drawImage(sp, q[0] - sp.width * s / 2, q[1] - sp.height * s / 2 + bob * q[3] * .5, sp.width * s, sp.height * s); }
-  // объекты: тени, потом сами
-  const vis = [];
-  const bills = [];
-  for (const o of objs) { if (o.dead || dot(o.p, CP) < visCos - o.rad / R) continue; const q = P(o.p, true); if (!q[2] && dot(o.p, CP) < visCos) continue; const bb = BB[o.type]; if (bb && IMG[bb.img]) { bills.push({ y: q[1], o, q, bb }); continue; } vis.push([o, q]); }
-  for (let pass = 0; pass < 2; pass++) for (const [o, q] of vis) {
-    let sp = sprite(o); if (pass && outZone(o.p, zone)) sp = charred(o, sp); const k = q[3] / SS, ang = sp.round ? 0 : scrDir(o.p, o.u);
-    const c = Math.cos(ang) * k * dpr, s = Math.sin(ang) * k * dpr;
-    const ox = pass ? 0 : 4 * q[3], oy = pass ? 0 : 6 * q[3];
-    ctx.setTransform(c, s, -s, c, (q[0] + ox) * dpr, (q[1] + oy) * dpr);
-    ctx.drawImage(pass ? sp.s : sp.sh, -sp.s.width / 2, -sp.s.height / 2);
-  }
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = rim; ctx.fillRect(0, 0, W, H);
-  // ===== огонь кометы =====
-  if (zone.rho < Math.PI) {
-    ctx.drawImage(MKB, 0, 0, W, H);
-    ctx.globalCompositeOperation = 'lighter';
-    for (const d of deco) { if (d.v === 1 || dot(d.p, CP) < visCos || !outZone(d.p, zone)) continue; const q = P(d.p); if (!q) continue; const s = q[3] / SS * 1.4, ew = EMBER.width * s; ctx.globalAlpha = .5 + .5 * Math.sin(now / 400 + d.a * 9); ctx.drawImage(EMBER, q[0] - ew / 2, q[1] - ew / 2, ew, ew); }
-    ctx.globalAlpha = 1;
-    // фронт: свечение + языки пламени
-    const pts = capPath(zone.c, zone.rho, 150); ctx.lineCap = 'round';
-    for (const [w, c] of [[60, 'rgba(255,70,10,.10)'], [34, 'rgba(255,90,20,.2)'], [18, 'rgba(255,130,30,.5)'], [7, 'rgba(255,230,120,.95)']]) {
-      ctx.strokeStyle = c; ctx.lineWidth = w * Z; ctx.beginPath(); let on = false;
-      for (const p of pts) { if (p[2]) { on ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); on = true; } else on = false; } ctx.stroke();
-    }
-    let i = 0; for (const p of pts) { i++; if (!p[2]) continue; const f = .75 + .45 * Math.sin(now / 80 + i * 1.7) + .25 * Math.sin(now / 37 + i * 3.1), s = p[3] * (i % 3 ? 1.2 : 1.9) * f; ctx.drawImage(FLAME, p[0] - 12 * s, p[1] - 26 * s, 24 * s, 30 * s);
-      if (smoke.length < 70 && Math.random() < .035) smoke.push({ x: p[0], y: p[1], t: 0, r: 6 + Math.random() * 8, vx: (Math.random() - .5) * 14, cp: camP }); }
-    ctx.globalCompositeOperation = 'source-over';
-  }
-  // дым (экранные частицы, сдвигаем вместе с камерой грубо)
-  for (const m of smoke) { m.t += dt; m.y -= 22 * dt; m.x += m.vx * dt; const a = Math.max(0, .35 * (1 - m.t / 2.6)); ctx.fillStyle = `rgba(60,55,55,${a})`; ctx.beginPath(); ctx.arc(m.x, m.y, (m.r + m.t * 14) * Z, 0, 6.2832); ctx.fill(); }
-  smoke = smoke.filter(m => m.t < 2.6 && angDist(m.cp, camP) * R < 25);
-  // следующая зона — белый пунктир
-  if (phase === 1 && plan && !zone.pre && !zone.mv && zone.k < ZONE.length) {
-    const pts = capPath(plan[zone.k], ZONE[zone.k][0], 120); ctx.setLineDash([10, 10]); ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 3; ctx.beginPath(); let on = false;
-    for (const p of pts) { if (p[2]) { on ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); on = true; } else on = false; } ctx.stroke(); ctx.setLineDash([]);
-  }
-  if (phase === 1 && matchT < COMET_T0) { // комета летит
-    const q = P(comet, true), k = matchT / COMET_T0; const tx = q[0], ty = q[1];
-    const sx = tx - 600 * (1 - k), sy = ty - 400 * (1 - k);
-    if (k > .6) { const g = ctx.createLinearGradient(sx, sy, sx - 160, sy - 110); g.addColorStop(0, 'rgba(255,200,80,.9)'); g.addColorStop(1, 'rgba(255,100,20,0)'); ctx.strokeStyle = g; ctx.lineWidth = 14 * Z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx - 160, sy - 110); ctx.stroke(); blob(ctx, sx, sy, 10 * Z * (1 + k), '#ffe8a3'); }
-    if (q[2]) { ctx.strokeStyle = `rgba(255,80,40,${.5 + .5 * Math.sin(now / 120)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(tx, ty, 30 * Z, 0, 6.2832); ctx.stroke(); }
-  }
-  // корабль эвакуации садится в финальной точке
-  if (phase >= 1 && plan && zone.k >= 5) {
-    const q = P(plan[ZONE.length - 1]);
-    if (q) { const s = q[3]; const t = endInfo ? (now - endInfo.t) / 1000 : 0; const lift = endInfo ? Math.max(0, t - 1.5) : 0;
-      ctx.strokeStyle = `rgba(105,219,124,${.4 + .3 * Math.sin(now / 200)})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(q[0], q[1], (40 + 8 * Math.sin(now / 300)) * s, 0, 6.2832); ctx.stroke();
-      drawShip(q[0], q[1] - lift * lift * 260, s * (1 + lift * .8), now); }
-  }
-  // транспорт высадки
-  if (phase === 1 && matchT < DROP_T + 4) {
-    const [sp, sd] = moveOn(shipS, shipD, SHIP_V * matchT, shipD); const q = P(sp);
-    if (q) drawTransport(q[0], q[1], scrDir(sp, sd), q[3] * 1.4, now);
-  }
-  // трассеры
-  for (const t of tracers) {
-    t.t += dt; if (!t.from) { const e = t.sid === myId && predP ? predP : ents[t.sid] && ents[t.sid].disp; t.from = e || t.end; }
-    const a = P(t.from, true), b = P(t.end, true); const w = t.wb & 15;
-    ctx.globalAlpha = Math.max(0, 1 - t.t / .12); ctx.strokeStyle = w === 4 ? '#fff' : '#ffe066'; ctx.lineWidth = (w === 4 ? 3 : 1.8) * Z;
-    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.globalAlpha = 1;
-    if (t.t < .05) blob(ctx, b[0], b[1], 3 * Z, '#fff');
-  }
-  tracers = tracers.filter(t => t.t < .12);
-  let meScr = null;
-  // игроки
-  blinkT += dt;
+  // персонажи для 3D
+  const list = [], labels = [];
   for (const id in ents) {
-    const e = ents[id]; if (e.seen < 0 && +id !== myId) continue; const air = (e.h[e.h.length - 1].fl >> 4) & 3; if (air === 1) continue;
+    const e = ents[id]; if (e.seen < 0 && +id !== myId) continue; const last = e.h[e.h.length - 1], air = (last.fl >> 4) & 3; if (air === 1) continue;
     let q;
-    if (+id === myId && meAlive && !air) q = { p: target, aim: myAim || e.h[e.h.length - 1].aim, s: e.h[e.h.length - 1] };
+    if (+id === myId && meAlive && !air) q = { p: target, aim: myAim || last.aim, s: last };
     else q = interp(e, rt);
     if (!q) continue;
-    const prev = e.disp; e.disp = q.p; if (prev) e.walk += angDist(prev, q.p) * R * .25;
-    const sp = P(q.p); if (!sp) continue;
-    const ang = scrDir(q.p, tang(q.p, q.aim)), r = PR * sp[3], s = q.s;
-    const hh = artReady ? r * 4.3 : r; const hurt = e.lastHp !== undefined && s.hp < e.lastHp; e.lastHp = s.hp; if (hurt) e.hitT = .1; e.hitT = (e.hitT || 0) - dt;
-    if (air === 2) { bills.push({ y: sp[1] + 1e4, f: () => drawChute(sp[0], sp[1], r, ang, names[id] ? names[id].ch : +id, now) }); continue; }
-    bills.push({ y: sp[1], f: () => {
-    if (+id === myId) { ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(sp[0], sp[1] + (artReady ? 0 : r * .2), r * 1.55, artReady ? r * .7 : r * 1.35, 0, 0, 6.2832); ctx.stroke(); }
-    { const cs = Math.cos(ang); if (e.flip === undefined) e.flip = cs < 0; else if (cs < -.25) e.flip = true; else if (cs > .25) e.flip = false; }
-    drawChar(ctx, sp[0], sp[1], r, ang, names[id] ? names[id].ch : +id, s.wb, { flip: e.flip, rot: artReady ? tilt(sp[0], sp[1]) : 0, walk: e.walk, hit: e.hitT > 0, armor: s.fl & 2, blink: ((blinkT + +id * 1.3) % 3.2) < .12 });
-    if (s.fl & 8) { ctx.strokeStyle = '#ff6b6b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(sp[0], sp[1], r * 1.6, -1.57, -1.57 + 6.2832 * ((now / 1000) % 1)); ctx.stroke(); }
-    if (+id !== myId || !meAlive) { const nm = names[id] ? names[id].n : ''; ctx.font = `bold ${Math.round(11 * Math.max(.8, sp[3]))}px system-ui`; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillText(nm, sp[0] + 1, sp[1] - hh - 11); ctx.fillStyle = '#fff'; ctx.fillText(nm, sp[0], sp[1] - hh - 12);
-      ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(sp[0] - r, sp[1] - hh - 8, r * 2, 4); ctx.fillStyle = s.hp > 40 ? '#51cf66' : '#ff6b6b'; ctx.fillRect(sp[0] - r, sp[1] - hh - 8, r * 2 * s.hp / 100, 4); }
-    } });
-    if (+id === myId) meScr = sp;
+    const prev = e.disp; e.disp = q.p; const step = prev ? angDist(prev, q.p) * R : 0; e.walk += step * .16; e.mvT = step > .2 ? .15 : (e.mvT || 0) - dt;
+    const s = q.s, hurt = e.lastHp !== undefined && s.hp < e.lastHp; e.lastHp = s.hp; if (hurt) e.hitT = .1; e.hitT = (e.hitT || 0) - dt; e.fireT = (e.fireT || 0) - dt;
+    let alt = 0; if (air === 2) { if (!e.airT0) e.airT0 = now; alt = Math.max(0, 230 * (1 - (now - e.airT0) / 1000 / FALL_T)); } else e.airT0 = 0;
+    let aim = tang(q.p, q.aim); if (!aim[0] && !aim[1] && !aim[2]) aim = anyTang(q.p);
+    const ch = names[id] ? names[id].ch : +id;
+    list.push({ id: +id, ch, p: q.p, aim, wb: s.wb, walk: e.walk, moving: e.mvT > 0, hit: e.hitT > 0, armor: s.fl & 2, alt, fire: e.fireT > 0 && e.fireT > .04 });
+    labels.push({ id: +id, p: q.p, alt, hp: s.hp, heal: s.fl & 8 });
   }
-  // объёмные объекты и персонажи — по глубине (кто ниже на экране, тот ближе)
-  bills.sort((a, b) => a.y - b.y);
-  for (const b of bills) {
-    if (b.f) { b.f(); continue; }
-    const { o, q, bb } = b; let img = IMG[bb.img]; if (outZone(o.p, zone)) img = charredImg(bb.img, img);
-    const wpx = bb.w * q[3]; let al = 1;
-    if (meScr && meScr[1] < q[1] - 4 && Math.abs(meScr[0] - q[0]) < wpx * .45 && meScr[1] > q[1] - wpx * img.height / img.width * bb.ay) al = .45; // за деревом/домом — полупрозрачно
-    drawBill(img, q[0], q[1], wpx, bb.ay, tilt(q[0], q[1]), al, bb.sh);
-  }
-  // прицельная линия (сенсор)
-  if (meAlive && sticks.R && myAim && priv) { const s = priv.s[priv.cur]; const w = s[0] & 15; if (w) { const Wp = WEAPONS[w]; let p = target, d = myAim; ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.setLineDash([6, 8]); ctx.lineWidth = 2; ctx.beginPath(); const a = P(p, true); ctx.moveTo(a[0], a[1]); for (let i = 0; i < 12; i++) { [p, d] = moveOn(p, d, Wp.range / 12, d); const b = P(p, true); ctx.lineTo(b[0], b[1]); } ctx.stroke(); ctx.setLineDash([]); } }
-  // эффекты
-  for (const f of fx) {
-    f.t += dt; const q = P(f.p); if (!q) continue;
-    if (f.type === 'death') { // смешная смерть: крутится, сплющивается, улетает призрак
-      const k = Math.min(1, f.t / .6), r = PR * q[3];
-      if (f.t < 1.6) { ctx.globalAlpha = Math.max(0, 1 - Math.max(0, f.t - 1.1) / .5); drawChar(ctx, q[0], q[1], r, f.spin * f.t * 12, f.ch, 0, { dead: true, scale: 1 + .4 * Math.sin(k * 3.14) - k * .3 }); ctx.globalAlpha = 1; }
-      const gy = q[1] - f.t * 45 * q[3], gx = q[0] + Math.sin(f.t * 5) * 10 * q[3];
-      ctx.globalAlpha = Math.max(0, .85 - f.t / 3); ctx.fillStyle = '#f8f9fa'; ctx.beginPath(); ctx.arc(gx, gy, r * .8, 3.14, 0); ctx.lineTo(gx + r * .8, gy + r * .9); for (let i = 3; i >= -3; i--) ctx.lineTo(gx + i * r * .27, gy + r * (i % 2 ? .65 : .9)); ctx.fill();
-      blob(ctx, gx - r * .28, gy - r * .1, r * .13, '#000'); blob(ctx, gx + r * .28, gy - r * .1, r * .13, '#000'); ctx.strokeStyle = '#ffd43b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(gx, gy - r * 1.05, r * .5, r * .18, 0, 0, 6.2832); ctx.stroke(); ctx.globalAlpha = 1;
-      if (f.t < .5) for (let i = 0; i < 10; i++) { const a = i * .628 + f.spin, d = f.t * 140 * q[3]; ctx.fillStyle = COLORS[(i + f.ch) % 10]; ctx.fillRect(q[0] + Math.cos(a) * d, q[1] + Math.sin(a) * d - f.t * 30, 4, 7); }
-    } else if (f.type === 'crate') { for (let i = 0; i < 8; i++) { const a = i * .785, d = f.t * 120 * q[3]; ctx.fillStyle = '#c08a45'; ctx.save(); ctx.translate(q[0] + Math.cos(a) * d, q[1] + Math.sin(a) * d); ctx.rotate(f.t * 10 + i); ctx.fillRect(-4, -2, 8, 4); ctx.restore(); } }
-  }
+  for (const f of fx) { f.t += dt; if (f.type === 'death' && f.t < 1.3) list.push({ id: 100 + f.v, ch: f.ch, p: f.p, aim: f.aim || anyTang(f.p), wb: 0, walk: 0, dead: true, deadT: f.t }); }
   fx = fx.filter(f => f.t < 3);
-  // цифры урона
+  for (const t of tracers) { t.t += dt; if (!t.from) { const e = t.sid === myId && predP ? predP : ents[t.sid] && ents[t.sid].disp; t.from = e || t.end; if (ents[t.sid]) ents[t.sid].fireT = .1; } }
+  G3.frame({ now, dt, objs, zone, plan, matchT, phase, loot, list, tracers, comet, shipS, shipD, endInfo, camP, camF });
+  tracers = tracers.filter(t => t.t < .12);
+  // ===== 2D поверх 3D =====
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
   ctx.textAlign = 'center';
-  for (const n of nums) { n.t += dt; if (!n.p && ents[n.tid] && ents[n.tid].disp) n.p = ents[n.tid].disp; if (!n.p) continue; const q = P(n.p); if (!q) continue; ctx.globalAlpha = Math.max(0, 1 - n.t / .8); ctx.font = `900 ${n.crate ? 13 : 18}px system-ui`; ctx.fillStyle = '#000'; ctx.fillText(n.d, q[0] + 13 + 1, q[1] - 18 - n.t * 40 + 2); ctx.fillStyle = n.tid === myId ? '#ff6b6b' : n.crate ? '#ffd8a8' : n.d >= 50 ? '#ffd43b' : '#fff'; ctx.fillText(n.d, q[0] + 13, q[1] - 18 - n.t * 40); ctx.globalAlpha = 1; }
+  for (const l of labels) {
+    const [x, y, v] = G3.project(l.p, 66 + l.alt); if (!v) continue;
+    if (l.id !== myId || !meAlive) { const nm = names[l.id] ? names[l.id].n : ''; txt(nm, x, y - 8, 12, '#fff', 'center', 800);
+      ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(x - 18, y - 4, 36, 5); ctx.fillStyle = l.hp > 40 ? '#51cf66' : '#ff6b6b'; ctx.fillRect(x - 18, y - 4, 36 * l.hp / 100, 5); }
+    if (l.heal) { ctx.strokeStyle = '#ff6b6b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y + 12, 10, -1.57, -1.57 + 6.2832 * ((now / 1000) % 1)); ctx.stroke(); }
+  }
+  // призраки погибших
+  for (const f of fx) { if (f.type !== 'death') continue; const [x, y, v] = G3.project(f.p, 40 + f.t * 70); if (!v) continue; const r = 13;
+    ctx.globalAlpha = Math.max(0, .85 - f.t / 3); const gx = x + Math.sin(f.t * 5) * 10; ctx.fillStyle = '#f8f9fa'; ctx.beginPath(); ctx.arc(gx, y, r * .8, 3.14, 0); ctx.lineTo(gx + r * .8, y + r * .9); for (let i = 3; i >= -3; i--) ctx.lineTo(gx + i * r * .27, y + r * (i % 2 ? .65 : .9)); ctx.fill();
+    blob(ctx, gx - r * .28, y - r * .1, r * .13, '#000'); blob(ctx, gx + r * .28, y - r * .1, r * .13, '#000'); ctx.strokeStyle = '#ffd43b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(gx, y - r * 1.05, r * .5, r * .18, 0, 0, 6.2832); ctx.stroke(); ctx.globalAlpha = 1;
+    if (f.t < .6) { const [cx, cy] = G3.project(f.p, 20); for (let i = 0; i < 12; i++) { const a = i * .52 + f.spin, d = f.t * 160; ctx.fillStyle = COLORS[(i + f.ch) % 10]; ctx.fillRect(cx + Math.cos(a) * d, cy + Math.sin(a) * d - f.t * 40 + f.t * f.t * 200, 4, 7); } } }
+  // цифры урона
+  for (const n of nums) { n.t += dt; if (!n.p && ents[n.tid] && ents[n.tid].disp) n.p = ents[n.tid].disp; if (!n.p) continue; const [x, y, v] = G3.project(n.p, 60 + n.t * 50); if (!v) continue; ctx.globalAlpha = Math.max(0, 1 - n.t / .8); txt(String(n.d), x + 16, y, n.crate ? 13 : 18, n.tid === myId ? '#ff6b6b' : n.crate ? '#ffd8a8' : n.d >= 50 ? '#ffd43b' : '#fff'); ctx.globalAlpha = 1; }
   nums = nums.filter(n => n.t < .8);
-  ctx.restore();
-  ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(CX, CY, HR, 0, 6.2832); ctx.stroke();
+  // прицельная линия (сенсор)
+  if (meAlive && sticks.R && myAim && priv) { const s = priv.s[priv.cur]; const w = s[0] & 15; if (w) { const Wp = WEAPONS[w]; let p = target, d = myAim; ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.setLineDash([6, 8]); ctx.lineWidth = 2; ctx.beginPath(); let a = G3.project(p, 24); ctx.moveTo(a[0], a[1]); for (let i = 0; i < 12; i++) { [p, d] = moveOn(p, d, Wp.range / 12, d); a = G3.project(p, 24); if (!a[2]) break; ctx.lineTo(a[0], a[1]); } ctx.stroke(); ctx.setLineDash([]); } }
   // вспышка удара кометы
-  if (phase === 1 && matchT >= COMET_T0 && matchT < COMET_T0 + .8 && flash === 0) { flash = 1; shake = .8; sfx('boom'); }
+  if (phase === 1 && matchT >= COMET_T0 && matchT < COMET_T0 + .8 && flash === 0) { flash = 1; sfx('boom'); }
   if (flash > 0 && phase === 1 && matchT < COMET_T0 + 1) { ctx.fillStyle = `rgba(255,240,210,${Math.max(0, 1 - (matchT - COMET_T0) / .8)})`; ctx.fillRect(0, 0, W, H); }
   if (zone.rho < Math.PI && angDist(camP, zone.c) > zone.rho - .25) { while (ash.length < 40) ash.push({ x: Math.random() * W, y: Math.random() * H, s: 1 + Math.random() * 2.5, v: 20 + Math.random() * 30 });
     for (const a of ash) { a.y += a.v * dt; a.x += Math.sin(now / 700 + a.s * 5) * 15 * dt; if (a.y > H) { a.y = -5; a.x = Math.random() * W; } ctx.fillStyle = a.s > 2.5 ? 'rgba(255,140,60,.8)' : 'rgba(200,200,200,.55)'; ctx.fillRect(a.x, a.y, a.s, a.s); } } else ash = [];
@@ -794,9 +699,9 @@ function minimap(now, from) {
 // ===== стартовый экран =====
 let myName = '', myChar = Math.floor(Math.random() * 10);
 try { myName = localStorage.getItem('le_name') || ''; const c = localStorage.getItem('le_char'); if (c !== null) myChar = +c; } catch (e) { }
-const nameIn = document.getElementById('name'), pv = document.getElementById('pv'), pg = pv.getContext('2d');
+const nameIn = document.getElementById('name'), pv = document.getElementById('pv');
 nameIn.value = myName;
-function drawPv() { pg.setTransform(1, 0, 0, 1, 0, 0); pg.clearRect(0, 0, pv.width, pv.height); pg.setTransform(2, 0, 0, 2, 0, 0); if (artReady) drawCharArt(pg, 45, 84, 18, -.3, myChar, 2 | (2 << 4), {}); else drawChar(pg, 45, 45, 26, -.5, myChar, 2 | (2 << 4), {}); }
+function drawPv() { }
 document.getElementById('prev').onclick = () => { myChar = (myChar + 9) % 10; drawPv(); };
 document.getElementById('next').onclick = () => { myChar = (myChar + 1) % 10; drawPv(); };
 document.getElementById('play').onclick = () => {
@@ -806,4 +711,4 @@ document.getElementById('play').onclick = () => {
   try { if (touchUI || 'ontouchstart' in window) document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => { }); } catch (e) { }
 };
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => { });
-resize(); layout(); drawPv(); requestAnimationFrame(frame);
+resize(); layout(); G3.resize(W, H); requestAnimationFrame(frame);
