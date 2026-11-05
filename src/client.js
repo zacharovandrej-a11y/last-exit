@@ -577,8 +577,9 @@ function hud(now, meAlive, mePos) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const from = mePos || camP;
   if (phase === 1) {
-    if (zone.pre) { if (matchT > DROP_T) arrowTo(comet, '#ff6b3d', '☄️', from); }
-    else if (angDist(from, zone.c) > zone.rho * .6 || zone.k >= 5) arrowTo(zone.k >= 5 && plan ? plan[ZONE.length - 1] : (!zone.mv && plan && zone.k < ZONE.length ? plan[zone.k] : zone.c), '#69db7c', '🚀', from);
+    // одна стрелка: к ближайшей безопасной точке (следующей зоны, если она уже показана); в безопасности — не нужна
+    if (!zone.pre && meAlive) { const T = !zone.mv && plan && zone.k < ZONE.length ? { c: plan[zone.k], rho: ZONE[zone.k][0] } : zone;
+      if (angDist(from, T.c) > T.rho) arrowTo(T.c, outZone(from, zone) ? '#ff8787' : '#69db7c', '', from); }
     const wi = zone;
     const s = wi.pre ? '☄️ ' + Math.ceil(wi.left) : wi.mv ? '🔥 ' + Math.ceil(wi.left) : '⚠️ ' + Math.ceil(wi.left);
     const col = wi.pre ? '#ffa94d' : wi.mv ? '#ff6b6b' : (wi.left < 5 ? (Math.floor(now / 250) % 2 ? '#ffd43b' : '#fff') : '#fff');
@@ -614,7 +615,11 @@ function hud(now, meAlive, mePos) {
     pickShow = null; let bd = 1e9; for (const it of loot.values()) { const d = angDist(it.p, mePos) * R; if (d < PR + 30 && d < bd && it.k === 0) { bd = d; pickShow = it; } }
     if (pickShow) { const b = ui('pick'); btn(b, RARITY[pickShow.r], .7); ctx.save(); ctx.translate(b.x + b.w * .3, b.y + b.h * .5); gunShape(ctx, pickShow.x, b.h * .32, RARITY[pickShow.r]); ctx.restore(); txt(touchUI ? '✋' : 'E', b.x + b.w - 16, b.y + b.h * .65, 18); }
     // в огне
-    if (outZone(mePos, zone)) { const g = ctx.createRadialGradient(CX, CY, Math.min(W, H) * .3, CX, CY, Math.max(W, H) * .7); g.addColorStop(0, 'rgba(255,40,0,0)'); g.addColorStop(1, `rgba(255,40,0,${.45 + .2 * Math.sin(now / 120)})`); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); txt('🔥', CX, CY - 46, 26); }
+    if (outZone(mePos, zone)) { const g = ctx.createRadialGradient(CX, CY, Math.min(W, H) * .32, CX, CY, Math.max(W, H) * .7); g.addColorStop(0, 'rgba(255,40,0,0)'); g.addColorStop(1, `rgba(255,40,0,${.4 + .2 * Math.sin(now / 120)})`); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'lighter'; const n = Math.ceil((W + H) / 45);
+      for (let i = 0; i < n * 2; i++) { const t = i / (n * 2), per = 2 * (W + H), d = t * per; let x, y, a; if (d < W) { x = d; y = H; a = 0; } else if (d < W + H) { x = W; y = H - (d - W); a = -1.57; } else if (d < 2 * W + H) { x = W - (d - W - H); y = 0; a = 3.14; } else { x = 0; y = d - 2 * W - H; a = 1.57; }
+        const f = .6 + .5 * Math.sin(now / 70 + i * 2.3) + .3 * Math.sin(now / 31 + i * 5.1); if (f < .4) continue; ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.drawImage(FLAME, -18 * f, -50 * f, 36 * f, 50 * f); ctx.restore(); }
+      ctx.globalCompositeOperation = 'source-over'; }
     // джойстики
     drawStick(sticks.L, 'rgba(255,255,255,.65)'); drawStick(sticks.R, 'rgba(255,120,80,.75)');
     if (touchUI) { if (!sticks.L) ghostStick(W * .16, H * .68); if (!sticks.R) ghostStick(W * .84, H * .68); }
@@ -647,19 +652,38 @@ function hud(now, meAlive, mePos) {
 }
 function ghostStick(x, y) { ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 46, 0, 6.2832); ctx.stroke(); }
 function drawStick(s, col) { if (!s) return; ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(s.x0, s.y0, 55, 0, 6.2832); ctx.stroke(); const v = stickVec(s); blob(ctx, s.x0 + v[0] * 55, s.y0 - v[1] * 55, 24, col); }
+let mmC = null, mmT = 0;
+const BCOL = BIOMES.map(b => { const n = parseInt(b.col.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; });
+function mmRender(N) {
+  if (!mmC || mmC.width !== N) { mmC = document.createElement('canvas'); mmC.width = mmC.height = N; }
+  const g = mmC.getContext('2d'), im = g.createImageData(N, N), d = im.data, h = N / 2;
+  const nz_ = !zone.pre && !zone.mv && plan && zone.k < ZONE.length ? { c: plan[zone.k], rho: ZONE[zone.k][0] } : null;
+  const burnOn = phase >= 1 && zone.rho < Math.PI, cz = Math.cos(zone.rho), eps = 2.6 / N;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const nx = (x + .5 - h) / h, ny = -(y + .5 - h) / h, r2 = nx * nx + ny * ny; const i = (y * N + x) * 4;
+    if (r2 > 1) { d[i + 3] = 0; continue; }
+    const nz = Math.sqrt(1 - r2);
+    const q = [CR[0] * nx + CF[0] * ny + CP[0] * nz, CR[1] * nx + CF[1] * ny + CP[1] * nz, CR[2] * nx + CF[2] * ny + CP[2] * nz];
+    let col = [95, 184, 63];
+    for (let k = 0; k < BIOMES.length; k++) if (dot(q, BIOMES[k].c) > Math.cos(BIOMES[k].r)) { col = BCOL[k]; break; }
+    if (burnOn) { const dd = dot(q, zone.c);
+      if (dd < cz) col = [45, 16, 10];
+      if (Math.abs(Math.acos(Math.max(-1, Math.min(1, dd))) - zone.rho) < eps) col = [255, 212, 59]; }
+    if (phase >= 1 && nz_) { const a = Math.acos(Math.max(-1, Math.min(1, dot(q, nz_.c)))); if (Math.abs(a - nz_.rho) < eps * .8 && ((x + y) >> 1) % 2) col = [255, 255, 255]; }
+    const sh = .55 + .45 * nz;
+    d[i] = col[0] * sh; d[i + 1] = col[1] * sh; d[i + 2] = col[2] * sh; d[i + 3] = 255;
+  }
+  g.putImageData(im, 0, 0);
+}
 function minimap(now, from) {
   const big = bigMap, r = big ? Math.min(W, H) * .42 : 56, cx = big ? CX : W - 68, cy = big ? CY : 68;
   const pr = q => { const x = dot(q, CR), y = dot(q, CF), z = dot(q, CP); return [cx + x * r, cy - y * r, z]; };
-  const capPts = (c, th) => { const u = anyTang(c), v = cross(c, u), pts = []; for (let i = 0; i < 64; i++) { const t = i / 64 * 6.2832; let q = add(mul(c, Math.cos(th)), add(mul(u, Math.cos(t)), v, Math.sin(t)), Math.sin(th)); let [x, y, z] = pr(q); if (z < 0) { const l = Math.hypot(x - cx, y - cy) || 1; x = cx + (x - cx) / l * r; y = cy + (y - cy) / l * r; } pts.push([x, y]); } return pts; };
-  const cap = (c, th, col) => { if (th >= Math.PI - 1e-3) { ctx.fillStyle = col; ctx.fillRect(cx - r, cy - r, 2 * r, 2 * r); return; } const t = capTest(c, th, CP, Math.PI / 2); if (!t) return; const tp = pr(t); fillRegion(capPts(c, th), cx, cy, r, tp, col); };
-  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, 6.2832); ctx.fillStyle = '#5fb83f'; ctx.fill(); ctx.clip();
-  for (const b of BIOMES) cap(b.c, b.r, b.col);
-  if (phase >= 1 && zone.rho < Math.PI) cap(mul(zone.c, -1), Math.PI - zone.rho, 'rgba(40,12,8,.85)');
-  const g = ctx.createRadialGradient(cx - r * .3, cy - r * .3, r * .1, cx, cy, r); g.addColorStop(0, 'rgba(255,255,255,.18)'); g.addColorStop(1, 'rgba(0,0,30,.45)'); ctx.fillStyle = g; ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+  // глобус рисуем попиксельно в маленький буфер (надёжно и дёшево), обновляем 6 раз в секунду
+  const N = big ? 160 : 64;
+  if (!mmC || mmC.width !== N || now - mmT > 160) { mmT = now; mmRender(N); }
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, 6.2832); ctx.clip(); ctx.imageSmoothingEnabled = true; ctx.drawImage(mmC, cx - r, cy - r, 2 * r, 2 * r);
   if (phase >= 1) {
     const ring = (c, th, col, dash) => { ctx.setLineDash(dash ? [4, 4] : []); ctx.strokeStyle = col; ctx.lineWidth = big ? 3 : 2; ctx.beginPath(); let on = false; const u = anyTang(c), v = cross(c, u); for (let i = 0; i <= 64; i++) { const t = i / 64 * 6.2832; const q = add(mul(c, Math.cos(th)), add(mul(u, Math.cos(t)), v, Math.sin(t)), Math.sin(th)); const [x, y, z] = pr(q); if (z > 0) { on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; } else on = false; } ctx.stroke(); ctx.setLineDash([]); };
-    if (zone.rho < Math.PI) ring(zone.c, zone.rho, '#ffd43b');
-    if (plan && !zone.pre && !zone.mv && zone.k < ZONE.length) ring(plan[zone.k], ZONE[zone.k][0], '#fff', 1);
     if (plan && zone.k >= 5) { const [ax, ay, az] = pr(plan[ZONE.length - 1]); if (az > 0) txt('🚀', ax, ay + 5, big ? 22 : 13); }
     const [kx, ky, kz] = pr(comet); if (kz > 0 && zone.pre) txt('☄️', kx, ky + 5, big ? 22 : 13);
     if (phase === 1 && matchT < DROP_T) { const [sx, sy, sz] = pr(shipPos(shipS, shipD, matchT)[0]); if (sz > 0) txt('✈️', sx, sy + 5, big ? 22 : 13); }

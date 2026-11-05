@@ -149,7 +149,7 @@ export class World {
       if (!p.alive) continue;
       if (p.air) continue;
       // огонь
-      if (outZone(p.p, this.z)) { this.damage(p, zoneDps(this.z.rho) * DT, null, 0, true); p.fireAcc = (p.fireAcc || 0) + zoneDps(this.z.rho) * DT; if (p.fireAcc >= 5) { p.hm.push([p.id, Math.round(p.fireAcc)]); p.fireAcc = 0; } }
+      if (outZone(p.p, this.z)) { this.damage(p, zoneDps(this.z) * DT, null, 0, true); p.fireAcc = (p.fireAcc || 0) + zoneDps(this.z) * DT; if (p.fireAcc >= 5) { p.hm.push([p.id, Math.round(p.fireAcc)]); p.fireAcc = 0; } }
       // автоподбор
       for (const it of this.loot.values()) if (dot(it.p, p.p) > .9995 && angDist(it.p, p.p) * R < PR + 14) this.pickup(p, it, false);
     }

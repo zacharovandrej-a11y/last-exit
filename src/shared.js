@@ -49,13 +49,18 @@ const SHIP_V = 210;  // скорость транспорта
 const FALL_T = 2.6;  // секунд на парашюте
 const COMET_T0 = 32; // удар кометы (от начала матча)
 // этапы: [угловой радиус безопасной зоны, секунд движения, пауза]
-const ZONE = [[2.64, 18, 14], [2.14, 18, 14], [1.57, 18, 14], [1.04, 18, 12], [.6, 16, 12], [.28, 14, 10], [.09, 12, 8], [0, 12, 0]];
+// огонь всегда медленнее бегущего игрока (175 ед/с): ускоряется от 30 до 76 ед/с к концу, и жжёт сильнее
+const ZR = [2.64, 2.14, 1.57, 1.04, .6, .28, .09, 0];     // угловой радиус безопасной зоны
+const ZV = [30, 34, 38, 44, 52, 60, 68, 76];              // скорость фронта огня, ед/с
+const ZP = [20, 16, 14, 12, 12, 10, 8, 0];                // пауза после этапа, с
+const ZDPS = [3, 4, 6, 8, 11, 15, 20, 30];                // урон огня в секунду на этапе
+const ZONE = ZR.map((r, k) => [r, Math.max(6, ((k ? ZR[k - 1] : Math.PI) - r) * R / ZV[k]), ZP[k]]);
 // центры зон: первые три — точка напротив удара, дальше каждый круг смещается внутри прошлого
 function makePlan(rnd, comet) {
   let c = mul(comet, -1); const cs = [];
   for (let k = 0; k < ZONE.length; k++) {
     if (k >= 3 && k < ZONE.length - 1) {
-      const d = (ZONE[k - 1][0] - ZONE[k][0]) * (.35 + .55 * rnd()), u = anyTang(c), v = cross(c, u), a = rnd() * 6.2832;
+      const d = (ZONE[k - 1][0] - ZONE[k][0]) * (.3 + .2 * rnd()), u = anyTang(c), v = cross(c, u), a = rnd() * 6.2832;
       c = moveOn(c, norm(add(mul(u, Math.cos(a)), v, Math.sin(a))), d * R)[0];
     }
     cs.push(c);
@@ -74,7 +79,7 @@ function zoneAt(t, comet, cs) {
   }
   return { c, rho: 0, k: ZONE.length, mv: 0, left: 0 };
 }
-const zoneDps = rho => 5 + (Math.PI - rho) * 5;
+const zoneDps = z => ZDPS[Math.min(ZDPS.length - 1, Math.max(0, z.mv ? z.k : z.k - 1))];
 const outZone = (p, z) => z.rho < Math.PI && angDist(p, z.c) > z.rho;
 const shipPos = (S, D, t) => moveOn(S, D, SHIP_V * Math.max(0, Math.min(DROP_T, t)), D);
 
