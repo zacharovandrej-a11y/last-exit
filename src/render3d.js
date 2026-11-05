@@ -136,9 +136,16 @@ void main(){
     car: (w, h) => [[geo.box, 'car', M(0, 8, 0, w, 9, h)], [geo.box, 'car', M(-w * .06, 15.5, 0, w * .52, 7, h * .9)], [geo.box, 0x26323a, M(-w * .06, 15.5, 0, w * .54, 5.4, h * .92)],
       [geo.cyl10, 0x1c1c1c, MX(w * .3, 4.5, 0, 4.5, h * 1.02, 4.5)], [geo.cyl10, 0x1c1c1c, MX(-w * .3, 4.5, 0, 4.5, h * 1.02, 4.5)]],
     crate: () => [[geo.box, 'crate', M(0, 13, 0, 26, 26, 26)]],
-    furn: (w, h, o) => o.fk === 'bed' ? [[geo.box, 0x5a4632, M(0, 5, 0, w, 10, h)], [geo.box, 0xcfc8b8, M(0, 11, h * .05, w * .9, 3, h * .8)], [geo.box, 0x6b7a5a, M(0, 11.5, h * .12, w * .92, 3, h * .5)], [geo.box, 0xe8e4da, M(0, 12.5, -h * .38, w * .7, 3, h * .14)]]
-      : o.fk === 'table' ? [[geo.box, 0x6b4a2e, M(0, 13, 0, w, 2.5, h)], [geo.box, 0x4a3624, M(w * .4, 6, h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(-w * .4, 6, h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(w * .4, 6, -h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(-w * .4, 6, -h * .35, 2, 12, 2)]]
-      : [[geo.box, 0x6e6a62, M(0, 15, 0, w, 30, h)], [geo.box, 0xa8543a, M(-w * .2, 21, 0, w * .35, 6, h * .8)], [geo.box, 0x5a7a8a, M(w * .22, 21, 0, w * .3, 6, h * .8)], [geo.box, 0xc9a85a, M(0, 9, 0, w * .8, 6, h * .8)]],
+    furn: (w, h, o) => { const k = o.fk;
+      if (k === 'bed') return [[geo.box, 0x5a4632, M(0, 5, 0, w, 10, h)], [geo.box, 0xcfc8b8, M(0, 11, h * .05, w * .9, 3, h * .8)], [geo.box, 0x6b7a5a, M(0, 11.5, h * .12, w * .92, 3, h * .5)], [geo.box, 0xe8e4da, M(0, 12.5, -h * .38, w * .7, 3, h * .14)]];
+      if (k === 'bunk') return [[geo.box, 0x4a4f4a, M(0, 6, 0, w, 3, h)], [geo.box, 0x55603a, M(0, 8, 0, w * .9, 2, h * .9)], [geo.box, 0x4a4f4a, M(0, 24, 0, w, 3, h)], [geo.box, 0x55603a, M(0, 26, 0, w * .9, 2, h * .9)], [geo.box, 0x3a3d3a, M(w * .45, 14, h * .45, 1.6, 28, 1.6)], [geo.box, 0x3a3d3a, M(-w * .45, 14, -h * .45, 1.6, 28, 1.6)], [geo.box, 0x3a3d3a, M(w * .45, 14, -h * .45, 1.6, 28, 1.6)], [geo.box, 0x3a3d3a, M(-w * .45, 14, h * .45, 1.6, 28, 1.6)]];
+      if (k === 'table') return [[geo.box, 0x6b4a2e, M(0, 13, 0, w, 2.5, h)], [geo.box, 0x4a3624, M(w * .4, 6, h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(-w * .4, 6, h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(w * .4, 6, -h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(-w * .4, 6, -h * .35, 2, 12, 2)], [geo.box, 0xe8e4da, M(w * .15, 15, 0, 6, 1.5, 5)]];
+      if (k === 'desk') return [[geo.box, 0x5a4a3a, M(0, 13, 0, w, 2.5, h)], [geo.box, 0x4a3c2e, M(w * .3, 6, 0, w * .35, 12, h * .9)], [geo.box, 0x2a2a2a, M(-w * .1, 18, 0, 8, 7, 2)], [geo.box, 0x34342f, M(-w * .1, 7, h * .7, 8, 14, 8)]];
+      if (k === 'sofa') return [[geo.box, 0x5a3a3a, M(0, 5, 0, w, 10, h)], [geo.box, 0x4a2e2e, M(0, 12, -h * .35, w, 14, h * .3)], [geo.box, 0x4a2e2e, M(w * .45, 9, 0, w * .1, 10, h)], [geo.box, 0x4a2e2e, M(-w * .45, 9, 0, w * .1, 10, h)]];
+      return [[geo.box, 0x6e6a62, M(0, 15, 0, w, 30, h)], [geo.box, 0xa8543a, M(-w * .2, 21, 0, w * .35, 6, h * .8)], [geo.box, 0x5a7a8a, M(w * .22, 21, 0, w * .3, 6, h * .8)], [geo.box, 0xc9a85a, M(0, 9, 0, w * .8, 6, h * .8)]]; },
+    barrel: (w) => [[geo.cyl10, 0x4a5a3a, M(0, 12, 0, w / 2, 24, w / 2)], [geo.cyl10, 0x2e3a26, M(0, 8, 0, w / 2 + .3, 1.5, w / 2 + .3)], [geo.cyl10, 0x2e3a26, M(0, 17, 0, w / 2 + .3, 1.5, w / 2 + .3)]],
+    fence: (w) => [[geo.box, 0x6b5238, M(0, 10, 0, w, 2, 2)], [geo.box, 0x6b5238, M(0, 18, 0, w, 2, 2)], ...[-.5, -.25, 0, .25, .5].map(k => [geo.box, 0x5a4430, M(w * k * .96, 11, 0, 3, 22, 3)])],
+    bush: (w) => { const k = w / 34; return [[geo.dod, 'leaf2', M(0, 8 * k, 0, 15 * k, 11 * k, 15 * k)], [geo.dod, 'leaf', M(7 * k, 11 * k, 4 * k, 9 * k, 9 * k, 9 * k, 1)], [geo.dod, 'leaf', M(-6 * k, 10 * k, -3 * k, 9 * k, 8 * k, 9 * k, 2)]]; },
     wall: (w, h) => [[geo.box, 0x8d8d86, M(0, 11, 0, w, 22, h)], [geo.box, 0x76766f, M(0, 22.5, 0, w * 1.02, 2, h * 1.3)]],
     tent: (w, h) => [[geo.roof, 0x5a5a3a, M(0, 0, 0, w, 30, h)], [geo.box, 0x2e2e20, M(w / 2 + .3, 8, 0, .8, 14, 8)]],
   };
@@ -175,42 +182,81 @@ void main(){
     buildBuildings(objs);
   }
   // ===== здания =====
-  const BSTY = {
-    house: { wall: id => VAR.house[id % VAR.house.length], floor: 0x6b5038, roof: id => VAR.roof[id % VAR.roof.length], gable: 1, win: 1 },
-    house2: { wall: id => VAR.house2[id % VAR.house2.length], floor: 0x8a847a, roof: () => 0x66625b, win: 1 },
-    barn: { wall: () => 0x72302a, floor: 0x6b5a40, roof: () => 0x4e535a, gable: 1 },
-    market: { wall: () => 0xcfcac0, floor: 0x9a978e, roof: () => 0x6e6a62, win: 1 },
-    bunker: { wall: () => 0x82827a, floor: 0x5e5e58, roof: () => 0x6e6e66, slit: 1 },
+  // процедурные текстуры (серые — цвет задаёт оттенок экземпляра)
+  function tex(f, n = 128) { const c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d'); f(g, n, mkRng(n * 7 + f.length)); const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.magFilter = T.NearestFilter; return t; }
+  const noiseFill = (g, n, rnd, base, amp, k = 1800) => { g.fillStyle = `rgb(${base},${base},${base})`; g.fillRect(0, 0, n, n); for (let i = 0; i < k; i++) { const v = base + (rnd() - .5) * amp | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(rnd() * n | 0, rnd() * n | 0, 1 + (rnd() * 2 | 0), 1 + (rnd() * 2 | 0)); } };
+  const TX = {
+    brick: tex((g, n, rnd) => { g.fillStyle = '#d8d4cc'; g.fillRect(0, 0, n, n); for (let y = 0; y < n; y += 8) for (let x = -16; x < n; x += 16) { const o = (y / 8) % 2 ? 8 : 0, v = 150 + rnd() * 50 | 0; g.fillStyle = `rgb(${v + 20},${v},${v - 10})`; g.fillRect(x + o + 1, y + 1, 14, 6); } }),
+    plaster: tex((g, n, rnd) => { noiseFill(g, n, rnd, 225, 30); g.strokeStyle = 'rgba(90,80,70,.35)'; for (let i = 0; i < 4; i++) { g.beginPath(); let x = rnd() * n, y = rnd() * n; g.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (rnd() - .5) * 16; y += rnd() * 10; g.lineTo(x, y); } g.stroke(); } }),
+    concrete: tex((g, n, rnd) => { noiseFill(g, n, rnd, 200, 40); g.fillStyle = 'rgba(70,70,70,.35)'; g.fillRect(0, 0, n, 1); g.fillRect(0, 63, n, 1); g.fillRect(0, 0, 1, n); g.fillRect(63, 0, 1, n); }),
+    wood: tex((g, n, rnd) => { for (let x = 0; x < n; x += 12) { const v = 165 + rnd() * 50 | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x, 0, 12, n); g.fillStyle = 'rgba(40,30,20,.45)'; g.fillRect(x, 0, 1, n); for (let k = 0; k < 6; k++) { g.fillStyle = 'rgba(60,45,30,.2)'; g.fillRect(x + 2 + rnd() * 8, rnd() * n, 1, 10 + rnd() * 20); } } }),
+    metal: tex((g, n) => { for (let x = 0; x < n; x++) { const v = 185 + Math.sin(x / 4 * Math.PI) * 35 | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x, 0, 1, n); } }),
+    adobe: tex((g, n, rnd) => { noiseFill(g, n, rnd, 215, 45, 2600); }),
+    fwood: tex((g, n, rnd) => { for (let y = 0; y < n; y += 10) { let x = -rnd() * 40; while (x < n) { const l = 30 + rnd() * 40, v = 150 + rnd() * 60 | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x, y, l, 10); g.fillStyle = 'rgba(30,20,10,.5)'; g.fillRect(x, y, 1, 10); x += l; } g.fillStyle = 'rgba(30,20,10,.5)'; g.fillRect(0, y, n, 1); } }),
+    tile: tex((g, n, rnd) => { for (let y = 0; y < n; y += 32) for (let x = 0; x < n; x += 32) { const v = ((x + y) / 32) % 2 ? 235 : 200; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x, y, 32, 32); } g.fillStyle = 'rgba(60,60,60,.5)'; for (let i = 0; i < n; i += 32) { g.fillRect(i, 0, 1, n); g.fillRect(0, i, n, 1); } }),
+    floorc: tex((g, n, rnd) => { noiseFill(g, n, rnd, 190, 30); g.fillStyle = 'rgba(0,0,0,.08)'; for (let i = 0; i < 6; i++) { g.beginPath(); g.arc(rnd() * n, rnd() * n, 6 + rnd() * 16, 0, 6.28); g.fill(); } }),
+    dirt: tex((g, n, rnd) => { noiseFill(g, n, rnd, 180, 60, 3000); }),
+    rooftile: tex((g, n, rnd) => { g.fillStyle = '#9a9a9a'; g.fillRect(0, 0, n, n); for (let y = 0; y < n; y += 8) for (let x = (y / 8) % 2 ? -6 : 0; x < n; x += 12) { const v = 175 + rnd() * 50 | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.beginPath(); g.ellipse(x + 6, y + 4, 6, 5, 0, 0, Math.PI); g.fill(); } }),
+    gravel: tex((g, n, rnd) => { noiseFill(g, n, rnd, 170, 70, 4000); }),
   };
+  // материал с текстурой «по миру»: стены, пол, крыша любой длины без растяжения
+  const texMats = {};
+  function texMat(name, scale) {
+    const k = name + scale; if (texMats[k]) return texMats[k];
+    const m = new T.MeshLambertMaterial({ color: 0xffffff, map: TX[name] });
+    m.onBeforeCompile = sh => {
+      sh.uniforms.zc = U.zc; sh.uniforms.zrho = U.zrho;
+      sh.vertexShader = 'varying vec3 vWP;varying vec3 vWN;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n#ifdef USE_INSTANCING\nmat4 mw_=modelMatrix*instanceMatrix;\n#else\nmat4 mw_=modelMatrix;\n#endif\nvWP=(mw_*vec4(transformed,1.)).xyz;vWN=normalize(mat3(mw_)*objectNormal);');
+      sh.fragmentShader = 'varying vec3 vWP;varying vec3 vWN;uniform vec2 zc;uniform float zrho;\n' + sh.fragmentShader
+        .replace('#include <map_fragment>', `vec3 an_=abs(vWN);vec2 wuv_=an_.y>.6?vWP.xz:(an_.x>an_.z?vWP.zy:vWP.xy);vec4 texelColor=texture2D(map,wuv_/${scale.toFixed(1)});texelColor=mapTexelToLinear(texelColor);diffuseColor*=texelColor;`)
+        .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n' + GRADE + 'if(length(vWP.xz-zc)>zrho)gl_FragColor.rgb=gl_FragColor.rgb*.16+vec3(.05,.02,.01);');
+    };
+    return texMats[k] = m;
+  }
+  const BSTY = {
+    plaster: { tex: 'plaster', cols: [0xe0d6c2, 0xd8cfbe, 0xcdbfa6, 0xd9c9b0] }, plaster2: { tex: 'plaster', cols: [0xc9c2b4, 0xbcb4a6, 0xd6cfc0, 0xb8a990] },
+    brick: { tex: 'brick', cols: [0xb8705a, 0xa86450, 0xc08068] }, concrete: { tex: 'concrete', cols: [0xbdb8ae, 0xaaa69e, 0x9c988f] },
+    wood: { tex: 'wood', cols: [0x8a5a3a, 0x7a3a2c, 0x6e5238] }, metal: { tex: 'metal', cols: [0x8a8f86, 0x7a8478, 0x9a9488] }, adobe: { tex: 'adobe', cols: [0xd9b88a, 0xcfa878, 0xe0c49a] },
+  };
+  const FLOOR = { wood: ['fwood', 0x9a7350], tile: ['tile', 0xb8b4aa], concrete: ['floorc', 0x99968e], dirt: ['dirt', 0x8a7556] };
+  const ROOFC = [0x7e3a2c, 0x4a4f57, 0x6b4a3a, 0x5b4636, 0x8a4a34];
   const bInst = {}, bParts = []; let insideB = -1;
   function buildBuildings(objs) {
     for (const k in bInst) { scene.remove(bInst[k].mesh); delete bInst[k]; }
     bParts.length = 0; insideB = -1;
     const plan = {}, Y = new T.Vector3(0, 1, 0), ONE = new T.Vector3(1, 1, 1);
     for (const b of objs.blds || []) {
-      const base = new T.Matrix4().compose(new T.Vector3(b.p[0], 0, b.p[1]), new T.Quaternion().setFromAxisAngle(Y, -b.a), ONE);
-      const S = BSTY[b.kind], wc = S.wall(b.id), pcs = [];
-      pcs.push([geo.box, S.floor, M(0, .7, 0, b.w - 2, 1.4, b.h - 2), 'floor']);
+      const K = BKIND[b.kind], S = BSTY[K.style], base = new T.Matrix4().compose(new T.Vector3(b.p[0], 0, b.p[1]), new T.Quaternion().setFromAxisAngle(Y, -b.a), ONE);
+      const wc = S.cols[b.id % S.cols.length], wm = S.tex, pcs = [];
+      const [ft, fc] = FLOOR[K.floor]; pcs.push([geo.box, ft, 48, fc, M(0, .8, 0, b.w - 2, 1.6, b.h - 2), 'floor']);
       for (const id of b.walls) {
-        const o = objs[id], L = o.hor ? o.w : o.h, sx = o.hor ? L : WALLT, sz = o.hor ? WALLT : L;
-        pcs.push([geo.box, wc, M(o.lx, WALLH / 2, o.ly, sx, WALLH, sz), 'wall', M(o.lx, 7, o.ly, sx, 14, sz)]);
-        const outer = o.hor ? Math.abs(Math.abs(o.ly) - (b.h / 2 - WALLT / 2)) < 1 : Math.abs(Math.abs(o.lx) - (b.w / 2 - WALLT / 2)) < 1;
-        if (outer && (S.win || S.slit) && L > 40) { const n = Math.max(1, Math.floor(L / 62)); for (let k = 0; k < n; k++) { const off = (k + .5) / n * L - L / 2, x = o.lx + (o.hor ? off : 0), z = o.ly + (o.hor ? 0 : off);
-          if (S.slit) pcs.push([geo.box, 0x151515, M(x, 40, z, o.hor ? 18 : WALLT + 1.2, 4, o.hor ? WALLT + 1.2 : 18), 'win']);
-          else { pcs.push([geo.box, 0xe8e4da, M(x, 36, z, o.hor ? 18 : WALLT + .8, 17, o.hor ? WALLT + .8 : 18), 'win']); pcs.push([geo.box, 0x2b363c, M(x, 36, z, o.hor ? 14 : WALLT + 1.4, 13, o.hor ? WALLT + 1.4 : 14), 'win']); } } }
+        const o = objs[id], L = o.len, sx = o.hor ? L : WALLT, sz = o.hor ? WALLT : L, X = o.lx, Z = o.ly;
+        if (o.win) { // окно: подоконник, перемычка, рама; посередине пусто — видно и стреляют
+          const sill = K.slit ? 36 : 24, top = K.slit ? 44 : 50;
+          pcs.push([geo.box, wm, 48, wc, M(X, sill / 2, Z, sx, sill, sz), 'wall', M(X, 7, Z, sx, 14, sz)]);
+          pcs.push([geo.box, wm, 48, wc, M(X, (top + WALLH) / 2, Z, sx, WALLH - top, sz), 'top']);
+          if (!K.slit) { const fx = o.hor ? sx : WALLT + 1, fz = o.hor ? WALLT + 1 : sz; pcs.push([geo.box, 'plaster', 48, 0xe8e4da, M(X, sill + 1, Z, fx + 2, 2, fz + 2), 'win']); pcs.push([geo.box, 'plaster', 48, 0xe8e4da, M(X, top - 1, Z, fx + 2, 2, fz + 2), 'win']);
+            pcs.push([geo.box, 'plaster', 48, 0xd8d4ca, M(X, (sill + top) / 2, Z, o.hor ? 1.6 : WALLT * .4, top - sill, o.hor ? WALLT * .4 : 1.6), 'win']); }
+        } else pcs.push([geo.box, wm, 48, wc, M(X, WALLH / 2, Z, sx, WALLH, sz), 'wall', M(X, 7, Z, sx, 14, sz)]);
       }
-      // перемычки над дверями
-      for (const d of b.doors) { const c = lerp(d.i, d.o, .5), r = sub(c, b.p), lx = dot(r, b.u), ly = dot(r, b.v), dw = (BKIND[b.kind].door || DOOR) + 2;
-        pcs.push([geo.box, wc, M(lx, WALLH - 8, ly, dw, 16, WALLT), 'lintel']); }
-      if (S.gable) pcs.push([geo.roof, S.roof(b.id), M(0, WALLH, 0, b.w * 1.06, Math.min(b.h, b.w) * .4, b.h * 1.1), 'roof']);
-      else { pcs.push([geo.box, S.roof(b.id), M(0, WALLH + 1.5, 0, b.w + 3, 3, b.h + 3), 'roof']); pcs.push([geo.box, wc, M(0, WALLH + 4, 0, b.w + 3, 4, b.h + 3), 'roof']); }
+      // перемычки над дверями (наружными и внутренними)
+      const dw = (K.door || DOOR) + 2;
+      for (const d of b.doors) { const c = lerp(d.i, d.o, .5), r = sub(c, b.p), lx = dot(r, b.u), ly = dot(r, b.v), n = sub(d.o, d.i), hor = Math.abs(dot(n, b.v)) > Math.abs(dot(n, b.u));
+        pcs.push([geo.box, wm, 48, wc, M(hor ? lx : Math.sign(lx) * (b.w / 2 - WALLT / 2), WALLH - 8, hor ? Math.sign(ly) * (b.h / 2 - WALLT / 2) : ly, hor ? dw : WALLT, 16, hor ? WALLT : dw), 'top']); }
+      for (const [x, y] of b.idoors) { const onV = b.walls.some(i => { const o = objs[i]; return !o.hor && Math.abs(o.lx - x) < 1; }); pcs.push([geo.box, wm, 48, wc, M(x, WALLH - 8, y, onV ? WALLT : DOOR + 2, 16, onV ? DOOR + 2 : WALLT), 'top']); }
+      // крыша
+      const rc = ROOFC[b.id % ROOFC.length];
+      if (K.roof === 'gable') { const along = b.w >= b.h; pcs.push([geo.roof, 'rooftile', 24, K.style === 'metal' ? 0x7a807a : rc, along ? M(0, WALLH, 0, b.w * 1.04, Math.min(b.h, b.w) * .38, b.h * 1.08) : M(0, WALLH, 0, b.h * 1.04, Math.min(b.h, b.w) * .38, b.w * 1.08, 1.5708), 'roof']); }
+      else { pcs.push([geo.box, 'gravel', 32, 0x8a867e, M(0, WALLH + 1.5, 0, b.w + 2, 3, b.h + 2), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, WALLH + 4.5, b.h / 2 - 1, b.w + 3, 6, 3), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, WALLH + 4.5, -b.h / 2 + 1, b.w + 3, 6, 3), 'roof']);
+        pcs.push([geo.box, wm, 48, wc, M(b.w / 2 - 1, WALLH + 4.5, 0, 3, 6, b.h), 'roof']); pcs.push([geo.box, wm, 48, wc, M(-b.w / 2 + 1, WALLH + 4.5, 0, 3, 6, b.h), 'roof']);
+        pcs.push([geo.box, 'metal', 24, 0x9a9a92, M(b.w * .22, WALLH + 7, -b.h * .15, 22, 10, 16), 'roof']); }
       bParts[b.id] = [];
-      for (const [g, col, lm, role, low] of pcs) { const key = g.uuid + '|' + col + '|' + (role === 'floor' ? 'f' : 'w'); (plan[key] = plan[key] || { g, col, items: [] }).items.push([b.id, base.clone().multiply(lm), role, low ? base.clone().multiply(low) : null]); }
+      for (const [g, tx, sc, col, lm, role, low] of pcs) { const key = g.uuid + '|' + tx + '|' + sc + '|' + (role === 'floor' ? 'f' : 'w'); (plan[key] = plan[key] || { g, tx, sc, items: [] }).items.push([b.id, col, base.clone().multiply(lm), role, low ? base.clone().multiply(low) : null]); }
     }
     for (const key in plan) {
-      const { g, col, items } = plan[key];
-      const mesh = new T.InstancedMesh(g, lam(0xffffff), items.length); mesh.frustumCulled = false; mesh.castShadow = !key.endsWith('f'); mesh.receiveShadow = true;
-      items.forEach(([bid, m, role, low], i) => { mesh.setMatrixAt(i, m); mesh.setColorAt(i, new T.Color(col)); bParts[bid].push([mesh, i, m, role, low]); });
+      const { g, tx, sc, items } = plan[key];
+      const mesh = new T.InstancedMesh(g, texMat(tx, sc), items.length); mesh.frustumCulled = false; mesh.castShadow = !key.endsWith('f'); mesh.receiveShadow = true;
+      items.forEach(([bid, col, m, role, low], i) => { mesh.setMatrixAt(i, m); mesh.setColorAt(i, new T.Color(col)); bParts[bid].push([mesh, i, m, role, low]); });
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       scene.add(mesh); bInst[key] = { mesh };
     }

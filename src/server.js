@@ -115,9 +115,11 @@ export class World {
     }
     for (const c of this.clients) if (c.name && !c.pl) c.spec = 0;
     // лут на земле
-    for (let i = 0; i < 130; i++) { const b = i < 60 ? BIOMES[i % BIOMES.length] : null; const p = b ? nearPt(rnd, b.c, b.r) : rndMap(rnd); if (!inMap(p, 40) || this.objs.some(o => dist(o.p, p) < o.rad + 6)) continue; this.addLoot(this.randLoot(rnd), p, true); }
-    for (const b of this.objs.blds) { const n = b.kind === 'market' ? 5 : b.kind === 'barn' ? 3 : 1 + (rnd() < .6 ? 1 : 0);
-      for (let i = 0, k = 0; i < n && k < 30; k++) { const p = add(add(b.p, b.u, (rnd() - .5) * (b.w - 40)), b.v, (rnd() - .5) * (b.h - 40)); if (this.objs.some(o => !o.dead && objPush(o, p, 8))) continue; this.addLoot(this.randLoot(rnd, rnd() < .35), p, true); i++; } }
+    for (let i = 0; i < 70; i++) { const b = i < 30 ? BIOMES[i % BIOMES.length] : null; const p = b ? nearPt(rnd, b.c, b.r) : rndMap(rnd); if (!inMap(p, 40) || this.objs.some(o => dist(o.p, p) < o.rad + 6)) continue; this.addLoot(this.randLoot(rnd), p, true); }
+    for (const b of this.objs.blds) for (const r of b.rooms) { // лут по комнатам: в больших залах больше
+      const n = r.hall ? 3 : rnd() < .75 ? 1 : 0;
+      for (let i = 0, k = 0; i < n && k < 25; k++) { const lp = [r.x0 + 14 + rnd() * (r.x1 - r.x0 - 28), r.y0 + 14 + rnd() * (r.y1 - r.y0 - 28)], p = add(add(b.p, b.u, lp[0]), b.v, lp[1]);
+        if (nearObjs(this.objs, p, 30).some(o => !o.dead && !o.nc && objPush(o, p, 8))) continue; this.addLoot(this.randLoot(rnd, rnd() < .3), p, true); i++; } }
     this.lAdd = [];
     this.sendAll(this.matchMsg());
   }
@@ -226,8 +228,8 @@ export class World {
   }
   hitscan(p, d, range, rt) {
     const from = p.p; let best = range, obj = null, pl = null;
-    for (const o of this.objs) {
-      if (o.dead || o.type === 'snowman' || o.type === 'furn' || dist(o.p, from) > range + o.rad) continue;
+    for (const o of rayObjs(this.objs, from, d, range)) {
+      if (o.dead || o.pass || o.type === 'snowman') continue;
       const t = rayObj(from, d, o); if (t < best) { best = t; obj = o; }
     }
     for (const q of this.players) {
@@ -245,7 +247,7 @@ export class World {
   damage(v, dmg, by, w, wave) {
     if (!v.alive) return;
     if (!wave && v.armor > 0) { const a = Math.min(v.armor, dmg * .6); v.armor -= a; dmg -= a; }
-    v.hp -= dmg;
+    v.hp -= dmg; if (by) v.hitAt = this.t;
     if (by) by.hm.push([v.id, Math.max(1, Math.round(dmg))]);
     if (v.hp <= 0) this.kill(v, by, w);
   }
@@ -266,10 +268,19 @@ export class World {
   // ===== Боты =====
   // путь к точке t с учётом зданий: заходим и выходим через двери
   nav(b, t) {
-    const B = this.objs.blds, bt = bldAt(B, t), bb = b.bi ?? -1; if (bt === bb) return t;
-    const near = (ds, q) => ds.reduce((m, d) => dist(d.o, q) < dist(m.o, q) ? d : m);
-    if (bb >= 0) { const d = near(B[bb].doors, t); return dist(b.p, d.i) < 22 ? d.o : d.i; }
-    const d = near(B[bt].doors, b.p); return dist(b.p, d.o) < 22 ? d.i : d.o;
+    const B = this.objs.blds, bt = bldAt(B, t), bb = b.bi ?? -1;
+    if (bb < 0) { if (bt < 0) return t; const d = near(B[bt].doors, b.p); return dist(b.p, d.o) < 24 ? d.i : d.o; } // снаружи → к ближайшей двери
+    const Bd = B[bb], lp = toLocal(Bd, b.p), rb = roomAt(Bd, lp);
+    let goalRoom, exit = null;
+    if (bt === bb) goalRoom = roomAt(Bd, toLocal(Bd, t)); else { exit = near(Bd.doors, t); goalRoom = exit.room; }
+    if (rb === goalRoom) return exit ? (dist(b.p, exit.i) < 24 ? exit.o : exit.i) : t;
+    // поиск пути по комнатам (BFS)
+    const prev = new Map([[rb, -1]]), Q = [rb];
+    while (Q.length) { const r = Q.shift(); if (r === goalRoom) break; for (const e of Bd.adj) { const n = e.a === r ? e.b : e.b === r ? e.a : -1; if (n >= 0 && !prev.has(n)) { prev.set(n, r); Q.push(n); } } }
+    if (!prev.has(goalRoom)) return t;
+    let r = goalRoom; while (prev.get(r) !== rb) r = prev.get(r);
+    const e = Bd.adj.find(e => (e.a === rb && e.b === r) || (e.b === rb && e.a === r)), dp = toWorld(Bd, e.p);
+    const R2 = Bd.rooms[r]; return dist(b.p, dp) < 20 ? toWorld(Bd, [(R2.x0 + R2.x1) / 2, (R2.y0 + R2.y1) / 2]) : dp;
   }
   botStep(b) {
     const rnd = this.rnd;
@@ -280,7 +291,7 @@ export class World {
       b.think = 4 + Math.floor(rnd() * 4);
       let best = null, bd = 1e9;
       for (const q of this.players) if (q.alive && q !== b && !q.air) { const d = dist(q.p, b.p); if (d < bd) { bd = d; best = q; } }
-      const early = this.t < ZONE_T0 + 25, eng = early ? 220 + b.skill * 120 : 380 + b.skill * 120; // в начале боты больше собирают лут, чем дерутся
+      const early = this.t < ZONE_T0 + 40, eng = early ? (b.hitAt && this.t - b.hitAt < 5 ? 420 : 130) : 380 + b.skill * 120; // в начале боты собирают лут и дерутся, только если их задели
       const nt = best && bd < eng ? best : null; if (nt && nt !== b.target) b.react = Math.round((.5 + (1 - b.skill) * .8) * TICK); b.target = nt; b.tdist = bd;
       if (b.target) { const h = this.hitscan(b, dirTo(b.p, b.target.p), Math.min(bd + 10, 900), this.tick); b.los = h.pl === b.target; }
       // лучшее оружие по ситуации
@@ -307,7 +318,7 @@ export class World {
       const range = W ? W.range : 300;
       if (!danger) { if (!b.los) mv = dirTo(b.p, this.nav(b, t.p)); else { const want = range * .55; mv = norm(add(mul(to, b.tdist > want ? 1 : -.4), perp(to), b.side * .7)); if (rnd() < .006) b.side *= -1; } }
       if (b.react > 0) b.react--;
-      else if (W && b.los && b.tdist < range * .95 && rnd() < (this.t < ZONE_T0 + 25 ? .16 : .22) + b.skill * .25) fire = true;
+      else if (W && b.los && b.tdist < range * .95 && rnd() < (this.t < ZONE_T0 + 40 ? .14 : .22) + b.skill * .25) fire = true;
     } else if (!danger && b.goal) { if (this.loot.has(b.goal.id)) { mv = dirTo(b.p, this.nav(b, b.goal.p)); if (dist(b.goal.p, b.p) < PR + 26) this.pickup(b, b.goal, true); } else b.think = 0; }
     else if (!mv) { if (!b.wp || dist(b.wp, b.p) < 45 || rnd() < .004) b.wp = clampMap(nearPt(rnd, nz.c, Math.min(630, Math.max(45, nz.rho * .7))), 80); mv = dirTo(b.p, this.nav(b, b.wp)); }
     if (!t && b.hp < 60 && b.meds > 0 && !danger) { this.startHeal(b); mv = null; }
@@ -372,4 +383,8 @@ export class World {
     for (const p of this.players) p.step = 0;
   }
 }
+const near = (ds, q) => ds.reduce((m, d) => dist(d.o, q) < dist(m.o, q) ? d : m);
+const toLocal = (b, p) => { const r = sub(p, b.p); return [dot(r, b.u), dot(r, b.v)]; };
+const toWorld = (b, l) => add(add(b.p, b.u, l[0]), b.v, l[1]);
+function roomAt(b, l) { let best = 0, bd = 1e9; b.rooms.forEach((r, i) => { const dx = Math.max(r.x0 - l[0], 0, l[0] - r.x1), dy = Math.max(r.y0 - l[1], 0, l[1] - r.y1), d = Math.hypot(dx, dy); if (d < bd) { bd = d; best = i; } }); return best; }
 function lootArr(it) { return [it.id, it.k, it.x, it.r, it.n, Math.round(it.p[0] * 10) / 10, Math.round(it.p[1] * 10) / 10]; }

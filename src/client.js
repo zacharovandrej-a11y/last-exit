@@ -459,6 +459,7 @@ function minimap(now, from) {
   ctx.setTransform(dpr * k * CAM_R[0], -dpr * k * CAM_F[0], dpr * k * CAM_R[1], -dpr * k * CAM_F[1], dpr * cx, dpr * cy);
   ctx.globalAlpha = .92; ctx.fillStyle = '#5fb83f'; ctx.fillRect(-HALF, -HALF, HALF * 2, HALF * 2); ctx.globalAlpha = 1;
   for (const b of BIOMES) { ctx.fillStyle = b.col; ctx.beginPath(); ctx.arc(b.c[0], b.c[1], b.r, 0, 6.2832); ctx.fill(); }
+  ctx.fillStyle = '#4a4540'; for (const b of objs.blds || []) { ctx.save(); ctx.translate(b.p[0], b.p[1]); ctx.rotate(b.a); ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h); ctx.restore(); } // здания
   if (phase >= 1) {
     if (!zone.pre) { ctx.fillStyle = 'rgba(45,16,10,.88)'; ctx.beginPath(); ctx.rect(-HALF, -HALF, HALF * 2, HALF * 2); ctx.arc(zone.c[0], zone.c[1], Math.max(0, zone.rho), 0, 6.2832); ctx.fill('evenodd');
       ctx.strokeStyle = '#ffd43b'; ctx.lineWidth = 2 / k; ctx.beginPath(); ctx.arc(zone.c[0], zone.c[1], Math.max(0, zone.rho), 0, 6.2832); ctx.stroke(); }
