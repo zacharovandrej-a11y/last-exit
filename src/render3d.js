@@ -107,30 +107,44 @@ void main(){
   // prism: после поворотов — треугольник в плоскости YZ? подгоняем отдельно ниже
   geo.roof = (() => { const s = new T.Shape(); s.moveTo(-.5, 0); s.lineTo(.5, 0); s.lineTo(0, 1); s.closePath(); const g = new T.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false }); g.translate(0, 0, -.5); g.rotateY(Math.PI / 2); return g; })(); // гребень вверх, длина по X, ширина по Z
   const M = (x, y, z, sx, sy, sz, ry = 0, rz = 0) => new T.Matrix4().compose(new T.Vector3(x, y, z), new T.Quaternion().setFromEuler(new T.Euler(0, ry, rz)), new T.Vector3(sx, sy, sz));
-  const VAR = { house: [0xf1e7d0, 0xf8d7a8, 0xd3f9d8, 0xe7f5ff], roof: [0xd9534f, 0x3d7ec7, 0x8f5a3c, 0x2f9e44], car: [0x3d8bd9, 0xe03131, 0xf59f00, 0xf1f3f5, 0x37b24d], house2: [0xf2d7a0, 0xffe3e3, 0xd0ebff] };
+  const MX = (x, y, z, sx, sy, sz) => new T.Matrix4().compose(new T.Vector3(x, y, z), new T.Quaternion().setFromEuler(new T.Euler(Math.PI / 2, 0, 0)), new T.Vector3(sx, sy, sz)); // цилиндр вдоль Z
+  // приглушённые реальные цвета; у каждого экземпляра свой оттенок
+  const VAR = {
+    house: [0xd8cfbe, 0xc9b79c, 0xb9b3a6, 0xe0d5c0, 0xc4a98a], roof: [0x7e3a2c, 0x4a4f57, 0x6b4a3a, 0x5b4636, 0x8a4a34],
+    car: [0x2f4a63, 0x6e2626, 0x8a7d5e, 0xaeb0ab, 0x3a4a3a, 0x232323, 0x5e6266], house2: [0xbdb5a6, 0xa9a39a, 0xc8bfae, 0x9c958a],
+    leaf: [0x3b5323, 0x4a6b2a, 0x55702f, 0x3f5a26, 0x5c6b2e], leaf2: [0x2f4a1f, 0x3d5a24, 0x47622a], pine: [0x2c4a2a, 0x2f5233, 0x34502c], rock: [0x7d7b74, 0x8a857a, 0x6e6c66],
+  };
   // части каждого типа: [геометрия, цвет (или ключ VAR), матрица в единицах w/h объекта]
   const PARTS = {
-    tree: (w) => { const k = w / 44; return [[geo.cyl6, 0x8b5a2b, M(0, 12 * k, 0, 4.5 * k, 24 * k, 4.5 * k)], [geo.ico1, 0x3fae49, M(0, 46 * k, 0, 27 * k, 25 * k, 27 * k)], [geo.ico1, 0x5ccf5e, M(7 * k, 60 * k, -5 * k, 17 * k, 16 * k, 17 * k)]]; },
-    pine: (w) => { const k = w / 40; return [[geo.cyl6, 0x6b4423, M(0, 7 * k, 0, 3 * k, 14 * k, 3 * k)], [geo.cone7, 0x2b8a3e, M(0, 30 * k, 0, 22 * k, 36 * k, 22 * k)], [geo.cone7, 0x37b24d, M(0, 50 * k, 0, 15 * k, 28 * k, 15 * k)], [geo.cone7, 0xf1f3f5, M(0, 66 * k, 0, 8 * k, 14 * k, 8 * k)]]; },
-    rock: (w) => { const k = w / 36; return [[geo.dod, 0x8d8f96, M(0, 6 * k, 0, 19 * k, 13 * k, 17 * k, w)]]; },
-    hay: (w) => { const k = w / 30; return [[geo.lay, 0xe7c14a, M(0, 15 * k, 0, 22 * k, 15 * k, 15 * k)]]; },
-    cactus: (w) => { const k = w / 26; return [[geo.cyl6, 0x5c940d, M(0, 20 * k, 0, 7 * k, 40 * k, 7 * k)], [geo.cyl6, 0x4f8a0b, M(10 * k, 27 * k, 0, 4 * k, 16 * k, 4 * k)], [geo.cyl6, 0x4f8a0b, M(-9 * k, 21 * k, 0, 4 * k, 12 * k, 4 * k)], [geo.sph, 0xf783ac, M(0, 41 * k, 0, 3 * k, 3 * k, 3 * k)]]; },
-    snowman: (w) => { const k = w / 24; return [[geo.sph, 0xffffff, M(0, 12 * k, 0, 13 * k, 12 * k, 13 * k)], [geo.sph, 0xffffff, M(0, 31 * k, 0, 9 * k, 9 * k, 9 * k)], [geo.cone7, 0xfd7e14, M(0, 31 * k, 9 * k, 2 * k, 8 * k, 2 * k)], [geo.cyl10, 0x222222, M(0, 42 * k, 0, 7 * k, 6 * k, 7 * k)]]; },
-    igloo: (w) => [[geo.dome, 0xe7f5ff, M(0, 0, 0, w / 2, w * .42, w / 2)], [geo.box, 0xa5d8ff, M(w * .45, 8, 0, 14, 16, 16)]],
-    house: (w, h) => [[geo.box, 'house', M(0, 20, 0, w * .75, 40, h * .75)], [geo.roof, 'roof', M(0, 40, 0, w * .84, 28, h * .86)], [geo.box, 0x7a4a2a, M(0, 12, h * .375 + .6, 13, 24, 1.5)], [geo.box, 0x74c0fc, M(w * .22, 24, h * .375 + .6, 12, 10, 1.5)], [geo.box, 0x74c0fc, M(-w * .22, 24, h * .375 + .6, 12, 10, 1.5)], [geo.box, 0x868e96, M(w * .2, 60, -h * .15, 8, 18, 8)]],
-    house2: (w, h) => [[geo.box, 'house2', M(0, 23, 0, w, 46, h)], [geo.box, 0x3d7ec7, M(0, 47.5, 0, w * 1.04, 4, h * 1.04)], [geo.box, 0xadb5bd, M(-w * .2, 53, 0, 14, 8, 10)], [geo.box, 0x74c0fc, M(0, 26, h / 2 + .6, w * .6, 12, 1.5)]],
-    bunker: (w, h) => [[geo.box, 0x6b7048, M(0, 13, 0, w, 26, h)], [geo.box, 0x4e5334, M(0, 29, 0, w * .82, 6, h * .82)], [geo.box, 0x111111, M(0, 17, h / 2 + .6, w * .5, 4, 1)], [geo.box, 0xc9b77c, M(0, 4, h / 2 + 4, w * 1.05, 8, 7)]],
-    barn: (w, h) => [[geo.box, 0xb5442e, M(0, 23, 0, w, 46, h)], [geo.roof, 0x7a2b1c, M(0, 46, 0, w * 1.04, 30, h * 1.08)], [geo.box, 0xf8f9fa, M(0, 16, h / 2 + .6, 30, 32, 1.5)]],
-    market: (w, h) => [[geo.box, 0xe9ecef, M(0, 26, 0, w, 52, h)], [geo.box, 0xe94e77, M(0, 47, 0, w * 1.02, 10, h * 1.02)], [geo.box, 0xadb5bd, M(0, 53, 0, w * .96, 3, h * .96)], [geo.box, 0x74c0fc, M(0, 20, h / 2 + .6, w * .7, 18, 1.5)]],
-    car: (w, h) => [[geo.box, 'car', M(0, 9, 0, w, 12, h)], [geo.box, 0xa5d8ff, M(-w * .05, 19, 0, w * .55, 9, h * .86)], [geo.box, 0x222222, M(w * .3, 4, 0, 8, 8, h * 1.05)], [geo.box, 0x222222, M(-w * .3, 4, 0, 8, 8, h * 1.05)]],
-    crate: (w) => [[geo.box, 'crate', M(0, 13, 0, 26, 26, 26)]],
-    wall: (w, h) => [[geo.box, 0x868e96, M(0, 11, 0, w, 22, h)]],
-    tent: (w, h) => [[geo.roof, 0x8f7a4a, M(0, 0, 0, w, 32, h)]],
+    tree: (w) => { const k = w / 44; return [[geo.cyl6, 0x4a3626, M(0, 15 * k, 0, 3.2 * k, 30 * k, 3.2 * k)], [geo.cyl6, 0x4a3626, M(5 * k, 28 * k, 0, 1.6 * k, 14 * k, 1.6 * k, 0, -.7)],
+      [geo.dod, 'leaf2', M(0, 38 * k, 0, 21 * k, 15 * k, 21 * k)], [geo.dod, 'leaf', M(-8 * k, 48 * k, 5 * k, 15 * k, 13 * k, 15 * k, 1)], [geo.dod, 'leaf', M(9 * k, 50 * k, -4 * k, 14 * k, 12 * k, 14 * k, 2)], [geo.dod, 'leaf', M(1 * k, 60 * k, 1 * k, 12 * k, 11 * k, 12 * k, 3)]]; },
+    pine: (w) => { const k = w / 40; return [[geo.cyl6, 0x4a3626, M(0, 8 * k, 0, 2.6 * k, 16 * k, 2.6 * k)], [geo.cone7, 'pine', M(0, 26 * k, 0, 21 * k, 30 * k, 21 * k)], [geo.cone7, 'pine', M(0, 44 * k, 0, 16 * k, 26 * k, 16 * k, .5)], [geo.cone7, 'pine', M(0, 60 * k, 0, 10 * k, 22 * k, 10 * k, 1)], [geo.cone7, 0xe4e9ec, M(0, 66 * k, 0, 5 * k, 10 * k, 5 * k)]]; },
+    rock: (w) => { const k = w / 36; return [[geo.dod, 'rock', M(0, 5 * k, 0, 18 * k, 12 * k, 15 * k, 0, .2)], [geo.dod, 'rock', M(9 * k, 3 * k, 6 * k, 9 * k, 7 * k, 8 * k, 1)]]; },
+    hay: (w) => { const k = w / 30; return [[geo.lay, 0xbfa25a, M(0, 14 * k, 0, 21 * k, 14 * k, 14 * k)]]; },
+    cactus: (w) => { const k = w / 26; return [[geo.cyl6, 0x55703a, M(0, 22 * k, 0, 5 * k, 44 * k, 5 * k)], [geo.cyl6, 0x4f6a35, M(7 * k, 20 * k, 0, 3 * k, 6 * k, 3 * k, 0, 1.57)], [geo.cyl6, 0x4f6a35, M(10 * k, 28 * k, 0, 3 * k, 16 * k, 3 * k)],
+      [geo.cyl6, 0x4f6a35, M(-6 * k, 16 * k, 0, 3 * k, 5 * k, 3 * k, 0, 1.57)], [geo.cyl6, 0x4f6a35, M(-8.5 * k, 22 * k, 0, 3 * k, 12 * k, 3 * k)]]; },
+    snowman: (w) => { const k = w / 24; return [[geo.dod, 0x76746e, M(0, 5 * k, 0, 12 * k, 9 * k, 11 * k)], [geo.dod, 0xe6eaed, M(0, 8 * k, 0, 11 * k, 6 * k, 10 * k, .4)]]; }, // заснеженный валун
+    igloo: (w) => [[geo.box, 0x6b4a2e, M(0, 13, 0, w * .7, 26, w * .7)], [geo.roof, 0x3e3328, M(0, 26, 0, w * .8, 18, w * .82)], [geo.box, 0xe4e9ec, M(0, 35, 0, w * .76, 1.5, w * .5)], [geo.box, 0x3a2a1c, M(0, 9, w * .35 + .6, 9, 18, 1.2)], [geo.box, 0x2e3a40, M(w * .2, 15, w * .35 + .6, 7, 6, 1.2)]], // бревенчатый домик
+    house: (w, h) => [[geo.box, 'house', M(0, 20, 0, w * .75, 40, h * .75)], [geo.roof, 'roof', M(0, 40, 0, w * .86, 26, h * .9)],
+      [geo.box, 0x4a3524, M(0, 12, h * .375 + .6, 11, 24, 1.5)], [geo.box, 0xe8e4da, M(w * .22, 25, h * .375 + .5, 13, 12, 1.2)], [geo.box, 0x2b363c, M(w * .22, 25, h * .375 + .8, 10, 9, 1.2)],
+      [geo.box, 0xe8e4da, M(-w * .22, 25, h * .375 + .5, 13, 12, 1.2)], [geo.box, 0x2b363c, M(-w * .22, 25, h * .375 + .8, 10, 9, 1.2)], [geo.box, 0x2b363c, M(-w * .375 - .6, 25, 0, 1.2, 9, 12)], [geo.box, 0x7a4a3a, M(w * .2, 58, -h * .15, 7, 16, 7)], [geo.box, 0x6b6b66, M(0, 1.5, h * .375 + 4, 16, 3, 7)]],
+    house2: (w, h) => [[geo.box, 'house2', M(0, 23, 0, w, 46, h)], [geo.box, 0x77726a, M(0, 47, 0, w * 1.02, 3, h * 1.02)], [geo.box, 0x8e8a82, M(-w * .2, 52, 0, 14, 8, 10)],
+      [geo.box, 0x2b363c, M(-w * .22, 14, h / 2 + .6, 12, 10, 1.2)], [geo.box, 0x2b363c, M(w * .22, 14, h / 2 + .6, 12, 10, 1.2)], [geo.box, 0x2b363c, M(-w * .22, 34, h / 2 + .6, 12, 10, 1.2)], [geo.box, 0x2b363c, M(w * .22, 34, h / 2 + .6, 12, 10, 1.2)], [geo.box, 0x2b363c, M(w / 2 + .6, 34, 0, 1.2, 10, 12)]],
+    bunker: (w, h) => [[geo.box, 0x82827a, M(0, 13, 0, w, 26, h)], [geo.box, 0x6e6e66, M(0, 28, 0, w * .9, 4, h * .9)], [geo.box, 0x151515, M(0, 17, h / 2 + .6, w * .5, 4, 1)], [geo.box, 0xa8966e, M(0, 4, h / 2 + 4, w * 1.05, 8, 7)], [geo.box, 0x9c8a64, M(0, 11, h / 2 + 3.5, w * .9, 6, 6)]],
+    barn: (w, h) => [[geo.box, 0x72302a, M(0, 23, 0, w, 46, h)], [geo.roof, 0x4e535a, M(0, 46, 0, w * 1.05, 28, h * 1.1)], [geo.box, 0xd6d2c8, M(0, 16, h / 2 + .6, 32, 32, 1.2)], [geo.box, 0x5a2520, M(0, 16, h / 2 + .9, 28, 28, 1.2)]],
+    market: (w, h) => [[geo.box, 0xcfcac0, M(0, 26, 0, w, 52, h)], [geo.box, 0x7a2e38, M(0, 46, h / 2 + 1, w * .98, 9, 2)], [geo.box, 0x77726a, M(0, 53, 0, w * 1.01, 3, h * 1.01)], [geo.box, 0x34474f, M(0, 18, h / 2 + .6, w * .7, 22, 1.5)], [geo.box, 0x8e8a82, M(w * .3, 58, 0, 22, 9, 16)]],
+    car: (w, h) => [[geo.box, 'car', M(0, 8, 0, w, 9, h)], [geo.box, 'car', M(-w * .06, 15.5, 0, w * .52, 7, h * .9)], [geo.box, 0x26323a, M(-w * .06, 15.5, 0, w * .54, 5.4, h * .92)],
+      [geo.cyl10, 0x1c1c1c, MX(w * .3, 4.5, 0, 4.5, h * 1.02, 4.5)], [geo.cyl10, 0x1c1c1c, MX(-w * .3, 4.5, 0, 4.5, h * 1.02, 4.5)]],
+    crate: () => [[geo.box, 'crate', M(0, 13, 0, 26, 26, 26)]],
+    wall: (w, h) => [[geo.box, 0x8d8d86, M(0, 11, 0, w, 22, h)], [geo.box, 0x76766f, M(0, 22.5, 0, w * 1.02, 2, h * 1.3)]],
+    tent: (w, h) => [[geo.roof, 0x5a5a3a, M(0, 0, 0, w, 30, h)], [geo.box, 0x2e2e20, M(w / 2 + .3, 8, 0, .8, 14, 8)]],
   };
+  // лёгкая разница в размерах деревьев и камней
+  const sizeVar = o => (o.type === 'tree' || o.type === 'pine' || o.type === 'rock' || o.type === 'cactus') ? .82 + ((o.id * 37) % 36) / 100 : 1;
   const inst = {}; // key -> {mesh}
   const objIdx = []; // id -> [[mesh, index]]
   const zero = new T.Matrix4().makeScale(0, 0, 0);
-  const basisAt = o => new T.Matrix4().compose(new T.Vector3(o.p[0], 0, o.p[1]), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -o.a), new T.Vector3(1, 1, 1));
+  const basisAt = o => { const k = sizeVar(o); return new T.Matrix4().compose(new T.Vector3(o.p[0], 0, o.p[1]), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -o.a), new T.Vector3(k, k, k)); };
   function buildWorld(objs) {
     for (const k in inst) { scene.remove(inst[k].mesh); delete inst[k]; }
     objIdx.length = 0;
@@ -158,70 +172,105 @@ void main(){
   }
   function killObj(id) { for (const [mesh, i] of objIdx[id] || []) { mesh.setMatrixAt(i, zero); mesh.instanceMatrix.needsUpdate = true; } }
 
-  // ===== персонажи =====
-  const SKIN = [0xffd8b0, 0xf1c27d, 0xe0ac69, 0xffdbac, 0xc68642, 0xffe0bd, 0xf1c27d, 0xd8a06a, 0xffd8b0, 0xffe0bd];
-  const PANTS = [0x364fc7, 0x5c3d2e, 0x4e5334, 0x862e9c, 0x343a40, 0x495057, 0x212529, 0x5f3dc4, 0x6b4423, 0xf8f9fa];
-  const SHIRT = [0xe03131, 0x8d6e63, 0x5c6b3c, 0xc92a2a, 0x1c7ed6, 0xf08c00, 0x343a40, 0x2f9e44, 0x868e96, 0xffffff];
+  // ===== персонажи: реалистичные солдаты =====
+  // камуфляж: [фон, пятна...]; у каждого персонажа своя форма
+  const CAMO = [
+    [0x4b5320, 0x6b5a3a, 0x2f3a22, 0x1f1f1a], // лес
+    [0xc2b280, 0xa08a5c, 0x8a7650, 0x6b5a3a], // пустыня
+    [0x7d7f7d, 0x5a5c5a, 0x9a9c9a, 0x3a3c3a], // город
+    [0x5f6b3a, 0x3d4a2a, 0x7a6a45, 0x2a2a20], // флектарн
+    [0x8a7d5a, 0x6b6a45, 0x4f5a3a, 0xa89a72], // мультикам
+    [0x2c2c2c, 0x363636, 0x222222, 0x404040], // чёрный
+    [0x55603a, 0x55603a, 0x4c5634, 0x5c6840], // олива
+    [0x3d4658, 0x2c3444, 0x4e5868, 0x232a36], // синий
+    [0x6b6048, 0x4f4636, 0x857a5c, 0x3a3428], // хаки
+    [0xb8bcc0, 0x8a9096, 0xd8dcdf, 0x5f666c], // зима
+  ];
+  const SKIN = [0xc8956c, 0xe0b48e, 0x8d5a3b, 0xd9a47e, 0x6b4430, 0xedc4a0, 0xb07850, 0xd4a07a, 0x9c6a48, 0xe5bb95];
+  const camoTex = {};
+  function camo(i) {
+    if (camoTex[i]) return camoTex[i]; const pal = CAMO[i % CAMO.length].map(c => '#' + c.toString(16).padStart(6, '0'));
+    const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), rnd = mkRng(31 + i * 7);
+    g.fillStyle = pal[0]; g.fillRect(0, 0, 64, 64);
+    for (let k = 1; k < pal.length; k++) for (let n = 0; n < 9; n++) { g.fillStyle = pal[k]; g.beginPath(); const x = rnd() * 64, y = rnd() * 64, r = 4 + rnd() * 8; for (let a = 0; a < 7; a++) { const ang = a / 7 * 6.2832, rr = r * (.6 + rnd() * .6); g.lineTo(x + Math.cos(ang) * rr * 1.4, y + Math.sin(ang) * rr); } g.fill(); }
+    const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.magFilter = T.NearestFilter; return camoTex[i] = t;
+  }
+  const METAL = 0x2a2c2e, WOOD = 0x5a3d26, POLY = 0x34352f;
   function gunMesh(w, rar) {
-    const g = new T.Group(); const L = [0, 9, 17, 16, 23, 12][w] || 9, th = w === 3 ? 4.2 : 3.2;
-    const body = new T.Mesh(geo.box, lam(0x2b2b2b)); body.scale.set(th, th, L); body.position.z = L / 2; g.add(body);
-    const st = new T.Mesh(geo.box, lam(new T.Color(RARITY[rar] || '#b8bcc4').getHex())); st.scale.set(th + .4, th + .4, L * .35); st.position.z = L * .3; g.add(st);
-    if (w === 4) { const sc = new T.Mesh(geo.cyl6, lam(0x111111)); sc.scale.set(1.6, 7, 1.6); sc.rotation.x = Math.PI / 2; sc.position.set(0, 3, L * .45); g.add(sc); }
-    if (w === 2 || w === 5) { const mg = new T.Mesh(geo.box, lam(0x2b2b2b)); mg.scale.set(2.4, 6, 3); mg.position.set(0, -4, L * .5); g.add(mg); }
+    const g = new T.Group();
+    const b = (c, x, y, z, sx, sy, sz, rx = 0) => { const o = new T.Mesh(geo.box, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.x = rx; g.add(o); return o; };
+    const tube = (c, x, y, z, r, l) => { const o = new T.Mesh(geo.cyl10, lam(c)); o.position.set(x, y, z); o.scale.set(r, l, r); o.rotation.x = Math.PI / 2; g.add(o); return o; };
+    let band = 2;
+    if (w === 1) { b(METAL, 0, 1, 3, 2, 2.4, 8); b(POLY, 0, -2, .5, 1.8, 4.5, 2.4, -.25); band = 1.5; } // пистолет
+    else if (w === 2) { b(METAL, 0, 0, 3, 2.4, 3.4, 10); b(POLY, 0, 0, 11, 2.8, 2.8, 7); tube(METAL, 0, .4, 17.5, .7, 7); b(METAL, 0, -4, 4.5, 2, 6, 3, .3); b(POLY, 0, -.3, -5, 2.2, 3.6, 7); b(POLY, 0, -3, 0, 1.8, 4, 2.2, -.3); b(0x111111, 0, 2.6, 3, 1.4, 1.8, 3); } // автомат
+    else if (w === 3) { b(METAL, 0, 0, 2, 2.4, 3, 8); tube(METAL, 0, .8, 13, .9, 16); tube(METAL, 0, -.9, 11, .8, 12); b(WOOD, 0, -.9, 11, 2.4, 2.4, 6); b(WOOD, 0, -.6, -6, 2.2, 3.8, 9); } // дробовик
+    else if (w === 4) { b(METAL, 0, 0, 2, 2.4, 3, 10); tube(METAL, 0, .4, 17, .7, 20); tube(0x111111, 0, 3.2, 3, 1.4, 10); b(WOOD, 0, -.5, -7, 2.4, 4.2, 10); b(WOOD, 0, -1, 9, 2.6, 2.8, 6); b(METAL, 0, -3.4, 2, 1.8, 3, 2.4); } // снайперка
+    else if (w === 5) { b(METAL, 0, 0, 2.5, 2.4, 3.6, 8); tube(METAL, 0, .6, 9, .7, 5); b(METAL, 0, -5, 3, 1.8, 8, 2.2, .1); b(METAL, 0, 0, -4, .8, 2.6, 6); b(POLY, 0, -3, -.5, 1.8, 4, 2.2, -.3); } // ПП
+    if (rar > 0) b(new T.Color(RARITY[rar]).getHex(), 0, 0, band, 2.7, 3.2, 1.2); // полоска редкости
     return g;
   }
-  function hat(ch, col) {
+  // головные уборы
+  function hat(ch) {
     const g = new T.Group(); const m = (gg, c, x, y, z, sx, sy, sz, rx = 0, rz = 0) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.set(rx, 0, rz); g.add(o); return o; };
     switch (ch % 10) {
-      case 0: m(geo.dome, 0xe03131, 0, 6, 0, 10.5, 7, 10.5); m(geo.box, 0xe03131, 0, 6.5, 9, 14, 1.2, 9); break; // кепка
-      case 1: m(geo.cyl10, 0x8b5a2b, 0, 8, 0, 17, 1.4, 17); m(geo.cyl10, 0x8b5a2b, 0, 12, 0, 8.5, 8, 8.5); m(geo.box, 0x3b2a1a, 0, -3, 10.5, 9, 2, 2); break; // ковбой + усы
-      case 2: m(geo.dome, 0x5c6b3c, 0, 4, 0, 12, 10, 12); break; // каска
-      case 3: for (let i = 0; i < 5; i++) { const a = i / 5 * 6.283; m(geo.cone7, 0xffd43b, Math.cos(a) * 7, 13, Math.sin(a) * 7, 2.5, 7, 2.5); } m(geo.cyl10, 0xffd43b, 0, 9, 0, 8, 4, 8); break; // корона
-      case 4: m(geo.cyl10, 0xe03131, 0, 5, 0, 10.6, 3, 10.6); m(geo.box, 0xe03131, 0, 4, -11, 3, 2, 8, .5); break; // бандана
-      case 5: m(geo.cone7, col, 6, 11, 0, 3.5, 8, 3.5, 0, -.3); m(geo.cone7, col, -6, 11, 0, 3.5, 8, 3.5, 0, .3); break; // ушки
-      case 6: for (let i = -2; i <= 2; i++) m(geo.cone7, 0x7048e8, 0, 10, i * 3.5, 2, 9, 2); break; // ирокез
-      case 7: m(geo.cyl10, 0xf59f00, 0, 8, 0, 22, 1.5, 22); m(geo.cone7, 0xe8590c, 0, 15, 0, 8, 14, 8); break; // сомбреро
-      case 8: m(geo.dome, 0x868e96, 0, 5, 0, 10.8, 8, 10.8); m(geo.cone7, 0xf8f9fa, 10, 10, 0, 2.2, 9, 2.2, 0, -.9); m(geo.cone7, 0xf8f9fa, -10, 10, 0, 2.2, 9, 2.2, 0, .9); m(geo.dome, 0xd9480f, 0, -5, 7, 6, 9, 4, Math.PI); break; // викинг
-      case 9: m(geo.cyl10, 0xffffff, 0, 10, 0, 8, 12, 8); m(geo.sph, 0xffffff, 0, 17, 0, 10, 6, 10); break; // повар
+      case 0: m(geo.dome, 0x4b5320, 0, 1, 0, 5.4, 5, 5.6); m(geo.box, 0x1a1a1a, 0, 1.6, 4.4, 6, 1.6, 1.2); break; // каска + очки
+      case 1: m(geo.cyl10, 0xa08a5c, 0, 2.2, 0, 8, .6, 8); m(geo.dome, 0xa08a5c, 0, 2.2, 0, 4.8, 3.5, 4.8); break; // панама
+      case 2: m(geo.sph, 0x7a1f1f, -.8, 3.4, 0, 5, 1.8, 5, 0, .25); break; // берет
+      case 3: m(geo.dome, 0x2a2a2a, 0, 1.6, 0, 4.9, 3.8, 4.9); m(geo.box, 0x2a2a2a, 0, 1.8, 5, 5, .6, 4); break; // кепка
+      case 4: m(geo.dome, 0xa89a72, 0, 1, 0, 5.4, 5, 5.6); for (const s of [-1, 1]) m(geo.cyl10, 0x222222, s * 4.6, -.6, 0, 1.8, 1.4, 1.8, 0, 1.57); break; // каска + наушники
+      case 5: m(geo.sph, 0x1c1c1c, 0, 0, 0, 4.5, 5.3, 4.8); m(geo.box, 0xc8956c, 0, .8, 4.3, 5, 1.4, .8); break; // балаклава
+      case 6: m(geo.dome, 0x55603a, 0, 1.4, 0, 4.7, 3.6, 4.8); m(geo.box, 0x55603a, 0, 1, -4.8, 1.6, 1.2, 3, .6); break; // бандана
+      case 7: m(geo.dome, 0x222222, 0, 1, 0, 5.4, 5, 5.6); m(geo.box, 0x111111, 0, 4.4, 4, 3, 2.2, 2.4); m(geo.cyl10, 0x111111, 0, 4, 5.6, 1.1, 2.4, 1.1, 1.57); break; // спецназ + ПНВ
+      case 8: m(geo.dome, 0x3a2a1c, 0, 1.4, -.3, 4.6, 3, 4.7); break; // короткая стрижка
+      case 9: m(geo.dome, 0x6e6a64, 0, 1.6, 0, 5.2, 4.4, 5.2); m(geo.box, 0x6e6a64, 0, -1, -.5, 10, 4, 7); break; // зимняя шапка
     }
     return g;
   }
   function makeChar(ch) {
     const g = new T.Group(), body = new T.Group(); g.add(body);
-    const mats = { shirt: charrable(new T.MeshLambertMaterial({ color: SHIRT[ch % 10] })), skin: charrable(new T.MeshLambertMaterial({ color: SKIN[ch % 10] })), pants: charrable(new T.MeshLambertMaterial({ color: PANTS[ch % 10] })) };
+    const cm = camo(ch), mats = { shirt: charrable(new T.MeshLambertMaterial({ color: 0xffffff, map: cm })), skin: charrable(new T.MeshLambertMaterial({ color: SKIN[ch % 10] })), pants: charrable(new T.MeshLambertMaterial({ color: 0xe8e8e8, map: cm })) };
     const part = (gg, mat, x, y, z, sx, sy, sz, par = body) => { const o = new T.Mesh(gg, mat); o.position.set(x, y, z); o.scale.set(sx, sy, sz); par.add(o); return o; };
-    const legL = new T.Group(), legR = new T.Group(); legL.position.set(-5, 15, 0); legR.position.set(5, 15, 0); body.add(legL, legR);
-    part(geo.box, mats.pants, 0, -7, 0, 6.5, 14, 7, legL); part(geo.box, mats.pants, 0, -7, 0, 6.5, 14, 7, legR);
-    part(geo.box, lam(0x343a40), 0, -14, 1.5, 7, 3, 10, legL); part(geo.box, lam(0x343a40), 0, -14, 1.5, 7, 3, 10, legR);
-    const torso = part(geo.box, mats.shirt, 0, 24, 0, 20, 19, 13);
-    const vest = part(geo.box, lam(0x1c7ed6), 0, 25, 0, 21.5, 15, 14.5); vest.visible = false;
-    const head = new T.Group(); head.position.set(0, 42, 0); body.add(head);
-    part(geo.sph, mats.skin, 0, 0, 0, 10.5, 10, 10, head);
-    for (const s of [-1, 1]) { part(geo.sph, lam(0xffffff), s * 3.8, 1.5, 8.4, 3, 3.3, 2, head); part(geo.sph, lam(0x111111), s * 3.8, 1.5, 10.1, 1.5, 1.7, 1, head); }
-    part(geo.sph, lam(0xff8787), 0, -2, 10, 1.8, 1.5, 1.5, head);
-    const hg = hat(ch, SHIRT[ch % 10]); hg.position.y = 3; head.add(hg);
-    const armL = new T.Group(), armR = new T.Group(); armL.position.set(-12.5, 31, 0); armR.position.set(12.5, 31, 0); body.add(armL, armR);
-    part(geo.box, mats.shirt, 0, -6, 0, 5.5, 13, 5.5, armL); part(geo.box, mats.shirt, 0, -6, 0, 5.5, 13, 5.5, armR);
-    part(geo.sph, mats.skin, 0, -13, 0, 3.3, 3.3, 3.3, armL); part(geo.sph, mats.skin, 0, -13, 0, 3.3, 3.3, 3.3, armR);
-    armL.rotation.x = -1.25; armR.rotation.x = -1.35; armL.rotation.z = -.35;
-    const gunHold = new T.Group(); gunHold.position.set(4, 27, 13); body.add(gunHold);
-    const shadow = new T.Mesh(new T.CircleGeometry(15, 16), new T.MeshBasicMaterial({ color: 0, transparent: true, opacity: .3, depthWrite: false })); shadow.rotation.x = -Math.PI / 2; shadow.position.y = .6; g.add(shadow);
-    shadow.material.opacity = .22; body.traverse(o => { if (o.isMesh) o.castShadow = true; });
-    g.userData = { body, legL, legR, armL, armR, head, torso, vest, gunHold, gunKey: '', mats, shadow };
+    const boot = lam(0x2e241b), gear = lam(0x3b3d30), belt = lam(0x26261f);
+    // ноги: бедро + голень (колено гнётся)
+    const leg = s => { const hip = new T.Group(); hip.position.set(s * 3.1, 24, 0); body.add(hip); part(geo.box, mats.pants, 0, -6, 0, 5, 12, 5.6, hip);
+      const knee = new T.Group(); knee.position.y = -12; hip.add(knee); part(geo.box, mats.pants, 0, -5.5, 0, 4.6, 11, 5.2, knee); part(geo.box, boot, 0, -11, 1.2, 5, 3.4, 8, knee); return [hip, knee]; };
+    const [legL, kneeL] = leg(-1), [legR, kneeR] = leg(1);
+    part(geo.box, belt, 0, 25, 0, 13.6, 2.4, 7.6);
+    const torso = part(geo.box, mats.shirt, 0, 33, 0, 13, 15, 7);
+    part(geo.box, gear, 0, 33.5, 3.8, 9, 7, 1); // нагрудные подсумки (разгрузка)
+    for (const s of [-1, 1]) part(geo.box, gear, s * 3.8, 33.5, 0, 1.4, 15.2, 7.4); // лямки
+    const vest = new T.Group(); body.add(vest); vest.visible = false; // бронежилет (если подобрал броню)
+    part(geo.box, lam(0x6b6248), 0, 33, 0, 14.4, 13, 9, vest); for (let i = -1; i <= 1; i++) part(geo.box, lam(0x585040), i * 4.2, 31, 4.9, 3.6, 5, 1.6, vest);
+    part(geo.box, gear, 0, 30, -4.6, 8, 8, 2.4); // рюкзак-подсумок сзади
+    part(geo.box, mats.skin, 0, 41.5, 0, 3.4, 2.4, 3.4); // шея
+    const head = new T.Group(); head.position.set(0, 46.5, 0); body.add(head);
+    part(geo.sph, mats.skin, 0, 0, .3, 4.1, 4.9, 4.5, head);
+    part(geo.box, lam(0x1a1a1a), 0, .7, 4.1, 4.8, .9, .6, head); // брови/глаза — тёмная полоска
+    head.add(hat(ch));
+    // руки: плечо + предплечье, держат оружие двумя руками
+    const arm = s => { const sh = new T.Group(); sh.position.set(s * 8.2, 39, 0); body.add(sh); part(geo.box, mats.shirt, 0, -4.8, 0, 3.8, 9.6, 3.8, sh);
+      const el = new T.Group(); el.position.y = -9.4; sh.add(el); part(geo.box, mats.shirt, 0, -4.2, 0, 3.4, 8.4, 3.4, el); part(geo.box, lam(0x2a2a24), 0, -9.2, 0, 3, 2.6, 3, el); return [sh, el]; };
+    const [armL, elL] = arm(-1), [armR, elR] = arm(1);
+    armR.rotation.set(-.35, 0, .12); elR.rotation.x = -1.25;
+    armL.rotation.set(-1.0, 0, -.45); elL.rotation.set(-.5, 0, .35);
+    const gunHold = new T.Group(); gunHold.position.set(2.6, 32.5, 8); body.add(gunHold);
+    const shadow = new T.Mesh(new T.CircleGeometry(11, 16), new T.MeshBasicMaterial({ color: 0, transparent: true, opacity: .22, depthWrite: false })); shadow.rotation.x = -Math.PI / 2; shadow.position.y = .6; g.add(shadow);
+    body.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    g.userData = { body, legL, legR, kneeL, kneeR, armL, armR, head, torso, vest, gunHold, gunKey: '', mats, shadow };
     return g;
   }
   function setGun(c, wb) {
     const u = c.userData; if (u.gunKey === wb) return; u.gunKey = wb;
-    u.gunHold.clear(); const w = wb & 15; if (w) u.gunHold.add(gunMesh(w, wb >> 4));
+    u.gunHold.clear(); const w = wb & 15; if (w) { const gm = gunMesh(w, wb >> 4); gm.traverse(o => { if (o.isMesh) o.castShadow = true; }); u.gunHold.add(gm); }
   }
   function poseChar(c, p, aim, walk, opt = {}) {
     c.position.set(p[0], opt.alt || 0, p[1]); c.rotation.set(0, Math.atan2(aim[0], aim[1]), 0);
     const u = c.userData, s = Math.sin(walk), moving = opt.moving;
-    u.legL.rotation.x = moving ? s * .7 : 0; u.legR.rotation.x = moving ? -s * .7 : 0;
-    u.body.position.y = moving ? Math.abs(Math.cos(walk)) * 2 : 0;
-    u.armL.rotation.x = -1.25 + (moving ? s * .08 : 0);
+    u.legL.rotation.x = moving ? s * .6 : 0; u.legR.rotation.x = moving ? -s * .6 : 0;
+    u.kneeL.rotation.x = moving ? Math.max(0, -s) * .9 : 0; u.kneeR.rotation.x = moving ? Math.max(0, s) * .9 : 0;
+    u.body.position.y = moving ? Math.abs(Math.cos(walk)) * 1.2 : 0;
     u.vest.visible = !!opt.armor;
-    const hit = opt.hit ? 1 : 0; u.mats.shirt.emissive.setScalar(hit * .8); u.mats.skin.emissive.setScalar(hit * .8);
+    const hit = opt.hit ? 1 : 0; u.mats.shirt.emissive.setScalar(hit * .6); u.mats.skin.emissive.setScalar(hit * .6);
     u.shadow.visible = !opt.alt;
   }
   // ===== лут =====
@@ -306,7 +355,7 @@ void main(){
       if (e.dead) { c.userData.body.rotation.z = Math.min(1.57, e.deadT * 5) * (e.id % 2 ? 1 : -1); c.userData.body.position.y = 0; }
       else c.userData.body.rotation.z = 0;
       // парашют
-      if (e.alt) { if (!c.userData.chute) { const ch = new T.Group(); for (let i = 0; i < 6; i++) { const seg = new T.Mesh(new T.SphereGeometry(24, 6, 4, i * Math.PI / 3, Math.PI / 3, 0, Math.PI / 2), lam(i % 2 ? 0xffffff : SHIRT[e.ch % 10])); ch.add(seg); } ch.position.y = 64; c.add(ch); c.userData.chute = ch; } c.userData.chute.visible = true; }
+      if (e.alt) { if (!c.userData.chute) { const ch = new T.Group(); for (let i = 0; i < 6; i++) { const seg = new T.Mesh(new T.SphereGeometry(24, 6, 4, i * Math.PI / 3, Math.PI / 3, 0, Math.PI / 2), lam(i % 2 ? 0xd8d4c8 : CAMO[e.ch % 10][0])); ch.add(seg); } ch.position.y = 64; c.add(ch); c.userData.chute = ch; } c.userData.chute.visible = true; }
       else if (c.userData.chute) c.userData.chute.visible = false;
     }
     for (const id in chars) if (!seen.has(+id)) chars[id].visible = false;
