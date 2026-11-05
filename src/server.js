@@ -116,6 +116,8 @@ export class World {
     for (const c of this.clients) if (c.name && !c.pl) c.spec = 0;
     // лут на земле
     for (let i = 0; i < 130; i++) { const b = i < 60 ? BIOMES[i % BIOMES.length] : null; const p = b ? nearPt(rnd, b.c, b.r) : rndMap(rnd); if (!inMap(p, 40) || this.objs.some(o => dist(o.p, p) < o.rad + 6)) continue; this.addLoot(this.randLoot(rnd), p, true); }
+    for (const b of this.objs.blds) { const n = b.kind === 'market' ? 5 : b.kind === 'barn' ? 3 : 1 + (rnd() < .6 ? 1 : 0);
+      for (let i = 0, k = 0; i < n && k < 30; k++) { const p = add(add(b.p, b.u, (rnd() - .5) * (b.w - 40)), b.v, (rnd() - .5) * (b.h - 40)); if (this.objs.some(o => !o.dead && objPush(o, p, 8))) continue; this.addLoot(this.randLoot(rnd, rnd() < .35), p, true); i++; } }
     this.lAdd = [];
     this.sendAll(this.matchMsg());
   }
@@ -153,12 +155,14 @@ export class World {
       if (p.bot) { if (!p.air) this.botStep(p); }
       else { const k = p.inputs.length > 4 ? 2 : 1; for (let i = 0; i < k && p.inputs.length; i++) this.applyInput(p, p.inputs.shift()); }
       if (!p.alive || p.air) continue;
+      // шаги: раз в ~0.35 с, если бежит
+      const mvd = p.lastP ? dist(p.p, p.lastP) : 0; if (mvd > 1.5) { p.mvDir = norm(sub(p.p, p.lastP)); p.stepT = (p.stepT || 0) + DT; if (p.stepT >= .35) { p.stepT = 0; p.step = 1; p.stepN = (p.stepN || 0) + 1; } } p.lastP = p.p;
       // огонь
       if (outZone(p.p, this.z)) { const d = zoneDps(this.z) * DT; this.damage(p, d, null, 0, true); p.fireAcc = (p.fireAcc || 0) + d; if (p.fireAcc >= 5) { p.hm.push([p.id, Math.round(p.fireAcc)]); p.fireAcc = 0; } }
       // автоподбор
       for (const it of this.loot.values()) if (dist(it.p, p.p) < PR + 14) this.pickup(p, it, false);
     }
-    for (const p of this.players) p.hist[this.tick % 32] = p.p;
+    for (const p of this.players) { p.hist[this.tick % 32] = p.p; p.bi = p.air ? -1 : bldAt(this.objs.blds, p.p); }
     const alive = this.players.filter(p => p.alive);
     if (alive.length <= 1 && this.phase === 1) {
       this.phase = 2; this.endT = 9 * TICK;
@@ -213,7 +217,7 @@ export class World {
       const sp = W.spread * sk * (W.pel > 1 ? (k / (W.pel - 1) - .5) * 2 + (this.rnd() - .5) * .3 : (this.rnd() - .5) * 2);
       const d = norm(add(p.aim, side, sp));
       const h = this.hitscan(p, d, W.range, rt);
-      this.shots.push([p.id, s.w | (s.r << 4), h.end]);
+      this.shots.push([p.id, s.w | (s.r << 4), h.end, p.p]);
       const dmg = W.dmg * RMULT[s.r] * (W.pel > 1 ? Math.max(.35, 1 - h.dist / W.range * .6) : 1);
       if (h.pl) this.damage(h.pl, dmg, p, s.w);
       else if (h.obj && h.obj.hp) { h.obj.hp -= dmg; p.hm.push([255, Math.round(dmg)]); if (h.obj.hp <= 0) this.breakCrate(h.obj); }
@@ -223,7 +227,7 @@ export class World {
   hitscan(p, d, range, rt) {
     const from = p.p; let best = range, obj = null, pl = null;
     for (const o of this.objs) {
-      if (o.dead || o.type === 'snowman' || dist(o.p, from) > range + o.rad) continue;
+      if (o.dead || o.type === 'snowman' || o.type === 'furn' || dist(o.p, from) > range + o.rad) continue;
       const t = rayObj(from, d, o); if (t < best) { best = t; obj = o; }
     }
     for (const q of this.players) {
@@ -260,6 +264,13 @@ export class World {
     for (const c of this.clients) if (c.spec === v.id) c.spec = by && by.alive ? by.id : -1;
   }
   // ===== Боты =====
+  // путь к точке t с учётом зданий: заходим и выходим через двери
+  nav(b, t) {
+    const B = this.objs.blds, bt = bldAt(B, t), bb = b.bi ?? -1; if (bt === bb) return t;
+    const near = (ds, q) => ds.reduce((m, d) => dist(d.o, q) < dist(m.o, q) ? d : m);
+    if (bb >= 0) { const d = near(B[bb].doors, t); return dist(b.p, d.i) < 22 ? d.o : d.i; }
+    const d = near(B[bt].doors, b.p); return dist(b.p, d.o) < 22 ? d.i : d.o;
+  }
   botStep(b) {
     const rnd = this.rnd;
     b.think--;
@@ -289,16 +300,16 @@ export class World {
     const t = b.target && b.target.alive && b.los ? b.target : null; // не видит — не гонится, а занимается своим
     let mv = null, fire = false;
     const danger = !z.pre && dist(b.p, z.c) > z.rho - 180;
-    if (danger) mv = dirTo(b.p, z.c); else if (!t && !b.goal && dist(b.p, nz.c) > nz.rho - 90) mv = dirTo(b.p, nz.c);
+    if (danger) mv = dirTo(b.p, this.nav(b, z.c)); else if (!t && !b.goal && dist(b.p, nz.c) > nz.rho - 90) mv = dirTo(b.p, this.nav(b, nz.c));
     if (t) {
       const to = dirTo(b.p, t.p); const err = (1 - b.skill) * .25 * Math.sin(this.t * 2.3 + b.id);
       b.aim = norm(add(to, perp(to), err));
       const range = W ? W.range : 300;
-      if (!danger) { if (!b.los) mv = to; else { const want = range * .55; mv = norm(add(mul(to, b.tdist > want ? 1 : -.4), perp(to), b.side * .7)); if (rnd() < .006) b.side *= -1; } }
+      if (!danger) { if (!b.los) mv = dirTo(b.p, this.nav(b, t.p)); else { const want = range * .55; mv = norm(add(mul(to, b.tdist > want ? 1 : -.4), perp(to), b.side * .7)); if (rnd() < .006) b.side *= -1; } }
       if (b.react > 0) b.react--;
       else if (W && b.los && b.tdist < range * .95 && rnd() < (this.t < ZONE_T0 + 25 ? .16 : .22) + b.skill * .25) fire = true;
-    } else if (!danger && b.goal) { if (this.loot.has(b.goal.id)) { mv = dirTo(b.p, b.goal.p); if (dist(b.goal.p, b.p) < PR + 26) this.pickup(b, b.goal, true); } else b.think = 0; }
-    else if (!mv) { if (!b.wp || dist(b.wp, b.p) < 45 || rnd() < .004) b.wp = clampMap(nearPt(rnd, nz.c, Math.min(630, Math.max(45, nz.rho * .7))), 80); mv = dirTo(b.p, b.wp); }
+    } else if (!danger && b.goal) { if (this.loot.has(b.goal.id)) { mv = dirTo(b.p, this.nav(b, b.goal.p)); if (dist(b.goal.p, b.p) < PR + 26) this.pickup(b, b.goal, true); } else b.think = 0; }
+    else if (!mv) { if (!b.wp || dist(b.wp, b.p) < 45 || rnd() < .004) b.wp = clampMap(nearPt(rnd, nz.c, Math.min(630, Math.max(45, nz.rho * .7))), 80); mv = dirTo(b.p, this.nav(b, b.wp)); }
     if (!t && b.hp < 60 && b.meds > 0 && !danger) { this.startHeal(b); mv = null; }
     if (wpn && wpn.mag <= 0) this.startReload(b);
     if (mv) {
@@ -325,10 +336,18 @@ export class World {
         if (!cam || !cam.alive) { cam = this.players.find(p => p.alive) || this.players[0]; if (cam) c.spec = cam.id; }
       }
       const ents = [];
-      if (cam) for (const p of this.players) if (p.alive && (p === cam || p === me || (p.air !== 1 && dist(p.p, cam.p) < VIEWD))) ents.push(p);
-      const sh = cam ? shots.filter(s => dist(s[2], cam.p) < VIEWD + 300) : [];
+      // видимость: стены и крыши закрывают; невидимых только «слышно» (шаги, выстрелы)
+      const seen = new Set(), noise = [];
+      if (cam) for (const p of this.players) {
+        if (!p.alive) continue;
+        const vis = p === cam || p === me || (p.air !== 1 && dist(p.p, cam.p) < VIEWD && (p.air || cam.air || canSee(this.objs, cam.p, p.p, cam.bi ?? -1, p.bi ?? -1)));
+        if (vis) { ents.push(p); seen.add(p.id); }
+        else if (p.step && !p.air && dist(p.p, cam.p) < HEAR) noise.push([1 | ((p.stepN & 1) << 4), p.p, p.mvDir || [0, 1]]);
+      }
+      const sh = [];
+      if (cam) { const heard = new Set(); for (const s of shots) { if (seen.has(s[0])) { if (dist(s[2], cam.p) < VIEWD + 300) sh.push(s); } else if (!heard.has(s[0]) && dist(s[3], cam.p) < HEAR * 1.8) { heard.add(s[0]); noise.push([2, s[3], [0, 0]]); } } }
       const hm = me ? me.hm.splice(0) : [];
-      const buf = new ArrayBuffer(40 + ents.length * 10 + sh.length * 6 + hm.length * 2), dv = new DataView(buf); let o = 0;
+      const buf = new ArrayBuffer(42 + ents.length * 10 + sh.length * 6 + hm.length * 2 + noise.length * 7), dv = new DataView(buf); let o = 0;
       const u8 = v => dv.setUint8(o++, Math.max(0, Math.min(255, Math.round(v))));
       const u16 = v => { dv.setUint16(o, v, true); o += 2; };
       const v2 = p => { dv.setInt16(o, q16(p[0]), true); dv.setInt16(o + 2, q16(p[1]), true); o += 4; };
@@ -347,8 +366,10 @@ export class World {
       for (const p of ents) { u8(p.id); v2(p.p); dv.setInt8(o++, i8(p.aim[0])); dv.setInt8(o++, i8(p.aim[1])); u8(p.hp); u8(1 | (p.armor > 0 ? 2 : 0) | (p.relT > 0 ? 4 : 0) | (p.healT > 0 ? 8 : 0) | (p.air << 4)); const s = p.slots[p.cur]; u8(s ? s.w | (s.r << 4) : 0); }
       u8(sh.length); for (const s of sh) { u8(s[0]); u8(s[1]); v2(s[2]); }
       u8(hm.length); for (const h of hm) { u8(h[0]); u8(Math.min(255, h[1])); }
+      u8(noise.length); for (const n of noise) { u8(n[0]); v2(n[1]); dv.setInt8(o++, i8(n[2][0])); dv.setInt8(o++, i8(n[2][1])); }
       this.send(c, buf.slice(0, o));
     }
+    for (const p of this.players) p.step = 0;
   }
 }
 function lootArr(it) { return [it.id, it.k, it.x, it.r, it.n, Math.round(it.p[0] * 10) / 10, Math.round(it.p[1] * 10) / 10]; }

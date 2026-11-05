@@ -13,7 +13,7 @@ let plan = null, shipS = [0, 0], shipD = [1, 0], myAir = 0, zone = zoneAt(0, nul
 let ents = {}, lastTick = 0, tickOff = null, snapCount = 0, snapRate = 0;
 let pending = [], seq = 0, predP = null, prevP = null, tickAcc = 0, outBuf = [];
 let camP = [0, 0];
-let tracers = [], fx = [], feed = [], nums = [], dead = null, endInfo = null;
+let tracers = [], fx = [], feed = [], nums = [], marks = [], dead = null, endInfo = null;
 let started = false, sound = null, menuOpen = false;
 
 // ===== рисование =====
@@ -35,7 +35,8 @@ function resize() { dpr = Math.min(2, devicePixelRatio || 1); W = innerWidth; H 
 addEventListener('resize', () => { resize(); layout(); G3.resize(W, H); });
 
 // ===== ввод =====
-const keys = {}; let mouse = { x: 0, y: 0, down: false, used: false }, sticks = { L: null, R: null }, touchUI = false;
+const keys = {}; let mouse = { x: 0, y: 0, down: false, used: false }, sticks = { L: null, R: null, F: null }, touchUI = false, aimT = 0;
+const fireOn = () => touchUI && phase === 1 && myId !== 255 && !dead && !myAir && predP;
 let wantSlot = -1, wantReload = false, wantHeal = false, wantPick = false, bigMap = false;
 addEventListener('keydown', e => { if (document.activeElement && document.activeElement.tagName === 'INPUT') return; keys[e.code] = 1; if (e.code === 'Escape') { menuOpen = started && !menuOpen; return; } if (e.code === 'Digit1') wantSlot = 0; if (e.code === 'Digit2') wantSlot = 1; if (e.code === 'KeyR') wantReload = true; if (e.code === 'KeyE' || e.code === 'KeyF') wantPick = true; if (e.code === 'Space') wantJump = true; if (e.code === 'KeyQ' || e.code === 'KeyH') wantHeal = true; if (e.code === 'KeyM') bigMap = !bigMap; if (e.code === 'Tab') { e.preventDefault(); specNext(); } });
 addEventListener('keyup', e => { keys[e.code] = 0; });
@@ -44,10 +45,12 @@ cv.addEventListener('mousedown', e => { if (uiHit(e.clientX, e.clientY)) return;
 addEventListener('mouseup', () => { mouse.down = false; });
 cv.addEventListener('wheel', () => { wantSlot = priv ? 1 - priv.cur : -1; });
 cv.addEventListener('touchstart', e => { touchUI = true; initSound();
-  for (const t of e.changedTouches) { if (uiHit(t.clientX, t.clientY)) continue; const s = t.clientX < W / 2 ? 'L' : 'R'; if (!sticks[s]) sticks[s] = { id: t.identifier, x0: t.clientX, y0: t.clientY, x: t.clientX, y: t.clientY }; }
+  for (const t of e.changedTouches) {
+    const fb = ui('fire'); if (!menuOpen && !bigMap && fb && fireOn() && Math.hypot(t.clientX - fb.cx, t.clientY - fb.cy) < fb.r * 1.25) { if (!sticks.F) sticks.F = { id: t.identifier, x0: t.clientX, y0: t.clientY, x: t.clientX, y: t.clientY }; continue; }
+    if (uiHit(t.clientX, t.clientY)) continue; const s = t.clientX < W / 2 ? 'L' : 'R'; if (!sticks[s]) sticks[s] = { id: t.identifier, x0: t.clientX, y0: t.clientY, x: t.clientX, y: t.clientY }; }
   e.preventDefault(); }, { passive: false });
-cv.addEventListener('touchmove', e => { for (const t of e.changedTouches) for (const s of ['L', 'R']) if (sticks[s] && sticks[s].id === t.identifier) { sticks[s].x = t.clientX; sticks[s].y = t.clientY; } e.preventDefault(); }, { passive: false });
-const tend = e => { for (const t of e.changedTouches) for (const s of ['L', 'R']) if (sticks[s] && sticks[s].id === t.identifier) sticks[s] = null; };
+cv.addEventListener('touchmove', e => { for (const t of e.changedTouches) for (const s of ['L', 'R', 'F']) if (sticks[s] && sticks[s].id === t.identifier) { sticks[s].x = t.clientX; sticks[s].y = t.clientY; } e.preventDefault(); }, { passive: false });
+const tend = e => { for (const t of e.changedTouches) for (const s of ['L', 'R', 'F']) if (sticks[s] && sticks[s].id === t.identifier) sticks[s] = null; };
 cv.addEventListener('touchend', tend); cv.addEventListener('touchcancel', tend);
 const stickVec = s => { if (!s) return [0, 0, 0]; let dx = s.x - s.x0, dy = s.y - s.y0; const l = Math.hypot(dx, dy), m = 55; if (l > m) { dx *= m / l; dy *= m / l; } return [dx / m, -dy / m, Math.min(1, l / m)]; };
 const scr2map = (x, y) => add(mul(CAM_R, x), CAM_F, y); // экранное направление → направление на карте
@@ -57,6 +60,7 @@ function layout() {
   const s = Math.max(44, Math.min(64, Math.min(W, H) * .13)), by = H - s * .5 - 30, ms = Math.min(150, Math.min(W, H) * .3);
   UI = [
     { id: 'exit', x: 8, y: 8, w: 44, h: 44 },
+    { id: 'fire', cx: W - 84, cy: H - 100, r: Math.max(38, Math.min(52, Math.min(W, H) * .12)), x: -999, y: -999, w: 0, h: 0 },
     { id: 'slot0', x: CX - s * 1.15, y: by - s * .65, w: s * 1.1, h: s * .8 },
     { id: 'slot1', x: CX + s * .05, y: by - s * .65, w: s * 1.1, h: s * .8 },
     { id: 'heal', x: CX - s * 2.25, y: by - s * .6, w: s * .9, h: s * .75 },
@@ -86,7 +90,7 @@ function uiHit(x, y) {
     menuOpen = false; return true;
   }
   for (const b of UI) if (!b.menu && inBox(b, x, y)) {
-    if (b.id === 'exit') { menuOpen = true; sticks.L = sticks.R = null; mouse.down = false; return true; }
+    if (b.id === 'exit') { menuOpen = true; sticks.L = sticks.R = sticks.F = null; mouse.down = false; return true; }
     if (b.id === 'map') { bigMap = !bigMap; return true; }
     if (bigMap) { bigMap = false; return true; }
     if (b.id === 'jump' && myAir === 1 && phase === 1 && !dead) { wantJump = true; return true; }
@@ -105,8 +109,8 @@ function specNext() { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t:
 function quit() {
   menuOpen = false;
   if (ws) { ws.onclose = null; try { if (ws.readyState === 1) ws.send(JSON.stringify({ t: 'quit' })); ws.close(); } catch (e) { } ws = null; }
-  started = false; phase = 0; myId = 255; camId = 255; ents = {}; loot = new Map(); dead = null; endInfo = null; predP = null; pending = []; lobbyNames = []; feed = []; fx = []; nums = []; tracers = []; myAir = 0; plan = null;
-  sticks.L = sticks.R = null; mouse.down = false; bigMap = false;
+  started = false; phase = 0; myId = 255; camId = 255; ents = {}; marks = []; loot = new Map(); dead = null; endInfo = null; predP = null; pending = []; lobbyNames = []; feed = []; fx = []; nums = []; tracers = []; myAir = 0; plan = null;
+  sticks.L = sticks.R = sticks.F = null; mouse.down = false; bigMap = false;
   try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch (e) { }
   document.getElementById('start').style.display = 'flex';
 }
@@ -163,7 +167,8 @@ function onSnap(buf) {
   const ack = dv.getUint16(o, true); o += 2;
   const mid = u8(), cid = u8(), an = u8();
   const pv = { hp: u8(), armor: u8(), cur: u8(), s: [[u8(), u8()], [u8(), u8()]], ammo: [u8(), u8(), u8(), u8()], meds: u8(), st: u8(), prog: u8(), kills: u8() };
-  phase = ph; timer = tm; aliveN = an; myId = mid; camId = cid; priv = pv; if (ph === 1) matchT = tm / 10;
+  phase = ph; timer = tm; aliveN = an; myId = mid; camId = cid; priv = pv;
+  if (ph === 1) { const st = tm / 10; if (Math.abs(st - matchT) > .6) matchT = st; else matchT += (st - matchT) * .08; } // плавно, без рывков
   // часы сервера
   const now = performance.now(), est = tick - now / 50;
   if (tickOff === null || est > tickOff || tick < lastTick - 100) tickOff = est; else tickOff += (est - tickOff) * .02;
@@ -181,6 +186,9 @@ function onSnap(buf) {
   for (let i = 0; i < ns; i++) { const sid = u8(), wb = u8(), end = rdPos(dv, o); o += 4; tracers.push({ sid, wb, end, t: 0, from: null }); if (sid !== myId) sfx(wb & 15, vol(end) * .8); }
   const nh = u8();
   for (let i = 0; i < nh; i++) { const tid = u8(), d = u8(); const e = ents[tid]; nums.push({ p: e && e.disp ? e.disp : null, tid, d, t: 0, crate: tid === 255 }); if (tid !== myId) sfx('hit', .7); }
+  // слышно, но не видно: шаги за стеной и выстрелы
+  if (o < dv.byteLength) { const nn = u8(); for (let i = 0; i < nn; i++) { const k = u8(), p = rdPos(dv, o); o += 4; const d = [dv.getInt8(o) / 127, dv.getInt8(o + 1) / 127]; o += 2;
+    marks.push({ k: k & 15, side: k >> 4, p, d, t: 0 }); if ((k & 15) === 2) sfx(2, vol(p) * .6); } }
 }
 function vol(p) { const d = dist(predP || camP, p); return Math.max(0, 1 - d / 900); }
 const seqAfter = (a, b) => ((a - b) & 0xffff) > 0 && ((a - b) & 0xffff) < 32768;
@@ -193,6 +201,14 @@ function reconcile(sp, ack) {
 
 // ===== локальный тик (ввод + предсказание) =====
 let myAim = null;
+// помощь в прицеливании на телефоне: ближайший видимый враг в зоне выстрела (cone — только впереди)
+function autoAim(cone) {
+  const s = priv && priv.s[priv.cur], w = s ? s[0] & 15 : 0; if (!w || !predP) return null; const rng = WEAPONS[w].range;
+  let best = null, bd = 1e9;
+  for (const id in ents) { if (+id === myId) continue; const e = ents[id]; if (e.seen < 0 || !e.disp) continue; const d = dist(e.disp, predP); if (d > rng || d >= bd) continue;
+    if (cone && myAim && dot(norm(sub(e.disp, predP)), myAim) < .88) continue; bd = d; best = e.disp; }
+  return best ? sub(best, predP) : null;
+}
 function readMove() {
   let mx = 0, my = 0; if (keys.KeyW || keys.ArrowUp) my++; if (keys.KeyS || keys.ArrowDown) my--; if (keys.KeyD || keys.ArrowRight) mx++; if (keys.KeyA || keys.ArrowLeft) mx--;
   if (sticks.L) { const v = stickVec(sticks.L); mx = v[0]; my = v[1]; }
@@ -212,7 +228,9 @@ function localTick() {
   if (!alive) return;
   const mv = readMove();
   let aim = null, fire = false;
-  if (sticks.R) { const v = stickVec(sticks.R); if (v[2] > .2) aim = scr2map(v[0], v[1]); fire = v[2] > .6; }
+  if (sticks.R) { const v = stickVec(sticks.R); if (v[2] > .15) { aim = scr2map(v[0], v[1]); aimT = performance.now(); } } // правый стик — только смотреть
+  if (sticks.F) { fire = true; const v = stickVec(sticks.F); if (v[2] > .3) { aim = scr2map(v[0], v[1]); aimT = performance.now(); } // кнопку огня можно тянуть — целится
+    else if (!sticks.R) { const a = autoAim(performance.now() - aimT < 1500); if (a) aim = a; } } // помощь в прицеливании
   else if (mouse.used && !touchUI) { const g = G3.screenToGround(mouse.x, mouse.y, 24); if (g && dist(g, predP) > 2) aim = sub(g, predP); fire = mouse.down || !!keys.Space; }
   if (aim) myAim = norm(aim);
   let fl = (fire ? 1 : 0) | (wantReload ? 2 : 0) | (wantPick ? 4 : 0) | (wantHeal ? 8 : 0);
@@ -267,7 +285,7 @@ function render(dt, now) {
   let target = null;
   if (meAlive) target = prevP ? lerp(prevP, predP, Math.min(1, tickAcc / DT)) : predP;
   else if (meIn && myAir === 1) target = shipPos(shipS, shipD, matchT);
-  else if (meIn && myAir === 2 && ents[myId]) { const q = interp(ents[myId], rt + 1.2); if (q) target = q.p; }
+  else if (meIn && myAir === 2 && ents[myId]) { const q = interp(ents[myId], rt); if (q) target = q.p; }
   else if (phase >= 1 && ents[camId]) { const q = interp(ents[camId], rt); if (q) target = q.p; }
   if (target) camP = dist(target, camP) > 300 ? target : lerp(camP, target, meAlive || (meIn && myAir) ? 1 : Math.min(1, dt * 8));
   else camP = [Math.cos(now / 9000) * 500, Math.sin(now / 9000) * 500]; // в лобби камера медленно плывёт
@@ -290,7 +308,8 @@ function render(dt, now) {
   for (const f of fx) { f.t += dt; if (f.type === 'death' && f.t < 1.3) list.push({ id: 100 + f.v, ch: f.ch, p: f.p, aim: f.aim && len(f.aim) > .05 ? norm(f.aim) : [0, 1], wb: 0, walk: 0, dead: true, deadT: f.t }); }
   fx = fx.filter(f => f.t < 3);
   for (const t of tracers) { t.t += dt; if (!t.from) { const e = t.sid === myId && predP ? predP : ents[t.sid] && ents[t.sid].disp; t.from = e || t.end; if (ents[t.sid]) ents[t.sid].fireT = .1; } }
-  G3.frame({ now, dt, objs, zone, plan, matchT, phase, loot, list, tracers, shipS, shipD, camP });
+  const inB = phase >= 1 && target && !(meIn && myAir) ? bldAt(objs.blds, target) : -1;
+  G3.frame({ now, dt, objs, zone, plan, matchT, phase, loot, list, tracers, shipS, shipD, camP, inB });
   tracers = tracers.filter(t => t.t < .12);
   // ===== 2D поверх 3D =====
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
@@ -307,11 +326,21 @@ function render(dt, now) {
     ctx.globalAlpha = Math.max(0, .85 - f.t / 3); const gx = x + Math.sin(f.t * 5) * 10; ctx.fillStyle = '#f8f9fa'; ctx.beginPath(); ctx.arc(gx, y, r * .8, 3.14, 0); ctx.lineTo(gx + r * .8, y + r * .9); for (let i = 3; i >= -3; i--) ctx.lineTo(gx + i * r * .27, y + r * (i % 2 ? .65 : .9)); ctx.fill();
     blob(ctx, gx - r * .28, y - r * .1, r * .13, '#000'); blob(ctx, gx + r * .28, y - r * .1, r * .13, '#000'); ctx.strokeStyle = '#ffd43b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(gx, y - r * 1.05, r * .5, r * .18, 0, 0, 6.2832); ctx.stroke(); ctx.globalAlpha = 1;
     if (f.t < .6) { const [cx, cy] = G3.project(f.p, 20); for (let i = 0; i < 12; i++) { const a = i * .52 + f.spin, d = f.t * 160; ctx.fillStyle = COLORS[(i + f.ch) % 10]; ctx.fillRect(cx + Math.cos(a) * d, cy + Math.sin(a) * d - f.t * 40 + f.t * f.t * 200, 4, 7); } } }
+  // следы шагов и выстрелы, которые слышно, но не видно
+  for (const m of marks) { m.t += dt; const [x, y] = G3.project(m.p, 0);
+    if (m.k === 1) { const life = 3; if (m.t > life) continue; const [x2, y2] = G3.project(add(m.p, m.d, 10), 0), a = Math.atan2(y2 - y, x2 - x), sd = m.side ? 1 : -1;
+      ctx.save(); ctx.translate(x - Math.sin(a) * sd * 4, y + Math.cos(a) * sd * 4); ctx.rotate(a); ctx.globalAlpha = Math.min(1, (life - m.t) / 1.2) * .9;
+      ctx.fillStyle = 'rgba(245,235,210,.95)'; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.ellipse(2, 0, 5, 2.6, 0, 0, 6.2832); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(-4.5, 0, 2.2, 2, 0, 0, 6.2832); ctx.fill(); ctx.stroke(); ctx.restore(); }
+    else if (m.k === 2 && m.t < 1.4) { const k = m.t / 1.4; ctx.globalAlpha = 1 - k; ctx.strokeStyle = '#ff922b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 8 + k * 34, 0, 6.2832); ctx.stroke();
+      if (x < 0 || x > W || y < 0 || y > H) { const a = Math.atan2(y - CY, x - CX), r = Math.min(W, H) * .44; txt('💥', CX + Math.cos(a) * r, CY + Math.sin(a) * r + 6, 18); } else txt('💥', x, y + 6, 16); ctx.globalAlpha = 1; } }
+  marks = marks.filter(m => m.t < 3);
+  // метка «я» под ногами — видно даже за стеной
+  if (meAlive) { const [x, y] = G3.project(target, 0); ctx.strokeStyle = 'rgba(105,219,124,.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(x, y, 16, 9, 0, 0, 6.2832); ctx.stroke(); }
   // цифры урона
   for (const n of nums) { n.t += dt; if (!n.p && ents[n.tid] && ents[n.tid].disp) n.p = ents[n.tid].disp; if (!n.p) continue; const [x, y, v] = G3.project(n.p, 60 + n.t * 50); if (!v) continue; ctx.globalAlpha = Math.max(0, 1 - n.t / .8); txt(String(n.d), x + 16, y, n.crate ? 13 : 18, n.tid === myId ? '#ff6b6b' : n.crate ? '#ffd8a8' : n.d >= 50 ? '#ffd43b' : '#fff'); ctx.globalAlpha = 1; }
   nums = nums.filter(n => n.t < .8);
   // прицельная линия (сенсор)
-  if (meAlive && sticks.R && myAim && priv) { const s = priv.s[priv.cur]; const w = s[0] & 15; if (w) { const a = G3.project(target, 24), b = G3.project(add(target, myAim, WEAPONS[w].range), 24); ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.setLineDash([6, 8]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.setLineDash([]); } }
+  if (meAlive && (sticks.R || sticks.F) && myAim && priv) { const s = priv.s[priv.cur]; const w = s[0] & 15; if (w) { const a = G3.project(target, 24), b = G3.project(add(target, myAim, WEAPONS[w].range), 24); ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.setLineDash([6, 8]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.setLineDash([]); } }
   // пепел рядом с огнём
   if (phase >= 1 && !zone.pre && dist(camP, zone.c) > zone.rho - 220) { while (ash.length < 40) ash.push({ x: Math.random() * W, y: Math.random() * H, s: 1 + Math.random() * 2.5, v: 20 + Math.random() * 30 });
     for (const a of ash) { a.y += a.v * dt; a.x += Math.sin(now / 700 + a.s * 5) * 15 * dt; if (a.y > H) { a.y = -5; a.x = Math.random() * W; } ctx.fillStyle = a.s > 2.5 ? 'rgba(255,140,60,.8)' : 'rgba(200,200,200,.55)'; ctx.fillRect(a.x, a.y, a.s, a.s); } } else ash = [];
@@ -372,8 +401,11 @@ function hud(now, meAlive, mePos) {
         const f = .6 + .5 * Math.sin(now / 70 + i * 2.3) + .3 * Math.sin(now / 31 + i * 5.1); if (f < .4) continue; ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.drawImage(FLAME, -18 * f, -50 * f, 36 * f, 50 * f); ctx.restore(); }
       ctx.globalCompositeOperation = 'source-over'; }
     // джойстики
-    drawStick(sticks.L, 'rgba(255,255,255,.65)'); drawStick(sticks.R, 'rgba(255,120,80,.75)');
-    if (touchUI) { if (!sticks.L) ghostStick(W * .16, H * .68); if (!sticks.R) ghostStick(W * .84, H * .68); }
+    drawStick(sticks.L, 'rgba(255,255,255,.65)'); drawStick(sticks.R, 'rgba(120,200,255,.7)');
+    if (touchUI) { if (!sticks.L) ghostStick(W * .16, H * .68); if (!sticks.R) ghostStick(W * .66, H * .62, '👁');
+      const fb = ui('fire'), fs = sticks.F, v = fs ? stickVec(fs) : [0, 0, 0], fx_ = fb.cx + v[0] * 26, fy_ = fb.cy - v[1] * 26;
+      ctx.fillStyle = fs ? 'rgba(255,80,60,.75)' : 'rgba(0,0,0,.45)'; ctx.beginPath(); ctx.arc(fx_, fy_, fb.r, 0, 6.2832); ctx.fill(); ctx.strokeStyle = fs ? '#fff' : 'rgba(255,107,107,.9)'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(fx_, fy_, fb.r * .38, 0, 6.2832); for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(fx_ + a * fb.r * .18, fy_ + b * fb.r * .18); ctx.lineTo(fx_ + a * fb.r * .62, fy_ + b * fb.r * .62); } ctx.stroke(); }
     if (mouse.used && !touchUI) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 9, 0, 6.2832); ctx.moveTo(mouse.x - 14, mouse.y); ctx.lineTo(mouse.x - 5, mouse.y); ctx.moveTo(mouse.x + 5, mouse.y); ctx.lineTo(mouse.x + 14, mouse.y); ctx.moveTo(mouse.x, mouse.y - 14); ctx.lineTo(mouse.x, mouse.y - 5); ctx.moveTo(mouse.x, mouse.y + 5); ctx.lineTo(mouse.x, mouse.y + 14); ctx.stroke(); }
   }
   // экраны
@@ -416,7 +448,7 @@ function hud(now, meAlive, mePos) {
     txt('↻', CX, CY + 80, 44, '#ffd43b'); }
   if (PERF) { ctx.font = '12px monospace'; ctx.textAlign = 'left'; ctx.fillStyle = '#0f0'; ctx.fillText(`${fps} fps · ${snapRate} snap/s · pend ${pending.length} · ents ${Object.keys(ents).length}`, 8, H - 8); }
 }
-function ghostStick(x, y) { ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 46, 0, 6.2832); ctx.stroke(); }
+function ghostStick(x, y, icon) { ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 46, 0, 6.2832); ctx.stroke(); if (icon) { ctx.globalAlpha = .35; txt(icon, x, y + 7, 20); ctx.globalAlpha = 1; } }
 function drawStick(s, col) { if (!s) return; ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(s.x0, s.y0, 55, 0, 6.2832); ctx.stroke(); const v = stickVec(s); blob(ctx, s.x0 + v[0] * 55, s.y0 - v[1] * 55, 24, col); }
 // миникарта — ромб, повёрнутый так же, как камера (вверх на карте = вверх на экране)
 function minimap(now, from) {

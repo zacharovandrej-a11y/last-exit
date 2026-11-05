@@ -136,6 +136,9 @@ void main(){
     car: (w, h) => [[geo.box, 'car', M(0, 8, 0, w, 9, h)], [geo.box, 'car', M(-w * .06, 15.5, 0, w * .52, 7, h * .9)], [geo.box, 0x26323a, M(-w * .06, 15.5, 0, w * .54, 5.4, h * .92)],
       [geo.cyl10, 0x1c1c1c, MX(w * .3, 4.5, 0, 4.5, h * 1.02, 4.5)], [geo.cyl10, 0x1c1c1c, MX(-w * .3, 4.5, 0, 4.5, h * 1.02, 4.5)]],
     crate: () => [[geo.box, 'crate', M(0, 13, 0, 26, 26, 26)]],
+    furn: (w, h, o) => o.fk === 'bed' ? [[geo.box, 0x5a4632, M(0, 5, 0, w, 10, h)], [geo.box, 0xcfc8b8, M(0, 11, h * .05, w * .9, 3, h * .8)], [geo.box, 0x6b7a5a, M(0, 11.5, h * .12, w * .92, 3, h * .5)], [geo.box, 0xe8e4da, M(0, 12.5, -h * .38, w * .7, 3, h * .14)]]
+      : o.fk === 'table' ? [[geo.box, 0x6b4a2e, M(0, 13, 0, w, 2.5, h)], [geo.box, 0x4a3624, M(w * .4, 6, h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(-w * .4, 6, h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(w * .4, 6, -h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(-w * .4, 6, -h * .35, 2, 12, 2)]]
+      : [[geo.box, 0x6e6a62, M(0, 15, 0, w, 30, h)], [geo.box, 0xa8543a, M(-w * .2, 21, 0, w * .35, 6, h * .8)], [geo.box, 0x5a7a8a, M(w * .22, 21, 0, w * .3, 6, h * .8)], [geo.box, 0xc9a85a, M(0, 9, 0, w * .8, 6, h * .8)]],
     wall: (w, h) => [[geo.box, 0x8d8d86, M(0, 11, 0, w, 22, h)], [geo.box, 0x76766f, M(0, 22.5, 0, w * 1.02, 2, h * 1.3)]],
     tent: (w, h) => [[geo.roof, 0x5a5a3a, M(0, 0, 0, w, 30, h)], [geo.box, 0x2e2e20, M(w / 2 + .3, 8, 0, .8, 14, 8)]],
   };
@@ -150,9 +153,9 @@ void main(){
     objIdx.length = 0;
     const plan = {};
     for (const o of objs) {
-      const f = PARTS[o.type]; if (!f) continue; const parts = f(o.w, o.h);
+      const f = PARTS[o.type]; if (!f) continue; const parts = f(o.w, o.h, o);
       parts.forEach(([g, col, lm], pi) => {
-        const key = o.type + '|' + pi + '|' + g.uuid + '|' + col;
+        const key = o.type + '|' + (o.fk || '') + '|' + pi + '|' + g.uuid + '|' + col;
         (plan[key] = plan[key] || { g, col, items: [] }).items.push([o, lm]);
       });
     }
@@ -169,6 +172,54 @@ void main(){
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       scene.add(mesh); inst[key] = { mesh };
     }
+    buildBuildings(objs);
+  }
+  // ===== здания =====
+  const BSTY = {
+    house: { wall: id => VAR.house[id % VAR.house.length], floor: 0x6b5038, roof: id => VAR.roof[id % VAR.roof.length], gable: 1, win: 1 },
+    house2: { wall: id => VAR.house2[id % VAR.house2.length], floor: 0x8a847a, roof: () => 0x66625b, win: 1 },
+    barn: { wall: () => 0x72302a, floor: 0x6b5a40, roof: () => 0x4e535a, gable: 1 },
+    market: { wall: () => 0xcfcac0, floor: 0x9a978e, roof: () => 0x6e6a62, win: 1 },
+    bunker: { wall: () => 0x82827a, floor: 0x5e5e58, roof: () => 0x6e6e66, slit: 1 },
+  };
+  const bInst = {}, bParts = []; let insideB = -1;
+  function buildBuildings(objs) {
+    for (const k in bInst) { scene.remove(bInst[k].mesh); delete bInst[k]; }
+    bParts.length = 0; insideB = -1;
+    const plan = {}, Y = new T.Vector3(0, 1, 0), ONE = new T.Vector3(1, 1, 1);
+    for (const b of objs.blds || []) {
+      const base = new T.Matrix4().compose(new T.Vector3(b.p[0], 0, b.p[1]), new T.Quaternion().setFromAxisAngle(Y, -b.a), ONE);
+      const S = BSTY[b.kind], wc = S.wall(b.id), pcs = [];
+      pcs.push([geo.box, S.floor, M(0, .7, 0, b.w - 2, 1.4, b.h - 2), 'floor']);
+      for (const id of b.walls) {
+        const o = objs[id], L = o.hor ? o.w : o.h, sx = o.hor ? L : WALLT, sz = o.hor ? WALLT : L;
+        pcs.push([geo.box, wc, M(o.lx, WALLH / 2, o.ly, sx, WALLH, sz), 'wall', M(o.lx, 7, o.ly, sx, 14, sz)]);
+        const outer = o.hor ? Math.abs(Math.abs(o.ly) - (b.h / 2 - WALLT / 2)) < 1 : Math.abs(Math.abs(o.lx) - (b.w / 2 - WALLT / 2)) < 1;
+        if (outer && (S.win || S.slit) && L > 40) { const n = Math.max(1, Math.floor(L / 62)); for (let k = 0; k < n; k++) { const off = (k + .5) / n * L - L / 2, x = o.lx + (o.hor ? off : 0), z = o.ly + (o.hor ? 0 : off);
+          if (S.slit) pcs.push([geo.box, 0x151515, M(x, 40, z, o.hor ? 18 : WALLT + 1.2, 4, o.hor ? WALLT + 1.2 : 18), 'win']);
+          else { pcs.push([geo.box, 0xe8e4da, M(x, 36, z, o.hor ? 18 : WALLT + .8, 17, o.hor ? WALLT + .8 : 18), 'win']); pcs.push([geo.box, 0x2b363c, M(x, 36, z, o.hor ? 14 : WALLT + 1.4, 13, o.hor ? WALLT + 1.4 : 14), 'win']); } } }
+      }
+      // перемычки над дверями
+      for (const d of b.doors) { const c = lerp(d.i, d.o, .5), r = sub(c, b.p), lx = dot(r, b.u), ly = dot(r, b.v), dw = (BKIND[b.kind].door || DOOR) + 2;
+        pcs.push([geo.box, wc, M(lx, WALLH - 8, ly, dw, 16, WALLT), 'lintel']); }
+      if (S.gable) pcs.push([geo.roof, S.roof(b.id), M(0, WALLH, 0, b.w * 1.06, Math.min(b.h, b.w) * .4, b.h * 1.1), 'roof']);
+      else { pcs.push([geo.box, S.roof(b.id), M(0, WALLH + 1.5, 0, b.w + 3, 3, b.h + 3), 'roof']); pcs.push([geo.box, wc, M(0, WALLH + 4, 0, b.w + 3, 4, b.h + 3), 'roof']); }
+      bParts[b.id] = [];
+      for (const [g, col, lm, role, low] of pcs) { const key = g.uuid + '|' + col + '|' + (role === 'floor' ? 'f' : 'w'); (plan[key] = plan[key] || { g, col, items: [] }).items.push([b.id, base.clone().multiply(lm), role, low ? base.clone().multiply(low) : null]); }
+    }
+    for (const key in plan) {
+      const { g, col, items } = plan[key];
+      const mesh = new T.InstancedMesh(g, lam(0xffffff), items.length); mesh.frustumCulled = false; mesh.castShadow = !key.endsWith('f'); mesh.receiveShadow = true;
+      items.forEach(([bid, m, role, low], i) => { mesh.setMatrixAt(i, m); mesh.setColorAt(i, new T.Color(col)); bParts[bid].push([mesh, i, m, role, low]); });
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      scene.add(mesh); bInst[key] = { mesh };
+    }
+  }
+  // игрок внутри здания: крыша исчезает, стены опускаются — видно, что внутри
+  function setInside(bid) {
+    if (bid === insideB) return;
+    const set = (id, open) => { for (const [mesh, i, m, role, low] of bParts[id] || []) { mesh.setMatrixAt(i, !open || role === 'floor' ? m : low || zero); mesh.instanceMatrix.needsUpdate = true; } };
+    if (insideB >= 0) set(insideB, false); insideB = bid; if (bid >= 0) set(bid, true);
   }
   function killObj(id) { for (const [mesh, i] of objIdx[id] || []) { mesh.setMatrixAt(i, zero); mesh.instanceMatrix.needsUpdate = true; } }
 
@@ -323,7 +374,11 @@ void main(){
     const asp = w / h; let hh, hw; if (asp >= 1) { hh = VIEW / 2; hw = hh * asp; } else { hw = VIEW / 2; hh = hw / asp; }
     camera.left = -hw; camera.right = hw; camera.top = hh; camera.bottom = -hh; camera.updateProjectionMatrix();
   }
-  function setCam(p) { camera.position.set(p[0] + CAM_OFF.x, CAM_OFF.y, p[1] + CAM_OFF.z); camera.lookAt(p[0], 0, p[1]); camera.updateMatrixWorld();
+  const bufV = new T.Vector2(), SIN_EL = CAM_OFF.y / CAM_OFF.length();
+  function setCam(p) {
+    // камеру двигаем шагами ровно в один пиксель картинки — так низкое разрешение не «дрожит» при движении
+    if (!HD) { renderer.getDrawingBufferSize(bufV); const px = (camera.top - camera.bottom) / Math.max(1, bufV.y), a = Math.round(dot(p, CAM_R) / px) * px, b = Math.round(dot(p, CAM_F) / (px / SIN_EL)) * (px / SIN_EL); p = add(mul(CAM_R, a), CAM_F, b); }
+    camera.position.set(p[0] + CAM_OFF.x, CAM_OFF.y, p[1] + CAM_OFF.z); camera.lookAt(p[0], 0, p[1]); camera.updateMatrixWorld();
     // тень считаем вокруг камеры; шаг привязки к текселю — чтобы тени не дрожали
     const sx = Math.round(p[0] / 4) * 4, sz = Math.round(p[1] / 4) * 4; sun.target.position.set(sx, 0, sz); sun.position.set(sx + SUN_DIR.x * 1500, SUN_DIR.y * 1500, sz + SUN_DIR.z * 1500); sun.target.updateMatrixWorld(); }
   // направления «вверх» и «вправо» экрана на карте
@@ -338,8 +393,9 @@ void main(){
     return [tmpA.x + (tmpB.x - tmpA.x) * t, tmpA.z + (tmpB.z - tmpA.z) * t];
   }
   function frame(st) {
-    const { now, dt, objs, zone, plan, matchT, phase, loot, list, tracers, shipS, shipD, camP } = st;
+    const { now, dt, objs, zone, plan, matchT, phase, loot, list, tracers, shipS, shipD, camP, inB } = st;
     if (worldBuilt !== objs) { buildWorld(objs); worldBuilt = objs; }
+    setInside(inB ?? -1);
     setCam(camP);
     U.t.value = now / 1000;
     if (phase >= 1 && !zone.pre) { U.zc.value.set(zone.c[0], zone.c[1]); U.zrho.value = zone.rho; } else U.zrho.value = 1e5;

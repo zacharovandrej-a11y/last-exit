@@ -5,6 +5,8 @@ const SPEED = 175;          // скорость бега (ед/с)
 const PR = 14;              // радиус персонажа
 const MAXP = 10;            // игроков в матче
 const VIEWD = 1150;         // кого присылать игроку (расстояние от камеры)
+const HEAR = 520;           // на каком расстоянии слышно шаги за стеной
+const WALLH = 64, WALLT = 6, DOOR = 44; // высота и толщина стен, ширина двери
 
 const add = (a, b, s = 1) => [a[0] + b[0] * s, a[1] + b[1] * s];
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
@@ -26,11 +28,11 @@ const inMap = (p, m = 0) => Math.abs(p[0]) < HALF - m && Math.abs(p[1]) < HALF -
 // ammo: 0 лёгкие, 1 тяжёлые, 2 дробь, 3 снайперские
 const WEAPONS = [
   null,
-  { n: 'Пистолет', dmg: 14, rate: 2.6, mag: 12, rel: 1.1, range: 480, spread: .035, ammo: 0, pel: 1, auto: false },
-  { n: 'Автомат', dmg: 9, rate: 7, mag: 30, rel: 1.9, range: 560, spread: .075, ammo: 1, pel: 1, auto: true },
-  { n: 'Дробовик', dmg: 7, rate: 1, mag: 5, rel: 2.3, range: 270, spread: .30, ammo: 2, pel: 8, auto: false },
-  { n: 'Снайперка', dmg: 66, rate: .6, mag: 4, rel: 2.6, range: 1150, spread: .004, ammo: 3, pel: 1, auto: false },
-  { n: 'ПП', dmg: 7, rate: 10, mag: 35, rel: 1.6, range: 400, spread: .12, ammo: 0, pel: 1, auto: true },
+  { n: 'Пистолет', dmg: 22, rate: 2.6, mag: 12, rel: 1.1, range: 480, spread: .035, ammo: 0, pel: 1, auto: false },
+  { n: 'Автомат', dmg: 15, rate: 7, mag: 30, rel: 1.9, range: 560, spread: .075, ammo: 1, pel: 1, auto: true },
+  { n: 'Дробовик', dmg: 12, rate: 1, mag: 5, rel: 2.3, range: 270, spread: .30, ammo: 2, pel: 8, auto: false },
+  { n: 'Снайперка', dmg: 95, rate: .6, mag: 4, rel: 2.6, range: 1150, spread: .004, ammo: 3, pel: 1, auto: false },
+  { n: 'ПП', dmg: 11, rate: 10, mag: 35, rel: 1.6, range: 400, spread: .12, ammo: 0, pel: 1, auto: true },
 ];
 const RARITY = ['#b8bcc4', '#51cf66', '#4dabf7', '#cc5de8', '#ffc61a']; // серое → золотое
 const RMULT = [1, 1.08, 1.16, 1.25, 1.35];
@@ -92,29 +94,79 @@ const OT = {
   tree: { s: 0 }, pine: { s: 0 }, rock: { s: 0 }, hay: { s: 0 }, cactus: { s: 0 }, snowman: { s: 0 },
   house: { s: 0 }, house2: { s: 1 }, bunker: { s: 1 }, barn: { s: 1 }, market: { s: 1 }, car: { s: 1 },
   crate: { s: 0, hp: 45 }, wall: { s: 1 }, igloo: { s: 0 }, tent: { s: 1 },
+  bw: { s: 1 }, furn: { s: 1, pass: 1 }, // стена здания; мебель (пули пролетают)
+};
+// здания: внутри можно ходить, стены — отдельные прямоугольники; крыша скрывает, что внутри
+const BKIND = {
+  house: { w: 120, h: 96, doors: 1, part: 1 }, house2: { w: 92, h: 84, doors: 1 }, barn: { w: 150, h: 104, doors: 2, door: 64 },
+  market: { w: 270, h: 180, doors: 2, door: 56 }, bunker: { w: 112, h: 84, doors: 1 },
 };
 function genWorld() {
-  const rnd = mkRng(424242), objs = [];
-  const free = (p, m) => { for (const o of objs) if (dist(o.p, p) < m + o.rad) return false; return true; };
-  function put(type, p, w, h) {
-    const a = rnd() * 6.2832, u = [Math.cos(a), Math.sin(a)];
+  const rnd = mkRng(424242), objs = [], blds = [];
+  const free = (p, m) => { for (const o of objs) if (dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + b.rad) return false; return true; };
+  function putA(type, p, w, h, a) {
+    const u = [Math.cos(a), Math.sin(a)];
     const o = { id: objs.length, type, p, a, u, v: perp(u), w, h, rad: Math.hypot(w, h) / 2, sh: OT[type].s };
     if (OT[type].hp) o.hp = OT[type].hp; objs.push(o); return o;
   }
+  const put = (type, p, w, h) => putA(type, p, w, h, rnd() * 6.2832);
   function many(type, cen, r, w, h, n, gap = 30) {
     for (let i = 0; i < n; i++) { const p = cen ? nearPt(rnd, cen, r) : rndMap(rnd, 80); if (inMap(p, 60) && free(p, Math.max(w, h) / 2 + gap)) put(type, p, w, h); }
   }
+  function building(kind, p) {
+    const K = BKIND[kind], W2 = K.w / 2, H2 = K.h / 2, t = WALLT, D = K.door || DOOR;
+    const a = Math.floor(rnd() * 4) * 1.5708 + (rnd() - .5) * .5, u = [Math.cos(a), Math.sin(a)], v = perp(u);
+    const b = { id: blds.length, kind, p, a, u, v, w: K.w, h: K.h, rad: Math.hypot(K.w, K.h) / 2, walls: [], furn: [], doors: [] };
+    const L = (x, y) => add(add(p, u, x), v, y);
+    const seg = (x0, y0, x1, y1) => { const len_ = Math.hypot(x1 - x0, y1 - y0); if (len_ < 4) return; const hor = Math.abs(y1 - y0) < 1e-6;
+      const o = putA('bw', L((x0 + x1) / 2, (y0 + y1) / 2), hor ? len_ : t, hor ? t : len_, a); o.bid = b.id; o.lx = (x0 + x1) / 2; o.ly = (y0 + y1) / 2; o.hor = hor; b.walls.push(o.id); };
+    const hwall = (y, gaps) => { let x = -W2; for (const g of gaps.sort((m, n) => m - n)) { seg(x, y, g - D / 2, y); x = g + D / 2; } seg(x, y, W2, y); };
+    const fd = (rnd() - .5) * (K.w - D - 40), bd = K.doors > 1 ? (K.door ? fd : (rnd() - .5) * (K.w - D - 40)) : null;
+    hwall(H2 - t / 2, [fd]); hwall(-H2 + t / 2, bd === null ? [] : [bd]);
+    seg(-W2 + t / 2, -H2 + t, -W2 + t / 2, H2 - t); seg(W2 - t / 2, -H2 + t, W2 - t / 2, H2 - t);
+    b.doors.push({ i: L(fd, H2 - 26), o: L(fd, H2 + 26) }); if (bd !== null) b.doors.push({ i: L(bd, -H2 + 26), o: L(bd, -H2 - 26) });
+    const fu = (fk, x, y, w, h) => { const o = putA('furn', L(x, y), w, h, a); o.fk = fk; o.bid = b.id; b.furn.push(o.id); };
+    if (kind === 'house') { // перегородка с проходом: две комнаты
+      const px = fd > 0 ? -W2 * .3 : W2 * .3; seg(px, -H2 + t, px, -D / 2); seg(px, D / 2, px, H2 - t);
+      fu('bed', px < 0 ? -W2 + 22 : W2 - 22, -H2 + 30, 22, 38); // кровать — в маленькой комнате
+      fu('table', px < 0 ? W2 - 30 : -W2 + 30, -H2 + 24, 26, 18);
+    } else if (kind === 'house2') { fu('table', 0, -H2 + 22, 34, 14); fu('shelf', W2 - 12, 0, 10, 34); }
+    else if (kind === 'market') { for (const y of [-42, 0]) fu('shelf', -40, y, 130, 10); fu('shelf', 70, -42, 60, 10); fu('table', 90, H2 - 40, 44, 16); }
+    else if (kind === 'barn') { for (let i = 0; i < 3; i++) { const o = putA('hay', L(-W2 + 26 + i * 32, -H2 + 26), 30, 30, a); o.bid = b.id; b.furn.push(o.id); } }
+    else if (kind === 'bunker') { for (const x of [-W2 + 22, W2 - 22]) { const o = putA('crate', L(x, -H2 + 22), 34, 34, a); o.bid = b.id; } }
+    blds.push(b); return b;
+  }
+  function manyB(kind, cen, r, n) { const K = BKIND[kind], m = Math.hypot(K.w, K.h) / 2 + 26; for (let i = 0; i < n; i++) { const p = nearPt(rnd, cen, r); if (inMap(p, m) && free(p, m)) building(kind, p); } }
   const B = BIOMES;
-  put('market', B[3].c, 260, 170);
-  many('house', B[0].c, 330, 110, 90, 26); many('house2', B[0].c, 330, 72, 72, 18); many('car', B[0].c, 330, 46, 26, 10);
-  many('bunker', B[1].c, 310, 120, 70, 9); many('wall', B[1].c, 310, 90, 18, 14); many('tent', B[1].c, 310, 60, 50, 8);
-  many('barn', B[2].c, 350, 120, 80, 7); many('hay', B[2].c, 370, 30, 30, 30);
+  building('market', B[3].c);
+  manyB('house', B[0].c, 330, 22); manyB('house2', B[0].c, 330, 14); many('car', B[0].c, 330, 46, 26, 10);
+  manyB('bunker', B[1].c, 310, 7); many('wall', B[1].c, 310, 90, 18, 14); many('tent', B[1].c, 310, 60, 50, 8);
+  manyB('barn', B[2].c, 350, 5); many('hay', B[2].c, 370, 30, 30, 30); manyB('house', B[2].c, 360, 4);
   many('car', B[3].c, 270, 46, 26, 26);
   many('pine', B[4].c, 390, 40, 40, 60); many('igloo', B[4].c, 360, 60, 60, 7); many('snowman', B[4].c, 360, 24, 24, 10);
-  many('cactus', B[5].c, 300, 26, 26, 40); many('rock', B[5].c, 300, 40, 40, 22);
+  many('cactus', B[5].c, 300, 26, 26, 40); many('rock', B[5].c, 300, 40, 40, 22); manyB('house2', B[5].c, 280, 4);
+  for (let i = 0; i < 40; i++) { const p = rndMap(rnd, 200); const K = BKIND.house; const m = Math.hypot(K.w, K.h) / 2 + 26; if (free(p, m)) building(rnd() < .5 ? 'house' : 'house2', p); } // одиночные дома по карте
   many('crate', null, 0, 34, 34, 120, 40);
   many('tree', null, 0, 44, 44, 300); many('rock', null, 0, 36, 36, 70);
+  objs.blds = blds;
   return objs;
+}
+// в каком здании точка (индекс или -1)
+function bldAt(blds, p) {
+  if (!blds) return -1;
+  for (const b of blds) { if (Math.abs(p[0] - b.p[0]) > b.rad || Math.abs(p[1] - b.p[1]) > b.rad) continue; const r = sub(p, b.p); if (Math.abs(dot(r, b.u)) < b.w / 2 && Math.abs(dot(r, b.v)) < b.h / 2) return b.id; }
+  return -1;
+}
+// видно ли точку b из точки a: стены зданий загораживают; внутрь чужого здания не видно (крыша)
+function canSee(objs, a, b, ba, bb) {
+  if (bb >= 0 && bb !== ba) return false;
+  const d = dist(a, b); if (d < 1) return true; const dir = norm(sub(b, a));
+  for (const B of objs.blds) {
+    // отрезок далеко от здания — пропускаем
+    const r = sub(B.p, a), t = Math.max(0, Math.min(d, dot(r, dir))), q = add(a, dir, t); if (dist(q, B.p) > B.rad + 4) continue;
+    for (const id of B.walls) { const o = objs[id]; if (rayObj(a, dir, o) < d - 2) return false; }
+  }
+  return true;
 }
 // столкновение точки p (радиус rr) с объектом; вектор выталкивания или null
 function objPush(o, p, rr) {
