@@ -554,6 +554,7 @@ void main(){
     armR.rotation.set(-.35, 0, .12); elR.rotation.x = -1.25;
     armL.rotation.set(-1.0, 0, -.45); elL.rotation.set(-.5, 0, .35);
     const gunHold = new T.Group(); gunHold.position.set(2.6, 32.5, 8); body.add(gunHold);
+    const handHold = new T.Group(); handHold.position.set(0, -9.4, .6); handHold.rotation.x = Math.PI / 2 - .2; elR.add(handHold); // пистолет — в правой руке
     const itemG = new T.Group(); elR.add(itemG);
     if (cv) { // жители без оружия: руки вниз, в руке — своя вещь
       armL.rotation.set(0, 0, -.12); elL.rotation.set(-.25, 0, 0); armR.rotation.set(-.2, 0, .12); elR.rotation.x = -.5;
@@ -562,17 +563,27 @@ void main(){
       if (cv.item) items[cv.item](); }
     const shadow = new T.Mesh(new T.CircleGeometry(11, 16), new T.MeshBasicMaterial({ color: 0, transparent: true, opacity: .22, depthWrite: false })); shadow.rotation.x = -Math.PI / 2; shadow.position.y = .6; g.add(shadow);
     body.traverse(o => { if (o.isMesh) o.castShadow = true; }); if (STYLE === 'toon') { const ms = []; body.traverse(o => { if (o.isMesh) ms.push(o); }); ms.forEach(o => addOutline(o, OUT_C)); }
-    g.userData = { body, legL, legR, kneeL, kneeR, armL, armR, elL, elR, itemG, civ: !!cv, sectLook: ch >= CH_SECT, head, torso, vest, gunHold, gunKey: '', mats, shadow };
+    g.userData = { body, legL, legR, kneeL, kneeR, armL, armR, elL, elR, itemG, civ: !!cv, sectLook: ch >= CH_SECT, head, torso, vest, gunHold, handHold, gunNode: gunHold, muz: 18, gunKey: '', mats, shadow, ready: 0, fireT: 9 };
     return g;
   }
+  const ONEH = w => w === 1 || w === 8; // пистолет, револьвер — одной рукой
   function setGun(c, wb) {
     const u = c.userData; if (u.gunKey === wb) return; u.gunKey = wb;
-    u.gunHold.clear(); const w = wb & 15;
-    if (u.civ) { // житель взял оружие — руки в стойку, вещь убираем
-      if (w) { u.armR.rotation.set(-.35, 0, .12); u.elR.rotation.set(-1.25, 0, 0); u.armL.rotation.set(-1, 0, -.45); u.elL.rotation.set(-.5, 0, .35); } else { u.armL.rotation.set(0, 0, -.12); u.elL.rotation.set(-.25, 0, 0); u.armR.rotation.set(-.2, 0, .12); u.elR.rotation.set(-.5, 0, 0); }
-      u.itemG.visible = !w; }
-    if (w) { const gm = gunMesh(w, wb >> 4); gm.traverse(o => { if (o.isMesh) o.castShadow = true; }); u.gunHold.add(gm); }
+    u.gunHold.clear(); u.handHold.clear(); const w = wb & 15;
+    if (u.civ) u.itemG.visible = !w; // житель взял оружие — вещь убираем
+    if (w) { const gm = gunMesh(w, wb >> 4); gm.traverse(o => { if (o.isMesh) o.castShadow = true; });
+      if (ONEH(w)) { gm.position.set(0, 2.2, -.6); u.handHold.add(gm); u.gunNode = u.handHold; u.muz = 10; } else { u.gunHold.add(gm); u.gunNode = u.gunHold; u.muz = 22; } }
   }
+  // руки к точке: плечо + локоть (простая двухзвенная IK), локти смотрят вниз-наружу
+  const _ik = { t: new T.Vector3(), h: new T.Vector3(), q: new T.Quaternion(), q2: new T.Quaternion(), p: new T.Vector3() };
+  function reach(sh, el, target, side) {
+    const A = 9.4, Bn = 9.2, t = _ik.t.copy(target).sub(sh.position); let d = t.length(); d = Math.min(A + Bn - .1, Math.max(1.5, d));
+    const th = Math.PI - Math.acos(Math.max(-1, Math.min(1, (A * A + Bn * Bn - d * d) / (2 * A * Bn))));
+    el.rotation.set(-th, 0, 0);
+    _ik.h.set(0, -A - Bn * Math.cos(th), Bn * Math.sin(th)).normalize(); t.normalize();
+    sh.quaternion.setFromUnitVectors(_ik.h, t); _ik.q2.setFromAxisAngle(t, side * .55); sh.quaternion.premultiply(_ik.q2);
+  }
+  const GRIP = new T.Vector3(0, -2.6, .4), FORE = { 2: 10, 3: 11, 4: 9, 5: 4, 6: 9, 7: 12, 9: 9 };
   function sectAcc(c, s) {
     const u = c.userData; if (u.accS === s) return; u.accS = s;
     for (const g of u.acc || []) g.parent && g.parent.remove(g); u.acc = [];
@@ -606,7 +617,7 @@ void main(){
       const sl = Math.min(1, t / .4); c.position.x += f[0] * (1 - Math.pow(1 - sl, 2)) * 12; c.position.z += f[1] * (1 - Math.pow(1 - sl, 2)) * 12;
       u.kneeL.rotation.x = kb * 1.1 * (1 - e * .7); u.kneeR.rotation.x = kb * .8 * (1 - e * .6); u.legL.rotation.x = -kb * .5 * (1 - e) + e * .2; u.legR.rotation.x = -kb * .3 * (1 - e) - e * .15;
       u.armL.rotation.set(-.6 - e * 1.4 * (id % 2 ? 1 : .4), 0, -.3 - e * .7); u.armR.rotation.set(-.4 - e * 1.1 * (id % 2 ? .5 : 1), 0, .3 + e * .8); u.elL.rotation.set(-.3, 0, 0); u.elR.rotation.set(-.4, 0, 0);
-      u.head.rotation.x = -e * .4 * lf; u.mats.shirt.emissive.setScalar(0); u.mats.skin.emissive.setScalar(0); u.gunHold.position.z = 8; return;
+      u.head.rotation.x = -e * .4 * lf; u.mats.shirt.emissive.setScalar(0); u.mats.skin.emissive.setScalar(0); u.gunHold.position.set(2.6, 32.5, 8); u.gunHold.rotation.set(.9, -.3, 0); return;
     }
     // походка: амплитуда от реальной скорости — шаг жителя и бег бойца отличаются
     u.amp += (Math.min(1.2, spd / 150) * (opt.moving || spd > 25 ? 1 : 0) - u.amp) * Math.min(1, dt * 8);
@@ -618,16 +629,29 @@ void main(){
     B.rotation.y = s1 * .08 * a; // корпус качается в такт шагам
     B.rotation.x = Math.max(-.12, Math.min(.22, fwd / SPEED * .2)) + run * .05; // наклон в беге
     B.rotation.z = Math.max(-.14, Math.min(.14, -side / SPEED * .14)) + (limp ? Math.sin(ph) * .09 : 0);
-    if (!armed && u.civ) { // руки машут в противофазе ногам
-      u.armL.rotation.set(-s1 * (.5 + run * .4) * a, 0, -.12 - run * .1); u.armR.rotation.set(-.15 + s1 * (.5 + run * .4) * a, 0, .12 + run * .1);
-      u.elL.rotation.set(-.25 - run * .9 * a, 0, 0); u.elR.rotation.set(-.5 - run * .6 * a, 0, 0);
-      if (a < .1) u.head.rotation.y = Math.sin(now * .45 + id * 1.7) * .4; // стоит — оглядывается
+    const w = opt.wb & 15, one = ONEH(w), sw = (.5 + run * .4) * a;
+    u.fireT = opt.fire ? 0 : u.fireT + dt; u.ready += ((u.fireT < 1.6 ? 1 : 0) - u.ready) * Math.min(1, dt * 9); // стрелял недавно — оружие у плеча
+    if (!w || one) { // свободные руки машут в противофазе ногам
+      u.armL.rotation.set(-s1 * sw, 0, -.12 - run * .1); u.elL.rotation.set(-.25 - run * .9 * a, 0, 0);
+      if (!w) { u.armR.rotation.set(-.15 + s1 * sw, 0, .12 + run * .1); u.elR.rotation.set(-.5 - run * .6 * a, 0, 0); }
+      if (a < .1 && u.civ) u.head.rotation.y = Math.sin(now * .45 + id * 1.7) * .4; // стоит — оглядывается
+    }
+    if (w && one) { // пистолет: опущен в руке и покачивается при ходьбе; стреляет — рука вытянута вперёд
+      const r = u.ready, swR = s1 * sw * .6;
+      u.armR.rotation.set((-.1 + swR) * (1 - r) + (-1.5 - u.rec * .35) * r, 0, .1 * (1 - r) - .12 * r); u.elR.rotation.set(-.55 * (1 - r) - .05 * r, 0, 0);
+      u.handHold.rotation.x = (Math.PI / 2 - .2) * r + (Math.PI / 2 + .55) * (1 - r);
+      if (r > .5) { u.armL.rotation.set(-1.1 * r, 0, -.35 * r + -.12 * (1 - r)); u.elL.rotation.set(-.8 * r, 0, 0); } // вторая рука подхватывает при стрельбе
+    } else if (w) { // длинное оружие: обе руки на оружии; на ходу — стволом вниз поперёк груди, при стрельбе — к плечу
+      const r = u.ready, G = u.gunHold;
+      G.position.set(2.2 * r + 1 * (1 - r), (35.5 * r + 31.5 * (1 - r)) + Math.sin(ph * 2) * .7 * a, (4.5 * r + 5.5 * (1 - r)) - u.rec * 3.2);
+      G.rotation.set(.5 * (1 - r) - u.rec * .08, -.45 * (1 - r), .25 * (1 - r)); G.updateMatrix();
+      reach(u.armR, u.elR, _ik.p.copy(GRIP).applyMatrix4(G.matrix), 1);
+      reach(u.armL, u.elL, _ik.p.set(0, -2, FORE[w] || 9).applyMatrix4(G.matrix), -1);
     }
     // отдача и вздрагивание от попадания (откидывает назад)
     if (opt.hit && !u.wasHit) u.fl = 1; u.wasHit = !!opt.hit; u.fl = Math.max(0, u.fl - dt * 5);
     u.rec = opt.fire ? 1 : Math.max(0, u.rec - dt * 14);
     const fl = u.fl * u.fl; B.rotation.x -= fl * .45 + u.rec * .05; u.head.rotation.x = -fl * .5; c.position.x -= sy * fl * 5; c.position.z -= cy * fl * 5;
-    u.gunHold.position.set(2.6, 32.5 + Math.sin(ph * 2) * .7 * a, 8 - u.rec * 3.5);
     const em = fl * .7; u.mats.shirt.emissive.setRGB(em, em * .15, em * .1); u.mats.skin.emissive.setRGB(em, em * .15, em * .1);
   }
   // ===== лут =====
@@ -742,7 +766,7 @@ void main(){
       seen.add(e.id); let c = chars[e.id];
       if (!c || c.userData.ch !== e.ch) { if (c) scene.remove(c); c = chars[e.id] = makeChar(e.ch); c.userData.ch = e.ch; scene.add(c); }
       c.visible = true; setGun(c, e.wb); poseChar(c, e.p, e.aim, e.walk, e);
-      if (e.fire && !c.userData.fired) { const tip = c.userData.gunHold.localToWorld(new T.Vector3(0, 0, 18)); flashAt(tip, 34); const rt = new T.Vector3(1, 0, 0).applyQuaternion(c.quaternion); shellAt(c.userData.gunHold.localToWorld(new T.Vector3(0, 2, 2)), rt); } c.userData.fired = e.fire;
+      if (e.fire && !c.userData.fired) { const tip = c.userData.gunNode.localToWorld(new T.Vector3(0, 0, c.userData.muz)); flashAt(tip, 34); const rt = new T.Vector3(1, 0, 0).applyQuaternion(c.quaternion); shellAt(c.userData.gunNode.localToWorld(new T.Vector3(0, 2, 2)), rt); } c.userData.fired = e.fire;
       // парашют
       if (e.alt) { if (!c.userData.chute) { const ch = new T.Group(); for (let i = 0; i < 6; i++) { const seg = new T.Mesh(new T.SphereGeometry(24, 6, 4, i * Math.PI / 3, Math.PI / 3, 0, Math.PI / 2), lam(i % 2 ? 0xd8d4c8 : CAMO[e.ch % 10][0])); ch.add(seg); } ch.position.y = 64; c.add(ch); c.userData.chute = ch; } c.userData.chute.visible = true; }
       else if (c.userData.chute) c.userData.chute.visible = false;
