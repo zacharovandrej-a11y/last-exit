@@ -4,7 +4,8 @@ const G3 = (() => {
   const glc = document.getElementById('g');
   const lowEnd = Math.min(screen.width, screen.height) < 500;
   // стиль «как в 90-х»: рендер в низком разрешении + растягивание по пикселям (#hd — чёткая картинка)
-  const STYLE = /toon/.test(location.hash) ? 'toon' : /bright/.test(location.hash) ? 'bright' : 'real';
+  // стиль: по умолчанию мультяшный (контуры только у людей); #toonall — контуры у всего; #bright — яркий без контуров; #real — старый реализм с пикселями
+  const STYLE = /real/.test(location.hash) ? 'real' : /bright/.test(location.hash) ? 'bright' : 'toon', OUTLINE_ALL = /toonall/.test(location.hash);
   const HD = /hd/.test(location.hash) || STYLE !== 'real', PIXH = 360;
   const renderer = new T.WebGLRenderer({ canvas: glc, antialias: HD, powerPreference: 'high-performance' });
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFShadowMap;
@@ -193,7 +194,7 @@ void main(){
         if (o.dead) mesh.setMatrixAt(i, zero);
       });
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-      scene.add(mesh); inst[key] = { mesh }; addOutline(mesh, OUT_B);
+      scene.add(mesh); inst[key] = { mesh }; if (OUTLINE_ALL) addOutline(mesh, OUT_B);
     }
     buildBuildings(objs);
   }
@@ -274,7 +275,7 @@ void main(){
       const mesh = new T.InstancedMesh(g, texMat(tx, sc), items.length); mesh.frustumCulled = false; mesh.castShadow = !key.endsWith('f'); mesh.receiveShadow = true;
       items.forEach(([bid, col, m, role, low], i) => { mesh.setMatrixAt(i, m); mesh.setColorAt(i, new T.Color(col)); bParts[bid].push([mesh, i, m, role, low]); });
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-      scene.add(mesh); bInst[key] = { mesh }; if (!key.endsWith('f')) addOutline(mesh, OUT_B);
+      scene.add(mesh); bInst[key] = { mesh }; if (OUTLINE_ALL && !key.endsWith('f')) addOutline(mesh, OUT_B);
     }
   }
   // игрок внутри здания: крыша исчезает, стены опускаются — видно, что внутри
