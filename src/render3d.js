@@ -350,6 +350,13 @@ void main(){
     { n: 'студент', shirt: 0xf08c1e, pants: 0x3a5a9a, skin: 0xd9a47e, hat: 'capback', back: 0x2f6a40 },
     { n: 'параноик', shirt: 0x6e7a52, pants: 0x5a4a3a, skin: 0xe0b48e, hat: 'foil' },
     { n: 'бизнесмен', shirt: 0x2a2e3a, pants: 0x2a2e3a, skin: 0xc8956c, hat: 'slick', tie: 1, item: 'case' },
+    { n: 'дед', shirt: 0x6a5a4a, pants: 0x4a4a52, skin: 0xe0b896, hat: 'flatcap', item: 'cane' },
+    { n: 'девушка', shirt: 0xd94a8a, pants: 0xe0b48e, skin: 0xedc4a0, skirt: 0x2a2a6a, hat: 'longhair', item: 'phone' },
+    { n: 'рабочий', shirt: 0xf08a24, pants: 0x3a4a6a, skin: 0xc8956c, hat: 'hardhat', item: 'wrench' },
+    { n: 'качок', shirt: 0xf2f2f2, pants: 0x34343a, skin: 0xb07850, hat: 'buzz', wide: 1 },
+  ];
+  // члены сект (агенты и игроки): ch 120 + секта
+  const CIV_S = [
     { n: 'Тапок', shirt: 0xf2f2ee, pants: 0x3a3a48, skin: 0xedc4a0, hat: 'neat', boots: 0xf08ab0, tie: 1, item: 'leaflets' },
     { n: 'Орден', shirt: 0x1c1820, pants: 0x1c1820, skin: 0xd9c0a8, skirt: 0x1c1820, long: 1, hat: 'hood', trim: 0xa01818, item: 'candle' },
     { n: 'Заговор', shirt: 0x8a7a5a, pants: 0x4a4038, skin: 0xd4a07a, skirt: 0x8a7a5a, hat: 'fedora', item: 'folder' },
@@ -357,7 +364,7 @@ void main(){
   ];
   function makeChar(ch) {
     const g = new T.Group(), body = new T.Group(); g.add(body);
-    const cv = ch >= 100 ? CIV[(ch - 100) % CIV.length] : null;
+    const cv = ch >= CH_SECT ? CIV_S[(ch - CH_SECT) % 4] : ch >= 100 ? CIV[(ch - 100) % CIV.length] : null;
     if (STYLE !== 'real') g.scale.setScalar(1.15); // в ярких стилях люди крупнее
     const cm = camo(ch), mats = cv ? { shirt: charrable(MAT({ color: cv.shirt })), skin: charrable(MAT({ color: cv.skin })), pants: charrable(MAT({ color: cv.pants })) } : { shirt: charrable(MAT({ color: 0xffffff, map: cm })), skin: charrable(MAT({ color: SKIN[ch % 10] })), pants: charrable(MAT({ color: 0xe8e8e8, map: cm })) };
     const part = (gg, mat, x, y, z, sx, sy, sz, par = body) => { const o = new T.Mesh(gg, mat); o.position.set(x, y, z); o.scale.set(sx, sy, sz); par.add(o); return o; };
@@ -367,7 +374,7 @@ void main(){
       const knee = new T.Group(); knee.position.y = -12; hip.add(knee); part(geo.box, mats.pants, 0, -5.5, 0, 4.6, 11, 5.2, knee); part(geo.box, boot, 0, -11, 1.2, 5, 3.4, 8, knee); return [hip, knee]; };
     const [legL, kneeL] = leg(-1), [legR, kneeR] = leg(1);
     part(geo.box, belt, 0, 25, 0, 13.6, 2.4, 7.6);
-    const torso = part(geo.box, mats.shirt, 0, 33, 0, 13, 15, 7);
+    const torso = part(geo.box, mats.shirt, 0, 33, 0, cv && cv.wide ? 16 : 13, 15, cv && cv.wide ? 8.5 : 7);
     if (!cv) { part(geo.box, gear, 0, 33.5, 3.8, 9, 7, 1); for (const s of [-1, 1]) part(geo.box, gear, s * 3.8, 33.5, 0, 1.4, 15.2, 7.4); } // разгрузка — только у бойцов
     else {
       if (cv.skirt) part(geo.box, lam(cv.skirt), 0, cv.long ? 14 : 20, 0, 14, cv.long ? 24 : 12, 9); // юбка / плащ / ряса
@@ -392,7 +399,11 @@ void main(){
         neat: () => hm(geo.dome, 0x6a4a2a, 0, 1.4, -.3, 4.6, 3.2, 4.7),
         hood: () => { hm(geo.dome, 0x1c1820, 0, .4, -.6, 5.4, 5.8, 5.6); hm(geo.box, 0x1c1820, 0, -2, -3.5, 9, 6, 4); },
         fedora: () => { hm(geo.cyl10, 0x3a3228, 0, 3, 0, 7, .6, 7); hm(geo.cyl10, 0x3a3228, 0, 5, 0, 4.4, 4, 4.4); hm(geo.box, 0x1a1a1a, 0, 3.6, 0, 9, 1, 9); },
-        capyel: () => { hm(geo.dome, 0xffd43b, 0, 1.6, 0, 4.9, 3.8, 4.9); hm(geo.box, 0xffd43b, 0, 1.8, 5, 5, .6, 4); } })[cv.hat](); }
+        capyel: () => { hm(geo.dome, 0xffd43b, 0, 1.6, 0, 4.9, 3.8, 4.9); hm(geo.box, 0xffd43b, 0, 1.8, 5, 5, .6, 4); },
+        flatcap: () => { hm(geo.dome, 0x5a5048, 0, 1.8, 0, 4.9, 3, 5.2); hm(geo.box, 0x5a5048, 0, 2.2, 4.4, 5.4, .6, 3); hm(geo.box, 0xd8d8d8, 0, -2.6, 3.8, 3, 1.6, 1); },
+        longhair: () => { hm(geo.dome, 0x7a4a24, 0, 1.2, -.3, 4.7, 4, 4.9); hm(geo.box, 0x7a4a24, 0, -3.5, -2.8, 8, 8, 3); },
+        hardhat: () => { hm(geo.dome, 0xffc61a, 0, 1.6, 0, 5.2, 4.4, 5.4); hm(geo.cyl10, 0xffc61a, 0, 1.4, .4, 6.4, .6, 6.6); },
+        buzz: () => hm(geo.dome, 0x2a2018, 0, 1.6, -.2, 4.4, 2.4, 4.6) })[cv.hat](); }
     // руки: плечо + предплечье, держат оружие двумя руками
     const arm = s => { const sh = new T.Group(); sh.position.set(s * 8.2, 39, 0); body.add(sh); part(geo.box, mats.shirt, 0, -4.8, 0, 3.8, 9.6, 3.8, sh);
       const el = new T.Group(); el.position.y = -9.4; sh.add(el); part(geo.box, mats.shirt, 0, -4.2, 0, 3.4, 8.4, 3.4, el); part(geo.box, lam(0x2a2a24), 0, -9.2, 0, 3, 2.6, 3, el); return [sh, el]; };
@@ -404,11 +415,11 @@ void main(){
     if (cv) { // жители без оружия: руки вниз, в руке — своя вещь
       armL.rotation.set(0, 0, -.12); elL.rotation.set(-.25, 0, 0); armR.rotation.set(-.2, 0, .12); elR.rotation.x = -.5;
       const it = (gg, c, x, y, z, sx, sy, sz, rx = 0) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.x = rx; itemG.add(o); };
-      const items = { bag: () => it(geo.box, 0x4a2e1e, 0, -12, 0, 3, 7, 7), case: () => it(geo.box, 0x2a1e14, 0, -13, 0, 2.6, 8, 10), leaflets: () => it(geo.box, 0xfafafa, 0, -10, 2.5, 5, 1.6, 6.5), candle: () => { it(geo.cyl6, 0xf2e6c0, 0, -8, 3, 1, 6, 1); it(geo.sph, 0xffb020, 0, -4.4, 3, 1, 1.6, 1); }, folder: () => it(geo.box, 0xc9a85a, 0, -10, 2.5, 1.4, 8, 6), roll: () => it(geo.cyl10, 0xf6f6f2, 0, -9, 3, 1.6, 14, 1.6, 1.4) };
+      const items = { bag: () => it(geo.box, 0x4a2e1e, 0, -12, 0, 3, 7, 7), case: () => it(geo.box, 0x2a1e14, 0, -13, 0, 2.6, 8, 10), leaflets: () => it(geo.box, 0xfafafa, 0, -10, 2.5, 5, 1.6, 6.5), candle: () => { it(geo.cyl6, 0xf2e6c0, 0, -8, 3, 1, 6, 1); it(geo.sph, 0xffb020, 0, -4.4, 3, 1, 1.6, 1); }, folder: () => it(geo.box, 0xc9a85a, 0, -10, 2.5, 1.4, 8, 6), roll: () => it(geo.cyl10, 0xf6f6f2, 0, -9, 3, 1.6, 14, 1.6, 1.4), cane: () => it(geo.cyl6, 0x4a3020, 0, -14, 1.5, .8, 22, .8), phone: () => it(geo.box, 0x1a1a1a, 0, -10, 2, 2.6, 1, 4.6), wrench: () => it(geo.box, 0x8a9096, 0, -12, 1, 1.4, 10, 1.6) };
       if (cv.item) items[cv.item](); }
     const shadow = new T.Mesh(new T.CircleGeometry(11, 16), new T.MeshBasicMaterial({ color: 0, transparent: true, opacity: .22, depthWrite: false })); shadow.rotation.x = -Math.PI / 2; shadow.position.y = .6; g.add(shadow);
     body.traverse(o => { if (o.isMesh) o.castShadow = true; }); if (STYLE === 'toon') { const ms = []; body.traverse(o => { if (o.isMesh) ms.push(o); }); ms.forEach(o => addOutline(o, OUT_C)); }
-    g.userData = { body, legL, legR, kneeL, kneeR, armL, armR, elL, elR, itemG, civ: !!cv, head, torso, vest, gunHold, gunKey: '', mats, shadow };
+    g.userData = { body, legL, legR, kneeL, kneeR, armL, armR, elL, elR, itemG, civ: !!cv, sectLook: ch >= CH_SECT, head, torso, vest, gunHold, gunKey: '', mats, shadow };
     return g;
   }
   function setGun(c, wb) {
@@ -419,6 +430,15 @@ void main(){
       u.itemG.visible = !w; }
     if (w) { const gm = gunMesh(w, wb >> 4); gm.traverse(o => { if (o.isMesh) o.castShadow = true; }); u.gunHold.add(gm); }
   }
+  function sectAcc(c, s) {
+    const u = c.userData; if (u.accS === s) return; u.accS = s;
+    for (const g of u.acc || []) g.parent && g.parent.remove(g); u.acc = [];
+    const add_ = (par, gg, col, x, y, z, sx, sy, sz, rx = 0) => { const o = new T.Mesh(gg, lam(col)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.x = rx; par.add(o); u.acc.push(o); if (STYLE === 'toon') addOutline(o, OUT_C); return o; };
+    if (s === 0) { add_(u.elL, geo.box, 0x24346e, 0, -9.5, 2.4, 1.6, 6.4, 5); add_(u.elL, geo.box, 0xf4f0e0, .2, -9.5, 2.4, 1.2, 6, 4.6); for (const k of [u.kneeL, u.kneeR]) add_(k, geo.box, 0xf08ab0, 0, -11.6, 1.6, 5.6, 2.8, 8.8); } // книжка и розовые тапки
+    else if (s === 1) { add_(u.head, geo.dome, 0x4a2478, 0, .2, -.6, 5.7, 6.2, 5.9); add_(u.body, geo.box, 0x3a1c60, 0, 28, -4.4, 13.4, 24, 2); add_(u.body, geo.box, 0x7a1a2a, 0, 40, 0, 14.4, 1.6, 8.2); } // капюшон и плащ
+    else if (s === 2) add_(u.head, geo.cone7, 0xdfe3e8, 0, 6.4, 0, 4.4, 9, 4.4); // шапочка из фольги
+    else if (s === 3) { add_(u.body, geo.box, 0x2f6ad8, 0, 32, 4.6, 13, 15, 1); add_(u.body, geo.box, 0xfafaf4, 0, 32, 5.2, 11, 13, .6); add_(u.body, geo.box, 0x2f6ad8, 0, 32, -4.6, 13, 15, 1); add_(u.body, geo.box, 0xd23a3a, 0, 33, 5.6, 7, 2, .4); } // плакат-бутерброд
+  }
   function poseChar(c, p, aim, walk, opt = {}) {
     c.position.set(p[0], opt.alt || 0, p[1]); c.rotation.set(0, Math.atan2(aim[0], aim[1]), 0);
     const u = c.userData, s = Math.sin(walk), moving = opt.moving;
@@ -427,25 +447,35 @@ void main(){
     u.body.position.y = moving ? Math.abs(Math.cos(walk)) * 1.2 : 0;
     u.vest.visible = !!opt.armor;
     const hit = opt.hit ? 1 : 0; u.mats.shirt.emissive.setScalar(hit * .6); u.mats.skin.emissive.setScalar(hit * .6);
+    u.body.rotation.x = opt.dead ? 0 : -hit * .3; // попадание — откидывает назад
+    u.gunHold.position.z = opt.fire ? 5 : 8; // отдача
     u.shadow.visible = !opt.alt;
+    if (u.civ && !u.sectLook) sectAcc(c, opt.sect ?? -1);
   }
   // ===== лут =====
   const lootG = new Map();
   const ringGeo = new T.RingGeometry(9, 13, 20);
   function lootMesh(it) {
-    const g = new T.Group(), col = it.k === 0 ? RARITY[it.r] : it.k === 1 ? AMMO_COL[it.x] : it.k === 2 ? '#ff6b6b' : '#4dabf7';
+    if (it.k === 4 && it.x === 1) { // голубь: без подсветки, клюёт землю
+      const g = new T.Group(), item = new T.Group(); g.add(item); const m = (gg, c, x, y, z, sx, sy, sz) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); item.add(o); return o; };
+      m(geo.sph, 0x8a8f9a, 0, 4.5, 0, 3, 3, 4.6); m(geo.sph, 0x6a7080, 0, 7.6, 3.6, 1.9, 1.9, 2); m(geo.cone7, 0xe0a030, 0, 7.4, 5.8, .6, 1.4, .6).rotation.x = 1.57; m(geo.box, 0x5a6070, 0, 4.8, -4.6, 2.6, .8, 3); m(geo.sph, 0x4a8a6a, 0, 6.2, 2.4, 2.2, 1.2, 1.4);
+      if (STYLE === 'toon') [...item.children].forEach(o => addOutline(o, OUT_C));
+      g.userData.item = item; g.userData.bird = 1; g.position.set(it.p[0], 0, it.p[1]); g.rotation.y = it.id * 2.3; return g; }
+    const g = new T.Group(), col = it.k === 0 ? RARITY[it.r] : it.k === 1 ? AMMO_COL[it.x] : it.k === 2 ? '#ff6b6b' : it.k === 4 ? SECTS[it.x].col : it.k === 5 ? '#69db7c' : '#4dabf7';
     const ring = new T.Mesh(ringGeo, new T.MeshBasicMaterial({ color: new T.Color(col), transparent: true, opacity: .7, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide })); ring.rotation.x = -Math.PI / 2; ring.position.y = 1; g.add(ring);
     const item = new T.Group(); item.position.y = 9; g.add(item);
     if (it.k === 0) { const gm = gunMesh(it.x, it.r); gm.position.z = -8; item.add(gm); }
     else if (it.k === 1) { const b = new T.Mesh(geo.box, lam(0x495057)); b.scale.set(11, 7, 8); item.add(b); for (let i = -1; i <= 1; i++) { const c = new T.Mesh(geo.cyl6, lam(new T.Color(col).getHex())); c.scale.set(1.4, 5, 1.4); c.position.set(i * 3.3, 5, 0); item.add(c); } }
     else if (it.k === 2) { const b = new T.Mesh(geo.box, lam(0xffffff)); b.scale.set(13, 9, 10); item.add(b); const c1 = new T.Mesh(geo.box, lam(0xe03131)); c1.scale.set(3, 9.4, 7); item.add(c1); const c2 = new T.Mesh(geo.box, lam(0xe03131)); c2.scale.set(9, 9.4, 3); item.add(c2); }
+    else if (it.k === 4) { const b = new T.Mesh(geo.box, lam(0xc9a85a)); b.scale.set(12, 2, 9); item.add(b); const p_ = new T.Mesh(geo.box, lam(0xf4f0e0)); p_.scale.set(11, 2.2, 8); p_.position.y = .4; item.add(p_); } // улики
+    else if (it.k === 5) { for (let i = 0; i < 3; i++) { const b = new T.Mesh(geo.box, lam(0x5aa05a)); b.scale.set(12, 1.4, 6); b.position.y = i * 1.6; b.rotation.y = i * .3; item.add(b); } } // деньги
     else { const b = new T.Mesh(geo.box, lam(0x1c7ed6)); b.scale.set(13, 15, 5); item.add(b); }
     g.userData.item = item; g.position.set(it.p[0], 0, it.p[1]);
     return g;
   }
   function syncLoot(loot, now) {
     for (const [id, g] of lootG) if (!loot.has(id)) { scene.remove(g); lootG.delete(id); }
-    for (const it of loot.values()) { let g = lootG.get(it.id); if (!g) { g = lootMesh(it); lootG.set(it.id, g); scene.add(g); } const i = g.userData.item; i.rotation.y = now / 700 + it.id; i.position.y = 9 + Math.sin(now / 300 + it.id) * 2; }
+    for (const it of loot.values()) { let g = lootG.get(it.id); if (!g) { g = lootMesh(it); lootG.set(it.id, g); scene.add(g); } const i = g.userData.item; if (g.userData.bird) { const ph = (now / 1000 + it.id * .37) % 2.4; i.rotation.x = ph < .3 ? Math.sin(ph / .3 * Math.PI) * .7 : 0; i.position.y = 0; continue; } i.rotation.y = now / 700 + it.id; i.position.y = 9 + Math.sin(now / 300 + it.id) * 2; }
   }
   // ===== трассеры, огонь =====
   const tracerPool = []; for (let i = 0; i < 40; i++) { const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(new Float32Array(2 * 3), 3)); const l = new T.Line(g, new T.LineBasicMaterial({ color: 0xffe066, transparent: true, blending: T.AdditiveBlending })); l.visible = false; l.frustumCulled = false; scene.add(l); tracerPool.push(l); }
@@ -466,6 +496,19 @@ void main(){
   // пыль/искры там, куда попала пуля
   const puffs = []; for (let i = 0; i < 30; i++) { const s = new T.Sprite(new T.SpriteMaterial({ map: smokeTex, depthWrite: false, transparent: true, color: 0xd8ccb0 })); s.visible = false; s.userData = { t: 9 }; scene.add(s); puffs.push(s); }
   let puffI = 0; function puffAt(v) { const s = puffs[puffI++ % puffs.length]; s.position.copy(v); s.userData.t = 0; s.visible = true; }
+  // кровь: брызги и лужи на земле
+  const bloodTex = cvTex(64, 64, g => { for (let i = 0; i < 9; i++) { g.fillStyle = `rgba(${120 + Math.random() * 40 | 0},0,0,.85)`; g.beginPath(); g.arc(32 + (Math.random() - .5) * 30, 32 + (Math.random() - .5) * 30, 4 + Math.random() * 12, 0, 6.28); g.fill(); } });
+  const sprays = []; for (let i = 0; i < 40; i++) { const s = new T.Sprite(new T.SpriteMaterial({ color: 0xb0101a, depthWrite: false, transparent: true })); s.visible = false; s.userData = { t: 9, v: new T.Vector3() }; scene.add(s); sprays.push(s); }
+  const pools = []; const poolGeo = new T.PlaneGeometry(1, 1); poolGeo.rotateX(-Math.PI / 2);
+  for (let i = 0; i < 60; i++) { const m = new T.Mesh(poolGeo, new T.MeshBasicMaterial({ map: bloodTex, transparent: true, depthWrite: false, opacity: .85 })); m.visible = false; m.renderOrder = 1; m.userData = { t: 99 }; scene.add(m); pools.push(m); }
+  let sprI = 0, poolI = 0;
+  function bloodAt(p, h = 26, big) {
+    for (let k = 0; k < (big ? 10 : 6); k++) { const s = sprays[sprI++ % sprays.length]; s.position.set(p[0], h, p[1]); s.userData.v.set((Math.random() - .5) * 90, 30 + Math.random() * 60, (Math.random() - .5) * 90); s.userData.t = 0; s.scale.setScalar(2 + Math.random() * 3); s.visible = true; }
+    const m = pools[poolI++ % pools.length], sc = (big ? 34 : 14) + Math.random() * 10; m.position.set(p[0] + (Math.random() - .5) * 8, .9 + (poolI % 60) * .002, p[1] + (Math.random() - .5) * 8); m.scale.set(sc, 1, sc); m.rotation.y = Math.random() * 6; m.userData.t = 0; m.material.opacity = .85; m.visible = true;
+  }
+  // гильзы
+  const shells = []; const shellGeo = new T.BoxGeometry(1.2, 1.2, 2.6); for (let i = 0; i < 40; i++) { const m = new T.Mesh(shellGeo, lam(0xd4a020)); m.visible = false; m.userData = { t: 9, v: new T.Vector3() }; scene.add(m); shells.push(m); }
+  let shellI = 0; function shellAt(v, right) { const m = shells[shellI++ % shells.length]; m.position.copy(v); m.userData.v.set(right.x * 60 + (Math.random() - .5) * 20, 50 + Math.random() * 30, right.z * 60 + (Math.random() - .5) * 20); m.userData.t = 0; m.visible = true; }
   let zoomCur = 1;
   const transport = plane(); transport.scale.setScalar(1.3); transport.traverse(o => { if (o.isMesh) o.castShadow = true; }); scene.add(transport);
   // ===== превью персонажа на старте =====
@@ -520,7 +563,7 @@ void main(){
       seen.add(e.id); let c = chars[e.id];
       if (!c || c.userData.ch !== e.ch) { if (c) scene.remove(c); c = chars[e.id] = makeChar(e.ch); c.userData.ch = e.ch; scene.add(c); }
       c.visible = true; setGun(c, e.wb); poseChar(c, e.p, e.aim, e.walk, e);
-      if (e.fire) { const tip = c.userData.gunHold.localToWorld(new T.Vector3(0, 0, 18)); flashAt(tip, 22); }
+      if (e.fire && !c.userData.fired) { const tip = c.userData.gunHold.localToWorld(new T.Vector3(0, 0, 18)); flashAt(tip, 34); const rt = new T.Vector3(1, 0, 0).applyQuaternion(c.quaternion); shellAt(c.userData.gunHold.localToWorld(new T.Vector3(0, 2, 2)), rt); } c.userData.fired = e.fire;
       if (e.dead) { c.userData.body.rotation.z = Math.min(1.57, e.deadT * 5) * (e.id % 2 ? 1 : -1); c.userData.body.position.y = 0; }
       else c.userData.body.rotation.z = 0;
       // парашют
@@ -535,9 +578,12 @@ void main(){
       if (ti >= tracerPool.length) break; const l = tracerPool[ti++]; const a = l.geometry.attributes.position;
       a.setXYZ(0, t.from[0], 24, t.from[1]); a.setXYZ(1, t.end[0], 24, t.end[1]);
       a.needsUpdate = true; l.material.opacity = Math.max(0, 1 - t.t / .12); l.material.color.set((t.wb & 15) === 4 ? 0xffffff : 0xffe066); l.visible = true;
-      if (t.t < dt * 1.5) { flashAt(at(t.end, 24), 10); puffAt(at(t.end, 22)); }
+      if (t.t < dt * 1.5) { if (t.wb & 128) bloodAt(t.end); else { flashAt(at(t.end, 24), 10); puffAt(at(t.end, 22)); } }
     }
     for (; ti < tracerPool.length; ti++) tracerPool[ti].visible = false;
+    for (const s of sprays) { if (!s.visible) continue; const u = s.userData; u.t += dt; if (u.t > .5 || s.position.y < 1) { s.visible = false; continue; } u.v.y -= 260 * dt; s.position.addScaledVector(u.v, dt); }
+    for (const m of pools) { if (!m.visible) continue; m.userData.t += dt; if (m.userData.t > 25) m.material.opacity = Math.max(0, .85 - (m.userData.t - 25) / 5); if (m.userData.t > 30) m.visible = false; }
+    for (const m of shells) { if (!m.visible) continue; const u = m.userData; u.t += dt; if (u.t > 3) { m.visible = false; continue; } if (m.position.y > 1) { u.v.y -= 300 * dt; m.position.addScaledVector(u.v, dt); m.rotation.x += dt * 15; m.rotation.y += dt * 9; } else { m.position.y = 1; u.v.set(0, 0, 0); } }
     for (const s of puffs) { if (!s.visible) continue; s.userData.t += dt; const k = s.userData.t / .45; if (k >= 1) { s.visible = false; continue; } s.scale.setScalar(6 + k * 18); s.material.opacity = .8 * (1 - k); s.position.y += dt * 12; }
     for (const s of flashes) { if (!s.visible) continue; s.userData.t += dt; const k = 1 - s.userData.t / .09; if (k <= 0) s.visible = false; else s.scale.setScalar(s.userData.size * (.6 + .4 * k)); }
     // языки пламени вдоль фронта — только рядом с камерой
@@ -559,5 +605,5 @@ void main(){
     if (transport.visible) { const sp = add(shipS, shipD, SHIP_V * matchT); transport.position.set(sp[0], 250, sp[1]); transport.rotation.set(0, Math.atan2(shipD[0], shipD[1]), 0); }
     renderer.render(scene, camera);
   }
-  return { frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R };
+  return { frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt };
 })();

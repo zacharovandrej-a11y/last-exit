@@ -51,9 +51,14 @@ export class World {
     for (let s = 0; s < 4; s++) { const hp = B[this.hq[s]].p; this.ents.filter(e => e && e.kind === 'r' && e.sect < 0).sort((a, c) => dist(a.p, hp) - dist(c.p, hp)).slice(0, 6).forEach(e => { e.sect = s; e.slots[0] = { w: 1, r: 0, mag: 12 }; }); }
     for (let s = 0; s < 4; s++) for (let k = 0; k < 3; k++) this.addAgent(ID_A + s * 3 + k, s);
     // лут: патроны, аптечки, броня, редкое оружие; свечи Ордена — на улице, улики Заговора — в домах
-    for (let i = 0; i < 90; i++) { const p = rndMap(rnd); if (!inMap(p, 40) || nearObjs(this.objs, p, 40).some(o => !o.nc && objPush(o, p, 8))) continue; this.addLoot(i % 3 === 0 ? { k: 4, x: 1, r: 0, n: 3 } : this.randLoot(rnd), p, true); }
+    for (let i = 0; i < 90; i++) { const p = rndMap(rnd); if (!inMap(p, 40) || nearObjs(this.objs, p, 40).some(o => !o.nc && objPush(o, p, 8))) continue; this.addLoot(this.randLoot(rnd), p, true); }
+    for (let i = 0; i < 45; i++) this.spawnPigeon(true);
     for (const b of B) for (const r of b.rooms) { if (rnd() > .5) continue; const p = this.roomPt(b, r, rnd); if (nearObjs(this.objs, p, 30).some(o => !o.nc && objPush(o, p, 8))) continue; this.addLoot(rnd() < .45 ? { k: 4, x: 2, r: 0, n: 2 } : this.randLoot(rnd), p, true); }
     this.lAdd = [];
+  }
+  // голубь: садится на улице (не в доме)
+  spawnPigeon(silent, near_) {
+    for (let k = 0; k < 20; k++) { const p = near_ ? clampMap(nearPt(this.rnd, near_, 300), 80) : rndMap(this.rnd, 80); if (bldAt(this.objs.blds, p) >= 0 || nearObjs(this.objs, p, 30).some(o => !o.nc && objPush(o, p, 8))) continue; return this.addLoot({ k: 4, x: 1, r: 0, n: 1 }, p, silent); }
   }
   roomPt(b, r, rnd) { return toWorld(b, [r.x0 + 14 + rnd() * Math.max(1, r.x1 - r.x0 - 28), r.y0 + 14 + rnd() * Math.max(1, r.y1 - r.y0 - 28)]); }
   newEnt(id, kind, name, ch, sect, p) {
@@ -68,7 +73,7 @@ export class World {
   }
   addAgent(id, s) {
     const B = this.objs.blds, d = B[this.hq[s]].doors[0];
-    const e = this.newEnt(id, 'a', AGENT_NAMES[(id - ID_A) % AGENT_NAMES.length], 104 + s, s, add(d.o, [this.rnd() * 40 - 20, this.rnd() * 40 - 20]));
+    const e = this.newEnt(id, 'a', AGENT_NAMES[(id - ID_A) % AGENT_NAMES.length], CH_SECT + s, s, add(d.o, [this.rnd() * 40 - 20, this.rnd() * 40 - 20]));
     e.slots[0] = { w: 2, r: 0, mag: 30 }; e.ammo = [24, 90, 0, 0]; e.meds = 1;
   }
   spawnPt(s) { const d = this.objs.blds[this.hq[s]].doors[0]; return collide(this.objs, add(d.o, [this.rnd() * 50 - 25, this.rnd() * 50 - 25])); }
@@ -95,7 +100,7 @@ export class World {
       if (m.t === 'join' && !c.pl) {
         let id = -1; for (let i = ID_H; i < ID_A; i++) if (!this.ents[i]) { id = i; break; } if (id < 0) return;
         const s = Math.abs(m.sect | 0) % 4, name = String(m.name || 'Игрок').replace(/[<>]/g, '').slice(0, 12).trim() || 'Игрок';
-        const p = this.newEnt(id, 'h', name, 104 + s, s, this.spawnPt(s)); p.c = c; c.pl = p;
+        const p = this.newEnt(id, 'h', name, CH_SECT + s, s, this.spawnPt(s)); p.c = c; c.pl = p;
         p.slots[0] = { w: 1, r: 0, mag: 12 }; p.ammo = [36, 0, 0, 0]; p.meds = 1; p.money = 60; p.xp = 0; p.trust = 100; p.res = 10;
         this.send(c, { t: 'w', me: id, hq: this.hq, ents: this.ents.filter(Boolean).map(e => this.entArr(e)), loot: [...this.loot.values()].map(lootArr), dead: this.objs.filter(o => o.dead).map(o => o.id) });
         this.sendAll({ t: 'e', a: [this.entArr(p)] }); this.score(true);
@@ -123,6 +128,7 @@ export class World {
   buy(p, i) {
     const it = SHOP[i]; if (!it || !this.atHQ(p)) return;
     if (p.money < it.p) { this.toast(p, 'Не хватает денег', '#ff8787'); return; }
+    if (it.noOrden && p.sect === 1) { this.toast(p, '🕊 Голубей не продают — лови на улице!', '#a259ff'); return; }
     if (it.n === 'res') p.res += 10; else if (it.n === 'Аптечка') { if (p.meds >= 5) return; p.meds++; } else if (it.n === 'Бронежилет') { if (p.armor >= 100) return; p.armor = 100; }
     else if (it.n === 'Патроны') { for (const s of p.slots) if (s) { const a = WEAPONS[s.w].ammo; p.ammo[a] = Math.min(AMMO_MAX[a], p.ammo[a] + AMMO_PACK[a] * 2); } }
     else if (it.w) { const W = WEAPONS[it.w], k = p.slots[1] ? p.cur : 1; p.slots[k] = { w: it.w, r: 1, mag: W.mag }; p.cur = k; p.ammo[W.ammo] = Math.min(AMMO_MAX[W.ammo], p.ammo[W.ammo] + AMMO_PACK[W.ammo] * 2); }
@@ -162,6 +168,10 @@ export class World {
     // новые жители вместо погибших
     if (this.tick % (15 * TICK) === 0) { const free = []; for (let i = ID_R; i < ID_R + NRES; i++) if (!this.ents[i] || !this.ents[i].alive) free.push(i); if (free.length) { const B = this.objs.blds.filter(b => !this.hq.includes(b.id)), b = B[Math.floor(this.rnd() * B.length)]; const e = this.addResident(free[0], b, Math.floor(this.rnd() * b.rooms.length)); this.sendAll({ t: 'e', a: [this.entArr(e)] }); } }
     if (this.tick % (2 * TICK) === 0) this.score();
+    // голуби: пугаются бегущих людей и улетают; новых подсаживаем
+    if (this.tick % 3 === 0) for (const it of [...this.loot.values()]) { if (it.k !== 4 || it.x !== 1) continue;
+      for (const c of this.clients) { const h = c.pl; if (h && h.alive && h.moving && dist(h.p, it.p) < 70 && this.rnd() < (h.sect === 1 ? .05 : .25)) { this.delLoot(it); this.spawnPigeon(false, it.p); this.flyT = (this.flyT || 0) + 1; break; } } }
+    if (this.tick % (8 * TICK) === 0 && [...this.loot.values()].filter(it => it.k === 4 && it.x === 1).length < 45) this.spawnPigeon(false);
     this.broadcast();
   }
   respawn(p) {
@@ -192,6 +202,11 @@ export class World {
   // кнопка «действие»: вербовать ближайшего жителя, иначе подобрать
   useAction(p) {
     if (p.actT > 0) return;
+    // Тёмный Орден: ритуал — съесть голубя на людях; вербует сразу нескольких, остальные в ужасе
+    if (p.kind === 'h' && p.sect === 1 && p.res > 0 && this.ents.some(r => r && r.kind === 'r' && r.alive && r.sect !== 1 && dist(r.p, p.p) < 140)) {
+      p.actT = SECTS[1].rec; p.actDur = p.actT; p.act = -2; p.relT = 0; p.healT = 0;
+      for (const r of this.ents) if (r && r.kind === 'r' && r.alive && dist(r.p, p.p) < 140) { r.talkBy = p.id; r.talkT = this.t + p.actT + .5; }
+      return; }
     let best = null, bd = 1e9;
     for (const r of this.ents) if (r && r.kind === 'r' && r.alive && r.sect !== p.sect) { const d = dist(r.p, p.p); if (d < 50 && d < bd) { bd = d; best = r; } }
     if (best) {
@@ -202,12 +217,28 @@ export class World {
     let li = null; bd = 1e9; for (const it of this.loot.values()) { const d = dist(it.p, p.p); if (d < PR + 30 && d < bd) { bd = d; li = it; } } if (li) this.pickup(p, li, true);
   }
   actStep(p) {
+    if (p.act === -2) { p.actT -= DT; if (p.actT <= 0) this.ritual(p); return; }
     const r = this.ents[p.act];
     if (!r || !r.alive || dist(r.p, p.p) > 75 || r.sect === p.sect) { p.actT = 0; return; }
     p.aim = dirTo(p.p, r.p); r.aim = dirTo(r.p, p.p); r.talkT = this.t + .5;
     p.actT -= DT; if (p.actT > 0) return;
     this.recruitRoll(p, r); if (p.kind === 'a') p.restT = this.t + 12 + this.rnd() * 14; // агенту — передышка
   }
+  ritual(p) {
+    p.res--; let yes = 0, scared = 0; const s = p.sect, lvl = lvlOf(p.xp);
+    for (const r of this.ents) {
+      if (!r || r.kind !== 'r' || !r.alive || r.sect === s || dist(r.p, p.p) > 140 || !canSee(this.objs, p.p, r.p, p.bi ?? -1, r.bi ?? -1)) continue;
+      const ch = (.12 + r.aff[s] * .45 + lvl * .02 - (r.sect >= 0 ? .15 : 0)) * (p.trust < 50 ? .7 : 1);
+      if (this.rnd() < ch) { r.sect = s; r.by = p.id; r.cool = this.t + 5; r.hostile.clear(); if (!r.slots[0]) { r.slots[0] = { w: 1, r: 0, mag: 12 }; r.ammo[0] = 24; } yes++; this.say(r, '🕊 Тьма приняла меня!'); }
+      else if (this.rnd() < .6) { r.aff[s] = Math.max(0, r.aff[s] - .08); r.panic = this.t + 6; r.cool = this.t + 10; scared++; this.say(r, '😱 Он ест голубя!'); }
+    }
+    p.money += yes * 12; const l0 = lvlOf(p.xp); p.xp += yes * 15;
+    this.toast(p, '🕊 Ритуал: ' + (yes ? '+' + yes + ' в Орден' : 'никто не вступил') + (scared ? ', ' + scared + ' в ужасе' : ''), yes ? SECTS[s].col : '#ffa94d');
+    if (lvlOf(p.xp) > l0) this.toast(p, '⭐ Уровень ' + lvlOf(p.xp) + '!', '#ffd43b');
+    this.sendAll({ t: 'rit', p: [Math.round(p.p[0]), Math.round(p.p[1])] });
+  }
+  // фраза над головой (видят все рядом)
+  say(e, s) { const m = JSON.stringify({ t: 'say', id: e.id, s }); for (const c of this.clients) if (c.pl && dist(c.pl.p, e.p) < VIEWD) this.send(c, m); }
   recruitRoll(p, r) {
     const s = p.sect, lvl = p.kind === 'h' ? lvlOf(p.xp) : 1;
     if (p.kind === 'h') p.res--;
@@ -231,7 +262,7 @@ export class World {
   finishReload(p) { const s = p.slots[p.cur]; if (!s) return; const W = WEAPONS[s.w]; const take = Math.min(W.mag - s.mag, p.ammo[W.ammo]); s.mag += take; p.ammo[W.ammo] -= take; }
   startHeal(p) { if (p.meds > 0 && p.hp < 100 && p.healT <= 0) { p.healT = 2.5; p.relT = 0; p.actT = 0; } }
   pickup(p, it, manual) {
-    if (it.k === 4) { if (p.kind !== 'h' || p.sect !== it.x) return; p.res += it.n; this.toast(p, SECTS[p.sect].ri + ' +' + it.n, SECTS[p.sect].col); }
+    if (it.k === 4) { if (p.kind !== 'h' || p.sect !== it.x) return; p.res += it.n; this.toast(p, it.x === 1 ? '🕊 Поймал голубя!' : SECTS[p.sect].ri + ' +' + it.n, SECTS[p.sect].col); }
     else if (it.k === 1) { const m = AMMO_MAX[it.x]; if (p.ammo[it.x] >= m) return; p.ammo[it.x] = Math.min(m, p.ammo[it.x] + it.n); }
     else if (it.k === 2) { if (p.meds >= 5) return; p.meds++; }
     else if (it.k === 3) { if (p.armor >= it.n) return; p.armor = it.n; }
@@ -257,7 +288,7 @@ export class World {
     for (let k = 0; k < W.pel; k++) {
       const sp = spr * sk * (W.pel > 1 ? (k / (W.pel - 1) - .5) * 2 + (this.rnd() - .5) * .3 : (this.rnd() - .5) * 2);
       const d = norm(add(p.aim, side, sp)), h = this.hitscan(p, d, W.range, rt);
-      this.shots.push([p.id, s.w | (s.r << 4), h.end, p.p]);
+      this.shots.push([p.id, s.w | (s.r << 4) | (h.pl ? 128 : 0), h.end, p.p]);
       const dmg = W.dmg * RMULT[s.r] * (1 - W.fall * Math.max(0, (h.dist / W.range - .4) / .6));
       if (h.pl) this.damage(h.pl, dmg, p, s.w);
       else if (h.obj && h.obj.hp) { h.obj.hp -= dmg; p.hm.push([255, Math.round(dmg)]); if (h.obj.hp <= 0) this.breakCrate(h.obj); }
@@ -364,12 +395,11 @@ export class World {
     // паника: бежит домой
     const home = this.objs.blds[r.home];
     if (r.panic > this.t && !W) { if (r.bi !== r.home) this.move(r, home.rooms[r.room] ? this.roomCenter(home, r.room) : home.p, 1); return; }
-    // свита: идёт за тем, кто завербовал (если он рядом)
-    const L = r.by >= 0 ? this.ents[r.by] : null;
-    if (L && L.alive && L.kind === 'h' && L.sect === r.sect && dist(L.p, r.p) < 420) {
-      if (r.lead !== L.id) { const n = this.ents.filter(e => e && e.lead === L.id).length; if (n < 2 + lvlOf(L.xp)) r.lead = L.id; }
-    } else r.lead = -1;
-    if (r.lead >= 0) { const d = dist(L.p, r.p); if (d > 60) this.move(r, add(L.p, dirTo(L.p, r.p), 40), d > 150 ? 1 : .85); return; }
+    // свой игрок проходит мимо — поздороваться и немного пройтись рядом
+    if (r.sect >= 0 && !(r.greetT > this.t)) for (const c of this.clients) { const h = c.pl; if (h && h.alive && h.sect === r.sect && dist(h.p, r.p) < 90 && canSee(this.objs, r.p, h.p, r.bi ?? -1, h.bi ?? -1)) { r.greetT = this.t + 50 + this.rnd() * 40; r.lead = h.id; r.leadT = this.t + 4 + this.rnd() * 3; this.say(r, RANDN(this.rnd, SECTS[r.sect].hi)); break; } }
+    if (r.lead >= 0) { const L = this.ents[r.lead]; if (!L || !L.alive || this.t > r.leadT) r.lead = -1; else { const d = dist(L.p, r.p); if (d > 50) this.move(r, add(L.p, dirTo(L.p, r.p), 36), .9); return; } }
+    // иногда сторонник идёт в свою церковь
+    if (r.sect >= 0 && !r.wp && this.rnd() < .002) { const hb = this.objs.blds[this.hq[r.sect]]; r.wp = this.roomPt(hb, hb.rooms[Math.floor(this.rnd() * hb.rooms.length)], this.rnd); }
     // к нему подошёл человек из другой секты — останавливается и слушает
     for (const c of this.clients) { const h = c.pl; if (h && h.alive && h.sect !== r.sect && dist(h.p, r.p) < 55) { r.wp = null; r.wait = Math.max(r.wait, 1.5); r.aim = dirTo(r.p, h.p); return; } }
     // обычная жизнь: стоит, ходит по своим комнатам, иногда выходит на улицу
