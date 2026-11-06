@@ -32,10 +32,11 @@ const sectCol = s => s >= 0 ? SECTS[s].col : '#c8c8c8';
 // ===== ввод =====
 const keys = {}; let mouse = { x: 0, y: 0, down: false, used: false }, sticks = { L: null, R: null, F: null }, touchUI = false, aimT = 0;
 const fireOn = () => touchUI && myId !== 255 && alive && predP && !shopOpen;
+let wantAct2 = false, des = [0, 0, 0, 0];
 let wantSlot = -1, wantReload = false, wantHeal = false, wantAct = false, bigMap = false;
 addEventListener('keydown', e => { if (document.activeElement && document.activeElement.tagName === 'INPUT') return; keys[e.code] = 1;
   if (e.code === 'Escape') { if (shopOpen) shopOpen = false; else menuOpen = started && !menuOpen; return; }
-  if (e.code === 'Digit1') wantSlot = 0; if (e.code === 'Digit2') wantSlot = 1; if (e.code === 'KeyR') wantReload = true; if (e.code === 'KeyE' || e.code === 'KeyF') wantAct = true;
+  if (e.code === 'Digit1') wantSlot = 0; if (e.code === 'Digit2') wantSlot = 1; if (e.code === 'KeyR') wantReload = true; if (e.code === 'KeyE' || e.code === 'KeyF') wantAct = true; if (e.code === 'KeyG') wantAct2 = true;
   if (e.code === 'KeyQ' || e.code === 'KeyH') wantHeal = true; if (e.code === 'KeyM') bigMap = !bigMap; if (e.code === 'KeyB' && priv && priv.atHQ) shopOpen = !shopOpen; });
 addEventListener('keyup', e => { keys[e.code] = 0; });
 let mouseMoveT = 0; cv.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.used = true; mouseMoveT = performance.now(); });
@@ -64,6 +65,7 @@ function layout() {
     { id: 'heal', x: CX - s * 2.25, y: by - s * .6, w: s * .9, h: s * .75 },
     { id: 'reload', x: CX + s * 1.35, y: by - s * .6, w: s * .9, h: s * .75 },
     { id: 'act', x: CX - s * 1.1, y: by - s * 1.95, w: s * 2.2, h: s * .95 },
+    { id: 'act2', x: CX - s * 1.1, y: by - s * 2.85, w: s * 2.2, h: s * .75 },
     { id: 'shop', x: W - 84 - 34, y: H - 100 - 130, w: 68, h: 52 },
     { id: 'map', x: W - ms - 6, y: 6, w: ms, h: ms },
     // меню выхода
@@ -85,7 +87,7 @@ function uiHit(x, y) {
     if (bigMap) { bigMap = false; return true; }
     if (!alive || !priv) continue;
     if (b.id === 'shop') { if (!priv.atHQ) continue; shopOpen = true; return true; }
-    if (b.id === 'slot0') wantSlot = 0; else if (b.id === 'slot1') wantSlot = 1; else if (b.id === 'heal') wantHeal = true; else if (b.id === 'reload') wantReload = true; else if (b.id === 'act') { if (!actShow) continue; wantAct = true; }
+    if (b.id === 'slot0') wantSlot = 0; else if (b.id === 'slot1') wantSlot = 1; else if (b.id === 'heal') wantHeal = true; else if (b.id === 'reload') wantReload = true; else if (b.id === 'act') { if (!actShow) continue; wantAct = true; } else if (b.id === 'act2') { if (!actShow || !actShow.des2) continue; wantAct2 = true; }
     return true;
   }
   if (bigMap) { bigMap = false; return true; }
@@ -132,7 +134,8 @@ let svc = { st: 0, end: 0, n: 0 }; const wits = {}; // болтуны, бегу�
 function onJson(m) {
   if (m.t === 'w') { myId = m.me; names = {}; setNames(m.ents); loot = new Map(); for (const a of m.loot) addLootArr(a); for (const id of m.dead) if (objs[id]) { objs[id].dead = true; G3.killObj(id); } ents = {}; pending = []; predP = null; dead = null; }
   else if (m.t === 'e') setNames(m.a);
-  else if (m.t === 'wit') wits[m.id] = { p: m.p, t: performance.now() };
+  else if (m.t === 'wit') wits[m.id] = { p: m.p, t: performance.now(), i: m.i || '🗣' };
+  else if (m.t === 'des') { des[m.s] = m.T ? performance.now() + m.T * 1000 : 0; const cb = objs.blds[(objs.churches || HQ)[m.s]]; if (cb && cb.altar !== undefined) G3.altarBroken(cb.altar, !!m.T, objs); }
   else if (m.t === 'x') { delete names[m.id]; delete ents[m.id]; }
   else if (m.t === 'rs') { if (m.id === myId) { dead = null; predP = null; pending = []; } }
   else if (m.t === 'sc') { score = m; }
@@ -217,9 +220,9 @@ function localTick() {
   if (manual) myAim = norm(aim);
   else if (len(mv) > .15 && performance.now() - aimT > 600) myAim = norm(mv); // идёт — смотрит по ходу
   else if (aim && !touchUI && !myAim) myAim = norm(aim);
-  let fl = (fire ? 1 : 0) | (wantReload ? 2 : 0) | (wantAct ? 4 : 0) | (wantHeal ? 8 : 0);
+  let fl = (fire ? 1 : 0) | (wantReload ? 2 : 0) | (wantAct ? 4 : 0) | (wantHeal ? 8 : 0) | (wantAct2 ? 64 : 0);
   if (wantSlot >= 0) fl |= 16 | (wantSlot << 5);
-  wantReload = wantAct = wantHeal = false; wantSlot = -1;
+  wantReload = wantAct = wantHeal = wantAct2 = false; wantSlot = -1;
   const slow = priv && (priv.st & 6) ? .4 : 1;
   seq = (seq + 1) & 0xffff;
   prevP = predP; predP = stepMove(objs, predP, mv, slow);
@@ -353,7 +356,7 @@ function hud(now, dt, meAlive, mePos) {
   if (meAlive && P) {
     // штаб — значок у края экрана
     const hb = objs.blds[HQ[ms]]; edgeIcon(hb.doors[0].o, from, '🏠', SECTS[ms].col);
-    for (const id in wits) { if (now - wits[id].t > 1800) { delete wits[id]; continue; } const e = ents[id]; edgeIcon(e && e.seen >= 0 && e.disp ? e.disp : wits[id].p, from, '🗣', '#ff6b6b'); }
+    for (const id in wits) { if (now - wits[id].t > 1800) { delete wits[id]; continue; } const e = ents[id]; edgeIcon(e && e.seen >= 0 && e.disp ? e.disp : wits[id].p, from, wits[id].i, '#ff6b6b'); }
     const bw = Math.min(260, W * .42), bx = CX - bw / 2, by = H - 24;
     ctx.fillStyle = 'rgba(0,0,0,.55)'; rr(ctx, bx - 2, by - 2, bw + 4, 16, 6); ctx.fill();
     ctx.fillStyle = P.hp > 40 ? '#51cf66' : '#ff6b6b'; rr(ctx, bx, by, bw * P.hp / 100, 12, 5); ctx.fill();
@@ -372,10 +375,15 @@ function hud(now, dt, meAlive, mePos) {
     actShow = null; let bd = 1e9;
     for (const id in ents) { const e = ents[id]; if (+id === myId || e.seen < 0 || !e.disp || !names[id] || names[id].k !== 2 || e.sect === ms) continue; const d = dist(e.disp, mePos); if (d < 50 && d < bd) { bd = d; actShow = { r: +id }; } }
     if (ms === 1 && P.res > 0) { let crowd = 0; for (const id in ents) { const e = ents[id]; if (e.seen >= 0 && e.disp && names[id] && names[id].k === 2 && e.sect !== 1 && dist(e.disp, mePos) < 140) crowd++; } actShow = crowd ? { rit: crowd } : null; }
-    for (const ci of objs.churches || []) { const cb = objs.blds[ci]; if (cb.altar !== undefined && dist(objs[cb.altar].p, mePos) < 50) actShow = { pray: cb.sect }; }
+    for (const ci of objs.churches || []) { const cb = objs.blds[ci], broken = des[cb.sect] > now;
+      if (cb.altar !== undefined && dist(objs[cb.altar].p, mePos) < 50) actShow = broken ? (cb.sect === ms ? { fix: 1 } : { brokenS: cb.sect }) : { pray: cb.sect, des2: cb.sect !== ms };
+      else if (cb.box !== undefined && cb.sect !== ms && dist(objs[cb.box].p, mePos) < 40) actShow = { rob: cb.sect }; }
     if (!actShow) for (const it of loot.values()) { const d = dist(it.p, mePos); if (d < PR + 30 && d < bd && it.k === 0) { bd = d; actShow = { it }; } }
     if (actShow && !(P.st & 4)) { const b = ui('act');
-      if (actShow.pray !== undefined) { const s_ = actShow.pray, own = s_ === ms; btn(b, SECTS[s_].col, .75); txt('🙏 Помолиться' + (touchUI ? '' : '  [E]'), b.x + b.w / 2, b.y + b.h * .48, 15, '#fff', 'center', 900); txt(own ? 'укрепить веру' : 'перейти: ' + SECTS[s_].n, b.x + b.w / 2, b.y + b.h * .82, 11, own ? '#ccc' : SECTS[s_].col, 'center', 700); }
+      if (actShow.fix) { btn(b, SECTS[ms].col, .75); txt('🛠 Восстановить алтарь' + (touchUI ? '' : '  [E]'), b.x + b.w / 2, b.y + b.h * .55, 14, '#fff', 'center', 900); txt('5 секунд', b.x + b.w / 2, b.y + b.h * .85, 11, '#ccc', 'center', 700); }
+      else if (actShow.brokenS !== undefined) { btn(b, '#555', .6); txt('💥 Алтарь осквернён', b.x + b.w / 2, b.y + b.h * .6, 14, '#ccc', 'center', 800); }
+      else if (actShow.rob !== undefined) { btn(b, '#ffd43b', .75); txt('💰 Взломать ящик' + (touchUI ? '' : '  [E]'), b.x + b.w / 2, b.y + b.h * .48, 15, '#fff', 'center', 900); txt('пожертвования «' + SECTS[actShow.rob].n + '»', b.x + b.w / 2, b.y + b.h * .82, 10, SECTS[actShow.rob].col, 'center', 700); }
+      else if (actShow.pray !== undefined) { if (actShow.des2) { const b2 = ui('act2'); btn(b2, '#ff6b6b', .7); txt('💥 Осквернить алтарь' + (touchUI ? '' : '  [G]'), b2.x + b2.w / 2, b2.y + b2.h * .62, 13, '#fff', 'center', 900); } const s_ = actShow.pray, own = s_ === ms; btn(b, SECTS[s_].col, .75); txt('🙏 Помолиться' + (touchUI ? '' : '  [E]'), b.x + b.w / 2, b.y + b.h * .48, 15, '#fff', 'center', 900); txt(own ? 'укрепить веру' : 'перейти: ' + SECTS[s_].n, b.x + b.w / 2, b.y + b.h * .82, 11, own ? '#ccc' : SECTS[s_].col, 'center', 700); }
       else if (actShow.rit) { btn(b, SECTS[1].col, .75); txt('🕊 Ритуал', b.x + b.w / 2, b.y + b.h * .48, 16, '#fff', 'center', 900); txt('съесть голубя при ' + actShow.rit + ' зрителях' + (touchUI ? '' : '  [E]'), b.x + b.w / 2, b.y + b.h * .82, 11, '#d0b0ff', 'center', 700); }
       else if (actShow.r !== undefined) { const e = ents[actShow.r], nm = names[actShow.r].n, other = e.sect >= 0; btn(b, SECTS[ms].col, .75); const pc = CHARS[names[actShow.r].pc || 0]; txt('🗣 ' + nm + (pc.i ? '  ' + pc.i + ' ' + pc.n : ''), b.x + b.w / 2, b.y + b.h * .48, 14, '#fff', 'center', 800); txt((other ? 'переманить: ' + SECTS[e.sect].n : 'завербовать') + (touchUI ? '' : '  [E]'), b.x + b.w / 2, b.y + b.h * .82, 11, other ? sectCol(e.sect) : '#ccc', 'center', 700); }
       else { const it = actShow.it; btn(b, RARITY[it.r], .7); ctx.save(); ctx.translate(b.x + b.w * .25, b.y + b.h * .5); gunShape(ctx, it.x, b.h * .3, RARITY[it.r]); ctx.restore(); txt(touchUI ? '✋' : 'E', b.x + b.w - 18, b.y + b.h * .65, 18); } }
@@ -438,7 +446,7 @@ function minimap(now, from) {
   ctx.restore(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   HQ.forEach((bi, s) => { const [x, y] = mm(objs.blds[bi].p); txt('★', x, y + 4, big ? 18 : 11, SECTS[s].col); });
   for (const id in ents) { const e = ents[id]; if (e.seen < 0 || +id === myId || !e.disp) continue; const [x, y] = mm(e.disp); blob(ctx, x, y, big ? 4 : 2.2, sectCol(e.sect)); }
-  for (const id in wits) { const [x, y] = mm(wits[id].p); txt('🗣', x, y + 4, big ? 16 : 11, '#ff6b6b'); }
+  for (const id in wits) { const [x, y] = mm(wits[id].p); txt(wits[id].i, x, y + 4, big ? 16 : 11, '#ff6b6b'); }
   const [mx, my] = mm(from); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(mx, my - 7); ctx.lineTo(mx + 5, my + 5); ctx.lineTo(mx - 5, my + 5); ctx.closePath(); ctx.fill(); ctx.stroke();
 }
 

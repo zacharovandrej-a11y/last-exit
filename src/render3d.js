@@ -159,6 +159,7 @@ void main(){
       if (k === 'table') return [[geo.box, 0x6b4a2e, M(0, 13, 0, w, 2.5, h)], [geo.box, 0x4a3624, M(w * .4, 6, h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(-w * .4, 6, h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(w * .4, 6, -h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(-w * .4, 6, -h * .35, 2, 12, 2)], [geo.box, 0xe8e4da, M(w * .15, 15, 0, 6, 1.5, 5)]];
       if (k === 'desk') return [[geo.box, 0x5a4a3a, M(0, 13, 0, w, 2.5, h)], [geo.box, 0x4a3c2e, M(w * .3, 6, 0, w * .35, 12, h * .9)], [geo.box, 0x2a2a2a, M(-w * .1, 18, 0, 8, 7, 2)], [geo.box, 0x34342f, M(-w * .1, 7, h * .7, 8, 14, 8)]];
       if (k === 'sofa') return [[geo.box, 0x5a3a3a, M(0, 5, 0, w, 10, h)], [geo.box, 0x4a2e2e, M(0, 12, -h * .35, w, 14, h * .3)], [geo.box, 0x4a2e2e, M(w * .45, 9, 0, w * .1, 10, h)], [geo.box, 0x4a2e2e, M(-w * .45, 9, 0, w * .1, 10, h)]];
+      if (k === 'dbox') return [[geo.box, 0x6b4a2e, M(0, 9, 0, w, 18, h)], [geo.box, 0x4a3220, M(0, 18.6, 0, w * 1.05, 1.5, h * 1.05)], [geo.box, 0x111111, M(0, 19.5, 0, w * .5, .6, 2)], [geo.box, 0xd4a017, M(w * .51, 12, 0, .6, 4, 4)]];
       if (k === 'bench') return [[geo.box, 0x6b4a2e, M(0, 8, 0, w, 2.5, h)], [geo.box, 0x5a3c24, M(-w * .42, 14, 0, 2, 12, h)], [geo.box, 0x4a3220, M(0, 4, h * .42, w * .8, 8, 2)], [geo.box, 0x4a3220, M(0, 4, -h * .42, w * .8, 8, 2)]];
       if (k === 'altar0') return [[geo.box, 0xf2efe6, M(0, 11, 0, w, 22, h)], [geo.box, 0xff7eb0, M(0, 22.5, 0, w * .9, 1.5, h * .5)], [geo.box, 0xff7eb0, M(-1, 26, -6, 12, 4, 20)], [geo.dome, 0xff9ec4, M(-1, 26, -16, 6, 5, 6)], [geo.box, 0xffffff, M(-1, 29, -4, 12, 2, 4)], [geo.box, 0x6b4a2e, M(-2, 24, 12, 8, 3, 10)]];
       if (k === 'altar1') return [[geo.box, 0x2a2630, M(0, 10, 0, w, 20, h)], [geo.box, 0x7a1020, M(0, 20.5, 0, w * 1.02, 1.5, h * .8)], ...[-16, -6, 6, 16].map(z => [geo.cyl6, 0xe8dcc0, M(-4, 25, z, 1.4, 8, 1.4)]), ...[-16, -6, 6, 16].map(z => [geo.cone7, 0xffb347, M(-4, 30.5, z, 1.2, 3, 1.2)]), [geo.sph, 0x8a8a90, M(2, 25, 0, 5, 4, 4)], [geo.cone7, 0xd8a040, M(-3, 25, 0, 1.4, 4, 1.4, 0, 1.57)], [geo.box, 0xa259ff, M(9, 30, 0, 1.5, 20, 30)]];
@@ -206,13 +207,14 @@ void main(){
       items.forEach(([o, lm], i) => {
         const m = basisAt(o).multiply(lm); mesh.setMatrixAt(i, m);
         mesh.setColorAt(i, new T.Color(typeof col === 'string' ? (VAR[col] ? VAR[col][o.id % VAR[col].length] : 0xffffff) : col));
-        (objIdx[o.id] = objIdx[o.id] || []).push([mesh, i]);
+        (objIdx[o.id] = objIdx[o.id] || []).push([mesh, i, m]);
         if (o.dead) mesh.setMatrixAt(i, zero);
       });
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       scene.add(mesh); inst[key] = { mesh }; if (OUTLINE_ALL) addOutline(mesh, OUT_B);
     }
     buildBuildings(objs);
+    for (const [id, ob] of brokenOn) if (ob) altarBroken(id, true, ob);
   }
   // ===== здания =====
   // процедурные текстуры (серые — цвет задаёт оттенок экземпляра)
@@ -356,6 +358,19 @@ void main(){
     const set = (id, open) => { for (const [mesh, i, m, role, low] of bParts[id] || []) { mesh.setMatrixAt(i, !open || role === 'floor' || role === 'prop' ? m : low || zero); mesh.instanceMatrix.needsUpdate = true; } };
     if (insideB >= 0) set(insideB, false); insideB = bid; if (bid >= 0) set(bid, true);
     for (const k in deco) for (const m of deco[k]) m.visible = +k !== bid;
+  }
+  // осквернённый алтарь: сам алтарь скрыт, вместо него обломки, красная надпись на полу
+  const broken = {};
+  const brokenOn = new Map();
+  function altarBroken(id, on, objs) {
+    brokenOn.set(id, on ? objs : null); if (!objIdx[id]) return;
+    for (const [mesh, i, m] of objIdx[id] || []) { mesh.setMatrixAt(i, on ? zero : m); mesh.instanceMatrix.needsUpdate = true; }
+    if (!broken[id]) { const o = objs[id], g = new T.Group(); g.position.set(o.p[0], 0, o.p[1]); g.rotation.y = -o.a;
+      [[0, 3, -10, 14, 6, 10, .3], [-6, 2.5, 8, 10, 5, 12, -.5], [8, 2, 2, 8, 4, 8, 1.1], [-2, 1.5, 18, 6, 3, 6, .7]].forEach(([x, y, z, a, b, c, r]) => { const k = new T.Mesh(geo.box, lam(0x5a5650)); k.position.set(x, y, z); k.scale.set(a, b, c); k.rotation.set(r, r * .7, r * .4); g.add(k); });
+      const cv = document.createElement('canvas'); cv.width = cv.height = 128; const cx = cv.getContext('2d'); cx.strokeStyle = 'rgba(220,20,20,.9)'; cx.lineWidth = 14; cx.lineCap = 'round'; cx.beginPath(); cx.moveTo(20, 20); cx.lineTo(108, 108); cx.moveTo(108, 20); cx.lineTo(20, 108); cx.stroke();
+      const d = new T.Mesh(new T.PlaneGeometry(50, 50), new T.MeshBasicMaterial({ map: new T.CanvasTexture(cv), transparent: true, depthWrite: false })); d.rotation.x = -Math.PI / 2; d.position.set(-14, 2, 0); g.add(d);
+      scene.add(g); broken[id] = g; }
+    broken[id].visible = on;
   }
   function killObj(id) { for (const [mesh, i] of objIdx[id] || []) { mesh.setMatrixAt(i, zero); mesh.instanceMatrix.needsUpdate = true; } }
 
@@ -678,5 +693,5 @@ void main(){
     if (transport.visible) { const sp = add(shipS, shipD, SHIP_V * matchT); transport.position.set(sp[0], 250, sp[1]); transport.rotation.set(0, Math.atan2(shipD[0], shipD[1]), 0); }
     renderer.render(scene, camera);
   }
-  return { frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt };
+  return { frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt, altarBroken };
 })();

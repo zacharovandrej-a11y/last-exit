@@ -38,6 +38,7 @@ export class World {
     this.objs = genWorld(); this.hq = sectHQ(this.objs);
     this.loot = new Map(); this.lootId = 1; this.lAdd = []; this.lDel = []; this.shots = [];
     this.ents = []; // все люди мира: игроки (h), агенты сект (a), жители (r); индекс = id
+    this.box = [60, 60, 60, 60]; this.desT = [0, 0, 0, 0]; this.alarm = [null, null, null, null]; // ящики пожертвований, осквернение, тревога
     this.svc = [0, 1, 2, 3].map(s => ({ st: 0, T: 50 + s * 35, n: 0 })); // службы в церквях: 0 нет, 1 скоро, 2 идёт
     this.spawnWorld();
   }
@@ -104,7 +105,7 @@ export class World {
         const p = this.newEnt(id, 'h', name, CH_SECT + s, s, this.spawnPt(s)); p.c = c; c.pl = p;
         p.slots[0] = { w: 1, r: 0, mag: 12 }; p.ammo = [36, 0, 0, 0]; p.meds = 1; p.money = 60; p.xp = 0; p.trust = 100; p.res = 10;
         this.send(c, { t: 'w', me: id, hq: this.hq, ents: this.ents.filter(Boolean).map(e => this.entArr(e)), loot: [...this.loot.values()].map(lootArr), dead: this.objs.filter(o => o.dead).map(o => o.id) });
-        this.sendAll({ t: 'e', a: [this.entArr(p)] }); this.score(true); this.svcSend(p.sect, p);
+        this.sendAll({ t: 'e', a: [this.entArr(p)] }); this.score(true); this.svcSend(p.sect, p); this.desT.forEach((T, s) => { if (T > this.t) this.send(c, { t: 'des', s, T: Math.round(T - this.t) }); });
         this.toast(p, 'Ты в секте «' + SECTS[s].n + '». Вербуй жителей!', SECTS[s].col);
       } else if (m.t === 'buy' && c.pl && c.pl.alive) this.buy(c.pl, m.i | 0);
       else if (m.t === 'quit') { this.clients.delete(c); this.leave(c); try { c.ws.close(1000, 'quit'); } catch (e) { } }
@@ -199,6 +200,7 @@ export class World {
     if (fl & 2) this.startReload(p);
     if (fl & 8) this.startHeal(p);
     if (fl & 4) this.useAction(p);
+    if (fl & 64) this.desecrateStart(p);
     if (fl & 1) this.fire(p, inp.vt);
   }
   // кнопка «действие»: вербовать ближайшего жителя, иначе подобрать
@@ -206,6 +208,8 @@ export class World {
     if (p.actT > 0) return;
     // у алтаря: в чужой церкви — сменить веру, в своей — помолиться
     if (p.kind === 'h') { const cb = this.altarNear(p.p, 50);
+      if (cb && this.desT[cb.sect] > this.t) { if (cb.sect === p.sect) { p.act = -7; p.actT = 5; p.actDur = 5; p.relT = 0; p.healT = 0; this.toast(p, '🛠 Восстанавливаешь алтарь…', SECTS[p.sect].col); } else this.toast(p, '💥 Алтарь осквернён', '#adb5bd'); return; }
+      const xb = this.boxNear(p.p, 40); if (xb && !cb) { if (xb.sect === p.sect) this.toast(p, '📦 В ящике пожертвований $' + this.box[xb.sect], SECTS[p.sect].col); else if (this.box[xb.sect] < 5) this.toast(p, '📦 Ящик пуст', '#adb5bd'); else { p.act = -5; p.actT = 4; p.actDur = 4; p.relT = 0; p.healT = 0; p.robS = xb.sect; this.toast(p, '💰 Взламываешь ящик…', '#ffd43b'); } return; }
       if (cb) { if (cb.sect !== p.sect) { p.act = -3; p.actT = 3; p.actDur = 3; p.prayS = cb.sect; p.relT = 0; p.healT = 0; this.toast(p, '🙏 Молишься у алтаря «' + SECTS[cb.sect].n + '»…', SECTS[cb.sect].col); }
         else if (p.prayT > this.t) this.toast(p, '🙏 Ты уже молился — приходи позже или на службу', '#adb5bd');
         else { p.act = -4; p.actT = 2; p.actDur = 2; p.relT = 0; p.healT = 0; }
@@ -226,6 +230,9 @@ export class World {
   }
   actStep(p) {
     if (p.act === -2) { p.actT -= DT; if (p.actT <= 0) this.ritual(p); return; }
+    if (p.act === -5) { const xb = this.boxNear(p.p, 70); if (!xb) { p.actT = 0; return; } p.aim = dirTo(p.p, this.objs[xb.box].p); p.actT -= DT; if (p.actT <= 0) this.rob(p, xb.sect); return; }
+    if (p.act === -6 || p.act === -7) { const cb = this.altarNear(p.p, 75); if (!cb) { p.actT = 0; return; } p.aim = dirTo(p.p, this.objs[cb.altar].p); p.actT -= DT; if (p.actT > 0) return;
+      if (p.act === -6) this.desecrate(p, cb.sect); else this.restoreAltar(p, cb.sect); return; }
     if (p.act === -3 || p.act === -4) { const cb = this.altarNear(p.p, 75); if (!cb) { p.actT = 0; return; } p.aim = dirTo(p.p, this.objs[cb.altar].p); p.actT -= DT; if (p.actT > 0) return;
       if (p.act === -3) this.convert(p, p.prayS); else { p.prayT = this.t + 90; p.trust = Math.min(100, p.trust + 8); p.xp += 5; this.toast(p, '🙏 Вера крепнет: доверие +8', SECTS[p.sect].col); } return; }
     const r = this.ents[p.act];
@@ -316,7 +323,7 @@ export class World {
     for (const q of this.ents) {
       if (!q || !q.alive || q === p) continue; const qp = rt === this.tick ? q.p : this.posAt(q, rt);
       if (Math.abs(qp[0] - from[0]) > range + 20 || Math.abs(qp[1] - from[1]) > range + 20) continue;
-      const t = rayCircle(from, d, qp, PR + 3); if (t < best) { best = t; pl = q; obj = null; }
+      const t = rayCircle(from, d, qp, PR + 3); if (t < best && (t > 4 || dist(qp, from) > PR)) { best = t; pl = q; obj = null; }
     }
     return { end: add(from, d, best), obj, pl, dist: best };
   }
@@ -339,6 +346,37 @@ export class World {
     }
     if (v.hp <= 0) this.kill(v, by, w);
   }
+  boxNear(q, r) { for (const bi of this.hq) { const b = this.objs.blds[bi]; if (b.box !== undefined && dist(this.objs[b.box].p, q) < r) return b; } return null; }
+  // тревога: вся секта охотится за обидчиком
+  raise(s, p, sec) {
+    for (const a of this.ents) if (a && a.alive && a.sect === s && a.kind !== 'h') { if (a.kind === 'a' || a.slots[a.cur]) { a.hostile.set(p.id, this.t + sec); a.hunt = p.id; a.huntT = this.t + sec; } else a.panic = this.t + 8; }
+    this.alarm[s] = { id: p.id, until: this.t + sec };
+    this.toast(p, '🚨 Вся секта «' + SECTS[s].n + '» охотится за тобой!', '#ff6b6b');
+  }
+  rob(p, s) {
+    const m = this.box[s]; this.box[s] = 0; p.money += m; p.xp += 15;
+    this.toast(p, '💰 Украл $' + m + ' из ящика «' + SECTS[s].n + '»', '#ffd43b');
+    for (const c of this.clients) if (c.pl && c.pl.sect === s) this.toast(c.pl, '🚨 ' + p.name + ' ограбил(а) нашу церковь! Догони!', '#ff6b6b');
+    this.raise(s, p, 90);
+  }
+  desecrateStart(p) {
+    if (p.kind !== 'h' || p.actT > 0) return; const cb = this.altarNear(p.p, 50);
+    if (!cb || cb.sect === p.sect) return; if (this.desT[cb.sect] > this.t) { this.toast(p, '💥 Алтарь уже осквернён', '#adb5bd'); return; }
+    p.act = -6; p.actT = 3; p.actDur = 3; p.relT = 0; p.healT = 0; this.toast(p, '💥 Оскверняешь алтарь…', '#ff6b6b');
+  }
+  desecrate(p, s) {
+    this.desT[s] = this.t + 180; const S = this.svc[s]; S.st = 0; S.T = this.desT[s] + 20; S.n = 0; for (const r of this.ents) if (r && r.svc === s) { r.svc = -1; r.svcP = null; r.wp = null; }
+    const pool = this.ents.filter(r => r && r.kind === 'r' && r.alive && r.sect === s && r.pc !== 5); let lost = 0;
+    for (const r of pool) if (lost < 8 && this.rnd() < .15) { lost++; r.sect = -1; r.by = -1; r.lead = -1; if (lost <= 2) this.say(r, '💔 Святыня осквернена… я ухожу'); }
+    const l0 = lvlOf(p.xp); p.xp += 40; p.money += 25;
+    this.toast(p, '💥 Алтарь «' + SECTS[s].n + '» осквернён! ' + (lost ? lost + ' потеряли веру' : 'паства держится'), '#ff6b6b'); if (lvlOf(p.xp) > l0) this.toast(p, '⭐ Уровень ' + lvlOf(p.xp) + '!', '#ffd43b');
+    for (const c of this.clients) if (c.pl && c.pl.sect === s) this.toast(c.pl, '💥 ' + p.name + ' осквернил(а) наш алтарь! Восстанови его и отомсти!', '#ff6b6b');
+    this.sendAll({ t: 'des', s, T: 180 }); this.svcSend(s); this.raise(s, p, 120);
+  }
+  restoreAltar(p, s) {
+    this.desT[s] = 0; this.svc[s].T = Math.min(this.svc[s].T, this.t + 30); const l0 = lvlOf(p.xp); p.xp += 20; p.trust = Math.min(100, p.trust + 10);
+    this.sendAll({ t: 'des', s, T: 0 }); for (const c of this.clients) if (c.pl && c.pl.sect === s) this.toast(c.pl, '🛠 ' + p.name + ' восстановил(а) алтарь!', SECTS[s].col); if (lvlOf(p.xp) > l0) this.toast(p, '⭐ Уровень ' + lvlOf(p.xp) + '!', '#ffd43b');
+  }
   altarNear(q, r) { for (const bi of this.hq) { const b = this.objs.blds[bi]; if (b.altar !== undefined && dist(this.objs[b.altar].p, q) < r) return b; } return null; }
   // смена веры: молитва у алтаря чужой церкви
   convert(p, s) {
@@ -354,8 +392,14 @@ export class World {
   // службы: раз в ~3 минуты; сторонники идут в церковь, игрок на службе получает награду
   svcSend(s, only) { const S = this.svc[s], m = { t: 'svc', st: S.st, T: Math.max(0, Math.round(S.T - this.t)), n: S.n }; for (const c of this.clients) if (c.pl && c.pl.sect === s && (!only || c.pl === only)) this.send(c, m); }
   svcStep() {
+    for (let s = 0; s < 4; s++) {
+      if (this.desT[s] && this.t > this.desT[s]) { this.desT[s] = 0; this.sendAll({ t: 'des', s, T: 0 }); }
+      if (this.tick % (30 * TICK) === 0) { const n = this.ents.filter(r => r && r.alive && r.kind === 'r' && r.sect === s).length; this.box[s] = Math.min(500, this.box[s] + Math.round(n * .6)); }
+      const A = this.alarm[s]; if (A) { const q = this.ents[A.id]; if (this.t > A.until || !q || !q.alive) this.alarm[s] = null; else for (const c of this.clients) if (c.pl && c.pl.sect === s && c.pl !== q) this.send(c, { t: 'wit', id: q.id, p: [Math.round(q.p[0]), Math.round(q.p[1])], i: '🚨' }); }
+    }
     this.svc.forEach((S, s) => {
       const b = this.objs.blds[this.hq[s]];
+      if (S.st === 0 && this.desT[s] > this.t) return; // осквернённый алтарь — служб нет
       if (S.st === 2) { S.n = this.ents.filter(r => r && r.kind === 'r' && r.alive && r.svc === s && r.bi === b.id).length; if (this.tick % (5 * TICK) === 0) this.svcSend(s); }
       if (this.t < S.T) return;
       if (S.st === 0) { S.st = 1; S.T = this.t + 20; S.n = 0;
@@ -364,7 +408,7 @@ export class World {
       } else if (S.st === 1) { S.st = 2; S.T = this.t + 40;
         for (const c of this.clients) if (c.pl && c.pl.sect === s) this.toast(c.pl, '⛪ Служба началась', SECTS[s].col);
       } else {
-        const att = this.ents.filter(r => r && r.kind === 'r' && r.alive && r.svc === s && r.bi === b.id); let said = 0;
+        const att = this.ents.filter(r => r && r.kind === 'r' && r.alive && r.svc === s && r.bi === b.id); let said = 0; this.box[s] = Math.min(500, this.box[s] + 5 * att.length);
         for (const r of att) { r.aff[s] = Math.min(1, r.aff[s] + .1); r.faithT = this.t + 300; if (said < 3 && this.rnd() < .4) { said++; this.say(r, RANDN(this.rnd, SECTS[s].hi)); } }
         for (const r of this.ents) if (r && r.svc === s) { r.svc = -1; r.svcP = null; r.wp = null; r.wait = this.rnd() * 3; }
         for (const c of this.clients) { const h = c.pl; if (!h || !h.alive || h.sect !== s) continue;
@@ -438,7 +482,7 @@ export class World {
     for (const [id, until] of e.hostile) { if (until < this.t) { e.hostile.delete(id); continue; } const q = this.ents[id]; if (!q || !q.alive) continue; const d = dist(q.p, e.p); if (d < bd) { bd = d; best = q; } }
     // свита: враги лидера — мои враги
     if (e.lead >= 0) { const L = this.ents[e.lead]; if (L) for (const [id, until] of L.hostile) { if (until < this.t) continue; const q = this.ents[id]; if (q && q.alive) { const d = dist(q.p, e.p); if (d < bd) { bd = d; best = q; } } } }
-    return best && bd < 520 ? best : null;
+    return best && (bd < 520 || (e.hunt === best.id && e.huntT > this.t)) ? best : null;
   }
   shootAt(e, t, W) {
     const to = dirTo(e.p, t.p), err = (1 - e.skill) * .25 * Math.sin(this.t * 2.3 + e.id);
@@ -460,7 +504,7 @@ export class World {
     const s = a.slots[a.cur], W = s ? WEAPONS[s.w] : null;
     if (s && s.mag <= 0) this.startReload(a);
     const t = this.enemyOf(a); a.fight = !!t;
-    if (t) { if (!a.tgt || a.tgt !== t.id) a.react = Math.round((.4 + (1 - a.skill) * .6) * TICK); a.tgt = t.id; const los = this.shootAt(a, t, W);
+    if (t) { if (a.tgt !== t.id) a.react = Math.round((.4 + (1 - a.skill) * .6) * TICK); a.tgt = t.id; const los = this.shootAt(a, t, W);
       const d = dist(a.p, t.p); if (!los) this.move(a, t.p); else if (d > (W ? W.range * .55 : 200)) this.move(a, t.p, .7); return; }
     if (a.hp < 60 && a.meds > 0) this.startHeal(a);
     if (a.actT > 0) return;
@@ -481,7 +525,7 @@ export class World {
     if (s && s.mag <= 0) this.startReload(r);
     if (r.gossip && this.gossipStep(r)) return;
     const t = W && r.pc !== 4 ? this.enemyOf(r) : null; r.fight = !!t;
-    if (t) { if (!r.tgt || r.tgt !== t.id) r.react = Math.round((.6 + (1 - r.skill)) * TICK / 2); r.tgt = t.id; const los = this.shootAt(r, t, W); if (!los) this.move(r, t.p, .8); return; }
+    if (t) { if (r.tgt !== t.id) r.react = Math.round((.6 + (1 - r.skill)) * TICK / 2); r.tgt = t.id; const los = this.shootAt(r, t, W); if (!los) this.move(r, t.p, .8); return; }
     // паника: бежит домой
     const home = this.objs.blds[r.home];
     if (r.panic > this.t && (!W || r.pc === 4)) { if (r.bi !== r.home) this.move(r, home.rooms[r.room] ? this.roomCenter(home, r.room) : home.p, 1); return; }
@@ -505,11 +549,21 @@ export class World {
     this.move(r, r.wp, .45);
     if (dist(r.p, r.wp) < 12 || r.stuck > 40) { r.wp = null; r.wait = 2 + this.rnd() * 7; r.stuck = 0; }
   }
+  // обход зданий снаружи: если прямой путь упирается в дом — идём через ближний угол
+  around(a, t) {
+    const B = this.objs.blds, d = dist(a, t), n = Math.min(10, Math.ceil(Math.min(d, 320) / 32)); let hit = -1;
+    for (let i = 1; i <= n; i++) { const q = lerp(a, t, Math.min(1, i * 32 / d)); hit = bldAt(B, q); if (hit >= 0) break; }
+    if (hit < 0) return t;
+    const b = B[hit], X = b.w / 2 + 26, Y = b.h / 2 + 26, cs = [[X, Y], [-X, Y], [X, -Y], [-X, -Y]].map(([x, y]) => add(add(b.p, b.u, x), b.v, y));
+    const clear = (p, q) => { const L = dist(p, q); for (let k = 1; k < 6; k++) if (bldAt(B, lerp(p, q, k / 6)) === hit) return false; return L > 6; };
+    let best = null, bd = 1e9; for (const c of cs) { if (!clear(a, c)) continue; const v = dist(a, c) + dist(c, t); if (v < bd) { bd = v; best = c; } }
+    return best || t;
+  }
   roomCenter(b, ri) { const R = b.rooms[ri]; return toWorld(b, [(R.x0 + R.x1) / 2, (R.y0 + R.y1) / 2]); }
   // путь к точке t с учётом зданий: заходим и выходим через двери, внутри — по комнатам
   nav(b, t) {
     const B = this.objs.blds, bt = bldAt(B, t), bb = b.bi ?? -1;
-    if (bb < 0) { if (bt < 0) return t; const d = near(B[bt].doors, b.p); return dist(b.p, d.o) < 24 || dist(b.p, d.i) < dist(d.o, d.i) ? d.i : d.o; }
+    if (bb < 0) { if (bt < 0) return this.around(b.p, t); const d = near(B[bt].doors, b.p); const go = dist(b.p, d.o) < 24 || dist(b.p, d.i) < dist(d.o, d.i) ? d.i : d.o; return go === d.o ? this.around(b.p, d.o) : go; }
     const Bd = B[bb], lp = toLocal(Bd, b.p);
     // комната «липкая»: в дверном проёме считаемся там, откуда пришли (иначе дёргается туда-сюда)
     let rb = Bd.rooms.findIndex(r => lp[0] > r.x0 && lp[0] < r.x1 && lp[1] > r.y0 && lp[1] < r.y1);

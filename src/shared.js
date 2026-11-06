@@ -191,6 +191,7 @@ function genWorld() {
       const set = SETS[K.furn], rw = r.x1 - r.x0, rh = r.y1 - r.y0;
       if (K.furn === 'church') { // церковь: алтарь у дальней стены, скамьи рядами, проход посередине
         const al = fu('altar' + K.church, r.x1 - 16, (r.y0 + r.y1) / 2, 20, 44); if (al) b.altar = al.id;
+        const bx = fu('dbox', r.x1 - 14, r.y1 - 12, 14, 14) || fu('dbox', r.x1 - 14, r.y0 + 12, 14, 14); if (bx) b.box = bx.id; // ящик пожертвований у алтаря
         const bw = Math.max(20, rh / 2 - 34); for (let x = r.x0 + 48; x < r.x1 - 52; x += 30) { fu('bench', x, r.y0 + 8 + bw / 2, 12, bw); fu('bench', x, r.y1 - 8 - bw / 2, 12, bw); }
         continue; }
       if (r.hall) { // зал: ряды стеллажей
@@ -246,7 +247,7 @@ function genWorld() {
   many('tree', null, 0, 44, 44, 420); many('rock', null, 0, 36, 36, 110); many('bush', null, 0, 34, 34, 260, 10);
   // убираем «лишнюю» мебель и перенумеровываем
   const keep = objs.filter(o => !o.gone), idm = new Map(); objs.length = 0; keep.forEach((o, i) => { idm.set(o.id, i); o.id = i; objs.push(o); });
-  for (const b of blds) { b.walls = b.walls.map(i => idm.get(i)); b.furn = b.furn.filter(i => idm.has(i)).map(i => idm.get(i)); if (b.altar !== undefined) b.altar = idm.get(b.altar); }
+  for (const b of blds) { b.walls = b.walls.map(i => idm.get(i)); b.furn = b.furn.filter(i => idm.has(i)).map(i => idm.get(i)); if (b.altar !== undefined) b.altar = idm.get(b.altar); if (b.box !== undefined) b.box = idm.get(b.box); }
   objs.blds = blds; objs.churches = churches; gridBuild(objs);
   return objs;
 }
