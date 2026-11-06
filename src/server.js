@@ -104,7 +104,7 @@ export class World {
         const s = Math.abs(m.sect | 0) % 4, name = String(m.name || 'Игрок').replace(/[<>]/g, '').slice(0, 12).trim() || 'Игрок';
         const p = this.newEnt(id, 'h', name, CH_SECT + s, s, this.spawnPt(s)); p.c = c; c.pl = p;
         p.slots[0] = { w: 1, r: 0, mag: 12 }; p.ammo = [36, 0, 0, 0]; p.meds = 1; p.money = 60; p.xp = 0; p.trust = 100; p.res = 10;
-        this.send(c, { t: 'w', me: id, hq: this.hq, ents: this.ents.filter(Boolean).map(e => this.entArr(e)), loot: [...this.loot.values()].map(lootArr), dead: this.objs.filter(o => o.dead).map(o => o.id) });
+        this.send(c, { t: 'w', me: id, hq: this.hq, ents: this.ents.filter(Boolean).map(e => this.entArr(e)), loot: [...this.loot.values()].map(lootArr), dead: this.objs.filter(o => o.dead).map(o => o.id), ob: this.objs.filter(o => o.smoke || o.burnt).map(o => [o.id, o.burnt ? 2 : 1]), gl: this.objs.filter(o => o.broken).map(o => o.id) });
         this.sendAll({ t: 'e', a: [this.entArr(p)] }); this.score(true); this.svcSend(p.sect, p); this.desT.forEach((T, s) => { if (T > this.t) this.send(c, { t: 'des', s, T: Math.round(T - this.t) }); });
         this.toast(p, 'Ты в секте «' + SECTS[s].n + '». Вербуй жителей!', SECTS[s].col);
       } else if (m.t === 'buy' && c.pl && c.pl.alive) this.buy(c.pl, m.i | 0);
@@ -169,6 +169,11 @@ export class World {
     if (this.tick % (20 * TICK) === 0) for (const r of this.ents) if (r && r.kind === 'r' && r.alive && r.by >= 0) { const h = this.ents[r.by]; if (h && h.kind === 'h' && h.sect === r.sect) h.money += 1; }
     // новые жители вместо погибших
     if (this.tick % TICK === 0) this.svcStep();
+    if (this.later && this.later.length) { const now_ = this.later.filter(l => l[0] <= this.t); this.later = this.later.filter(l => l[0] > this.t); for (const [, o, by] of now_) this.objHurt(o, by); }
+    if (this.tick % (5 * TICK) === 0) for (const o of this.objs) { // восстановление: бочки, ящики, сгоревшие машины
+      if (!o.fixT || this.t < o.fixT) continue;
+      if (this.ents.some(e => e && e.alive && dist(e.p, o.p) < o.rad + PR + 4)) continue;
+      o.fixT = 0; o.hp = OT[o.type].hp; if (o.dead) { o.dead = false; this.sendAll({ t: 'rv', id: o.id }); } if (o.burnt || o.smoke) { o.burnt = o.smoke = 0; this.sendAll({ t: 'ob', id: o.id, s: 0 }); } }
     if (this.tick % (15 * TICK) === 0) { const free = []; for (let i = ID_R; i < ID_R + NRES; i++) if (!this.ents[i] || !this.ents[i].alive) free.push(i); if (free.length) { const B = this.objs.blds.filter(b => !this.hq.includes(b.id)), b = B[Math.floor(this.rnd() * B.length)]; const e = this.addResident(free[0], b, Math.floor(this.rnd() * b.rooms.length)); this.sendAll({ t: 'e', a: [this.entArr(e)] }); } }
     if (this.tick % (2 * TICK) === 0) this.score();
     // голуби: пугаются бегущих людей и улетают; новых подсаживаем
@@ -310,7 +315,8 @@ export class World {
       this.shots.push([p.id, s.w | (s.r << 4) | (h.pl ? 128 : 0), h.end, p.p]);
       const dmg = W.dmg * RMULT[s.r] * (1 - W.fall * Math.max(0, (h.dist / W.range - .4) / .6));
       if (h.pl) this.damage(h.pl, dmg, p, s.w);
-      else if (h.obj && h.obj.hp) { h.obj.hp -= dmg; p.hm.push([255, Math.round(dmg)]); if (h.obj.hp <= 0) this.breakCrate(h.obj); }
+      else if (h.obj && h.obj.hp > 0) { h.obj.hp -= dmg; p.hm.push([255, Math.round(dmg)]); this.objHurt(h.obj, p); }
+      for (const o of rayObjs(this.objs, p.p, d, h.dist)) if (o.win && !o.broken && rayObj(p.p, d, o) < h.dist) { o.broken = 1; this.sendAll({ t: 'gl', id: o.id }); } // стёкла бьются
     }
     p.bloom = Math.min(W.maxB, (p.bloom || 0) + W.bloom);
     // выстрел пугает жителей рядом
@@ -327,7 +333,23 @@ export class World {
     }
     return { end: add(from, d, best), obj, pl, dist: best };
   }
-  breakCrate(o) { o.dead = true; this.sendAll({ t: 'cr', id: o.id }); for (let i = 0; i < 2; i++) this.dropNear(this.randLoot(this.rnd), o.p); if (this.rnd() < .5) this.dropNear({ k: 5, x: 0, r: 0, n: 5 + Math.floor(this.rnd() * 15) }, o.p); }
+  // повреждение предметов: ящик ломается, бочка взрывается, машина дымит, горит и взрывается
+  objHurt(o, by) {
+    if (o.type === 'crate') { if (o.hp <= 0) this.breakCrate(o); return; }
+    if (o.type === 'car' || o.type === 'truck') {
+      if (o.hp < OT[o.type].hp * .5 && !o.smoke && !o.burnt) { o.smoke = 1; this.sendAll({ t: 'ob', id: o.id, s: 1 }); }
+      if (o.hp <= 0 && !o.burnt) { o.burnt = 1; o.fixT = this.t + 180; this.sendAll({ t: 'ob', id: o.id, s: 2 }); this.explode(o.p, by, 130, 110); }
+      return; }
+    if (o.type === 'barrel' && o.hp <= 0 && !o.dead) { o.dead = true; o.fixT = this.t + 120; this.sendAll({ t: 'cr', id: o.id, boom: 1 }); this.explode(o.p, by, 110, 95); }
+  }
+  // взрыв: урон по радиусу, цепная реакция бочек и машин, ящики разлетаются
+  explode(c, by, R, dmg) {
+    this.sendAll({ t: 'boom', p: [Math.round(c[0]), Math.round(c[1])], r: R });
+    for (const e of this.ents) if (e && e.alive) { const d = dist(e.p, c); if (d < R) { const k = 1 - d / R; this.damage(e, dmg * k * k + 8, by && by.alive !== undefined ? by : null, 0); if (e.kind === 'r') e.panic = this.t + 10; } }
+    for (const r of this.ents) if (r && r.alive && r.kind === 'r' && dist(r.p, c) < 500) r.panic = Math.max(r.panic || 0, this.t + 6);
+    for (const o of nearObjs(this.objs, c, R)) { if (o.dead || !(o.hp > 0) || dist(o.p, c) > R * .8) continue; if (o.type === 'barrel' || o.type === 'crate') { o.hp = 0; (this.later = this.later || []).push([this.t + .15 + this.rnd() * .2, o, by]); } else if ((o.type === 'car' || o.type === 'truck') && !o.burnt) { o.hp -= dmg * .8; (this.later = this.later || []).push([this.t + .3, o, by]); } }
+  }
+  breakCrate(o) { o.dead = true; o.fixT = this.t + 150; this.sendAll({ t: 'cr', id: o.id }); for (let i = 0; i < 2; i++) this.dropNear(this.randLoot(this.rnd), o.p); if (this.rnd() < .5) this.dropNear({ k: 5, x: 0, r: 0, n: 5 + Math.floor(this.rnd() * 15) }, o.p); }
   damage(v, dmg, by, w) {
     if (!v.alive) return;
     if (v.armor > 0) { const a = Math.min(v.armor, dmg * .6); v.armor -= a; dmg -= a; }
@@ -496,8 +518,12 @@ export class World {
     if (!target) return;
     let mv = dirTo(e.p, this.nav(e, target)); if (dist(e.p, target) < 4) return;
     if (e.stuck > 0) { mv = norm(add(mv, perp(mv), e.side * 1.6)); e.stuck--; }
-    const np = stepMove(this.objs, e.p, mv, speed);
-    if (dist(np, e.p) < SPEED * DT * speed * .3) { e.stuck = 12; if (this.rnd() < .3) e.side *= -1; } e.p = np;
+    // плавно: разгон и поворот по дуге (боты не дёргаются)
+    if (this.tick - (e.mvTick || 0) > 2) { e.spd = 0; e.mvd = mv; } e.mvTick = this.tick;
+    { const m = lerp(e.mvd || mv, mv, e.stuck > 0 ? .7 : .38); e.mvd = len(m) > .05 ? norm(m) : mv; }
+    e.spd = (e.spd || 0) + (speed - (e.spd || 0)) * .3;
+    const np = stepMove(this.objs, e.p, e.mvd, e.spd); mv = e.mvd;
+    if (e.spd > speed * .6 && dist(np, e.p) < SPEED * DT * e.spd * .3) { e.stuck = 12; if (this.rnd() < .3) e.side *= -1; } e.p = np;
     if (!e.fight) e.aim = norm(lerp(e.aim, mv, .2));
   }
   agentStep(a) {

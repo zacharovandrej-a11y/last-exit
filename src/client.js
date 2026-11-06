@@ -32,7 +32,7 @@ const sectCol = s => s >= 0 ? SECTS[s].col : '#c8c8c8';
 // ===== ввод =====
 const keys = {}; let mouse = { x: 0, y: 0, down: false, used: false }, sticks = { L: null, R: null, F: null }, touchUI = false, aimT = 0;
 const fireOn = () => touchUI && myId !== 255 && alive && predP && !shopOpen;
-let wantAct2 = false, des = [0, 0, 0, 0];
+let mvS = [0, 0], wantAct2 = false, des = [0, 0, 0, 0];
 let wantSlot = -1, wantReload = false, wantHeal = false, wantAct = false, bigMap = false;
 addEventListener('keydown', e => { if (document.activeElement && document.activeElement.tagName === 'INPUT') return; keys[e.code] = 1;
   if (e.code === 'Escape') { if (shopOpen) shopOpen = false; else menuOpen = started && !menuOpen; return; }
@@ -114,7 +114,10 @@ function sfx(type, vol = 1) {
       const s = A.createBufferSource(); s.buffer = sound.noise; const f = A.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = [0, 2600, 1700, 900, 3800, 3200, 2000, 1500, 1200, 2400][type];
       s.connect(f); f.connect(g); const d = [0, .09, .1, .22, .35, .06, .2, .09, .18, .08][type]; g.gain.setValueAtTime(.35 * vol, now); g.gain.exponentialRampToValueAtTime(.001, now + d); s.start(now); s.stop(now + d);
       const o = A.createOscillator(), g2 = A.createGain(); o.type = 'sine'; o.connect(g2); g2.connect(A.destination); o.frequency.setValueAtTime(type === 3 || type === 4 ? 110 : 150, now); o.frequency.exponentialRampToValueAtTime(40, now + .12); g2.gain.setValueAtTime(.45 * vol, now); g2.gain.exponentialRampToValueAtTime(.001, now + .14); o.start(now); o.stop(now + .15); // удар
-    } else { const o = A.createOscillator(); o.type = type === 'hit' ? 'square' : 'sine'; o.connect(g);
+    } else if (type === 'boom' || type === 'glass') { const bm = type === 'boom', s = A.createBufferSource(); s.buffer = sound.noise; const f = A.createBiquadFilter(); f.type = bm ? 'lowpass' : 'highpass'; f.frequency.value = bm ? 420 : 3200; s.connect(f); f.connect(g); const d = bm ? 1.1 : .18;
+      g.gain.setValueAtTime((bm ? .9 : .25) * vol, now); g.gain.exponentialRampToValueAtTime(.001, now + d); s.start(now); s.stop(now + d);
+      if (bm) { const o = A.createOscillator(), g2 = A.createGain(); o.connect(g2); g2.connect(A.destination); o.frequency.setValueAtTime(70, now); o.frequency.exponentialRampToValueAtTime(25, now + .6); g2.gain.setValueAtTime(.8 * vol, now); g2.gain.exponentialRampToValueAtTime(.001, now + .7); o.start(now); o.stop(now + .7); } }
+    else { const o = A.createOscillator(); o.type = type === 'hit' ? 'square' : 'sine'; o.connect(g);
       const [f0, f1, d, v] = { hit: [900, 600, .05, .06], kill: [660, 1320, .25, .15], pick: [520, 880, .1, .08], dead: [400, 80, .6, .15], win: [520, 1560, .8, .15], bad: [300, 200, .25, .1] }[type];
       o.frequency.setValueAtTime(f0, now); o.frequency.exponentialRampToValueAtTime(f1, now + d); g.gain.setValueAtTime(v * vol, now); g.gain.exponentialRampToValueAtTime(.001, now + d); o.start(now); o.stop(now + d); }
   } catch (e) { }
@@ -132,7 +135,7 @@ function toast(s, c) { toasts.unshift({ s, c: c || '#fff', t: 0 }); toasts.lengt
 function setNames(a) { for (const [id, n, ch, k, pc] of a) { names[id] = { n, ch, k, pc: pc || 0 }; delete ents[id]; } }
 let svc = { st: 0, end: 0, n: 0 }; const wits = {}; // болтуны, бегущие рассказывать про меня: id -> {p, t}
 function onJson(m) {
-  if (m.t === 'w') { myId = m.me; names = {}; setNames(m.ents); loot = new Map(); for (const a of m.loot) addLootArr(a); for (const id of m.dead) if (objs[id]) { objs[id].dead = true; G3.killObj(id); } ents = {}; pending = []; predP = null; dead = null; }
+  if (m.t === 'w') { myId = m.me; names = {}; setNames(m.ents); loot = new Map(); for (const a of m.loot) addLootArr(a); for (const id of m.dead) if (objs[id]) { objs[id].dead = true; G3.killObj(id); } for (const [id, s] of m.ob || []) G3.objState(id, s, objs); for (const id of m.gl || []) if (objs[id]) { objs[id].broken = true; G3.breakGlass(id, objs); } ents = {}; pending = []; predP = null; dead = null; }
   else if (m.t === 'e') setNames(m.a);
   else if (m.t === 'wit') wits[m.id] = { p: m.p, t: performance.now(), i: m.i || '🗣' };
   else if (m.t === 'des') { des[m.s] = m.T ? performance.now() + m.T * 1000 : 0; const cb = objs.blds[(objs.churches || HQ)[m.s]]; if (cb && cb.altar !== undefined) G3.altarBroken(cb.altar, !!m.T, objs); }
@@ -142,11 +145,16 @@ function onJson(m) {
   else if (m.t === 'svc') svc = { st: m.st, end: performance.now() + m.T * 1000, n: m.n };
   else if (m.t === 'm') { toast(m.s, m.c); if (m.s.startsWith('✔')) sfx('win', .6); else if (m.s.startsWith('⚠') || m.s.startsWith('🚪') || m.s.startsWith('✖')) sfx('bad'); else sfx('pick', .6); }
   else if (m.t === 'l') { if (m.a) for (const a of m.a) addLootArr(a); if (m.d) for (const id of m.d) loot.delete(id); }
-  else if (m.t === 'cr') { const o = objs[m.id]; if (o) { o.dead = true; G3.killObj(m.id); sfx(3, vol(o.p) * .7); } }
+  else if (m.t === 'cr') { const o = objs[m.id]; if (o) { o.dead = true; G3.killObj(m.id); if (!m.boom) { sfx(3, vol(o.p) * .7); G3.debris(o.p, 14, 12, 0x8a6a40, 110, 3.2); } } }
+  else if (m.t === 'rv') { const o = objs[m.id]; if (o) { o.dead = false; G3.reviveObj(m.id); } }
+  else if (m.t === 'ob') G3.objState(m.id, m.s, objs);
+  else if (m.t === 'boom') { G3.boom(m.p, m.r); sfx('boom', vol(m.p)); }
+  else if (m.t === 'gl') { const o = objs[m.id]; if (o) { o.broken = true; G3.breakGlass(m.id, objs); sfx('glass', vol(o.p) * .8); } }
   else if (m.t === 'k') {
     feed.unshift({ t: performance.now(), k: m.k, v: m.v, w: m.w }); feed.length = Math.min(feed.length, 4);
     const e = ents[m.v]; const p = e ? e.disp || e.h[e.h.length - 1].p : null;
-    if (p) { fx.push({ type: 'death', p, v: m.v, aim: e && e.h.length ? e.h[e.h.length - 1].aim : null, t: 0, ch: names[m.v] ? names[m.v].ch : 0, sect: e ? e.sect : -1, wb: e && e.h.length ? e.h[e.h.length - 1].wb & 127 : 0 }); G3.bloodAt(p, 10, true); }
+    const kp = m.k >= 0 ? (m.k === myId && predP ? predP : ents[m.k] && ents[m.k].disp) : null;
+    if (p) { fx.push({ type: 'death', fall: kp && dist(kp, p) > 1 ? norm(sub(p, kp)) : null, p, v: m.v, aim: e && e.h.length ? e.h[e.h.length - 1].aim : null, t: 0, ch: names[m.v] ? names[m.v].ch : 0, sect: e ? e.sect : -1, wb: e && e.h.length ? e.h[e.h.length - 1].wb & 127 : 0 }); G3.bloodAt(p, 10, true); }
     if (m.k === myId && myId !== 255) sfx('kill');
     delete ents[m.v];
   } else if (m.t === 'say') { says[m.id] = { s: m.s, t: performance.now() }; }
@@ -208,7 +216,10 @@ function readMove() {
 }
 function localTick() {
   if (menuOpen || !alive || myId === 255 || !predP) return;
-  const mv = shopOpen ? [0, 0] : readMove();
+  const mv0 = shopOpen ? [0, 0] : readMove();
+  // разгон и торможение: вход сглаживается (сервер получает уже плавный вектор — предсказание совпадает)
+  { const k = len(mv0) > len(mvS) ? .42 : .5; mvS = [mvS[0] + (mv0[0] - mvS[0]) * k, mvS[1] + (mv0[1] - mvS[1]) * k]; if (len(mvS) < .04 && len(mv0) < .01) mvS = [0, 0]; }
+  const mv = mvS;
   let aim = null, fire = false;
   if (sticks.R) { const v = stickVec(sticks.R); if (v[2] > .15) { aim = scr2map(v[0], v[1]); aimT = performance.now(); } }
   if (sticks.F) { fire = true; const v = stickVec(sticks.F); if (v[2] > .3) { aim = scr2map(v[0], v[1]); aimT = performance.now(); }
@@ -278,10 +289,10 @@ function render(dt, now) {
     const s = q.s, hurt = e.lastHp !== undefined && s.hp < e.lastHp; e.lastHp = s.hp; if (hurt) e.hitT = .1; e.hitT = (e.hitT || 0) - dt; e.fireT = (e.fireT || 0) - dt;
     const aim = len(q.aim) > .05 ? norm(q.aim) : [0, 1];
     const ch = names[id] ? names[id].ch : 100;
-    list.push({ id: +id, ch, p: q.p, aim, wb: s.wb, walk: e.walk, moving: e.mvT > 0, hit: e.hitT > 0, armor: s.fl & 2, fire: e.fireT > .04, sect: e.sect });
+    list.push({ id: +id, ch, p: q.p, aim, hp: s.hp, wb: s.wb, walk: e.walk, moving: e.mvT > 0, hit: e.hitT > 0, armor: s.fl & 2, fire: e.fireT > .04, sect: e.sect });
     labels.push({ id: +id, p: q.p, hp: s.hp, heal: s.fl & 8, sect: e.sect, talk: e.talk, k: names[id] ? names[id].k : 2 });
   }
-  for (const f of fx) { f.t += dt; if (f.type === 'death' && f.t < 12) list.push({ id: 300 + (f.n || (f.n = ++corpseN % 200)), ch: f.ch, p: f.p, aim: f.aim && len(f.aim) > .05 ? norm(f.aim) : [0, 1], wb: f.wb, walk: 0, dead: true, deadT: f.t, sect: f.sect }); }
+  for (const f of fx) { f.t += dt; if (f.type === 'death' && f.t < 12) list.push({ id: 300 + (f.n || (f.n = ++corpseN % 200)), ch: f.ch, p: f.p, fall: f.fall, aim: f.aim && len(f.aim) > .05 ? norm(f.aim) : [0, 1], wb: f.wb, walk: 0, dead: true, deadT: f.t, sect: f.sect }); }
   fx = fx.filter(f => f.t < 12);
   for (const t of tracers) { t.t += dt; if (!t.from) { const e = t.sid === myId && predP ? predP : ents[t.sid] && ents[t.sid].disp; t.from = e || t.end; if (ents[t.sid]) ents[t.sid].fireT = .1; } }
   const inB = target ? bldAt(objs.blds, target) : -1;

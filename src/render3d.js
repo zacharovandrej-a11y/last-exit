@@ -215,6 +215,7 @@ void main(){
     }
     buildBuildings(objs);
     for (const [id, ob] of brokenOn) if (ob) altarBroken(id, true, ob);
+    for (const k in objCol) delete objCol[k]; for (const [id, b] of burning) if (b.s === 2) darken(id);
   }
   // ===== здания =====
   // процедурные текстуры (серые — цвет задаёт оттенок экземпляра)
@@ -256,7 +257,7 @@ void main(){
   };
   const FLOOR = { wood: ['fwood', 0x9a7350], tile: ['tile', 0xb8b4aa], concrete: ['floorc', 0x99968e], dirt: ['dirt', 0x8a7556] };
   const ROOFC = [0x7e3a2c, 0x4a4f57, 0x6b4a3a, 0x5b4636, 0x8a4a34];
-  const bInst = {}, bParts = []; let insideB = -1; const deco = {};
+  const bInst = {}, bParts = []; let insideB = -1; const deco = {}; const glassPlan = [], glassIdx = []; let glassMesh = null;
   // вывеска с текстом: всегда повёрнута к камере, чтобы читалась
   function sign(bid, wp, y, w, h, lines, bg, fg, frame) {
     const c = document.createElement('canvas'), k = 6; c.width = w * k; c.height = h * k; const g = c.getContext('2d');
@@ -312,7 +313,7 @@ void main(){
   }
   function buildBuildings(objs) {
     for (const k in bInst) { scene.remove(bInst[k].mesh); if (bInst[k].mesh.userData.outline) scene.remove(bInst[k].mesh.userData.outline); delete bInst[k]; }
-    bParts.length = 0; insideB = -1; for (const k in deco) { deco[k].forEach(m => scene.remove(m)); delete deco[k]; }
+    bParts.length = 0; insideB = -1; glassPlan.length = 0; if (glassMesh) { scene.remove(glassMesh); glassMesh = null; } glassIdx.length = 0; for (const k in deco) { deco[k].forEach(m => scene.remove(m)); delete deco[k]; }
     const plan = {}, Y = new T.Vector3(0, 1, 0), ONE = new T.Vector3(1, 1, 1);
     for (const b of objs.blds || []) {
       const K = BKIND[b.kind], S = BSTY[K.style], base = new T.Matrix4().compose(new T.Vector3(b.p[0], 0, b.p[1]), new T.Quaternion().setFromAxisAngle(Y, -b.a), ONE);
@@ -342,8 +343,11 @@ void main(){
         if (!K.church) pcs.push([geo.box, 'metal', 24, 0x9a9a92, M(b.w * .22, WALLH + 7, -b.h * .15, 22, 10, 16), 'roof']); }
       if (K.church !== undefined) churchDeco(b, K, pcs);
       bParts[b.id] = [];
+      if (!K.slit) for (const id of b.walls) { const o = objs[id]; if (!o.win) continue; glassPlan.push([o.id, b.id, base.clone().multiply(M(o.lx, 37, o.ly, o.hor ? o.len : 1.2, 26, o.hor ? 1.2 : o.len))]); }
       for (const [g, tx, sc, col, lm, role, low] of pcs) { const key = g.uuid + '|' + tx + '|' + sc + '|' + (role === 'floor' ? 'f' : 'w'); (plan[key] = plan[key] || { g, tx, sc, items: [] }).items.push([b.id, col, base.clone().multiply(lm), role, low ? base.clone().multiply(low) : null]); }
     }
+    if (glassPlan.length) { glassMesh = new T.InstancedMesh(geo.box, new T.MeshLambertMaterial({ color: 0xbfe4ff, transparent: true, opacity: .32, depthWrite: false }), glassPlan.length); glassMesh.frustumCulled = false;
+      glassPlan.forEach(([oid, bid, m], i) => { glassIdx[oid] = [i, m, bid]; glassMesh.setMatrixAt(i, objs[oid].broken ? zero : m); }); scene.add(glassMesh); }
     for (const key in plan) {
       const { g, tx, sc, items } = plan[key];
       const mesh = new T.InstancedMesh(g, texMat(tx, sc), items.length); mesh.frustumCulled = false; mesh.castShadow = !key.endsWith('f'); mesh.receiveShadow = true;
@@ -358,6 +362,7 @@ void main(){
     const set = (id, open) => { for (const [mesh, i, m, role, low] of bParts[id] || []) { mesh.setMatrixAt(i, !open || role === 'floor' || role === 'prop' ? m : low || zero); mesh.instanceMatrix.needsUpdate = true; } };
     if (insideB >= 0) set(insideB, false); insideB = bid; if (bid >= 0) set(bid, true);
     for (const k in deco) for (const m of deco[k]) m.visible = +k !== bid;
+    if (glassMesh) { for (const oid in glassIdx) { const [i, m, b] = glassIdx[oid]; glassMesh.setMatrixAt(i, b === bid || glassBroken.has(+oid) ? zero : m); } glassMesh.instanceMatrix.needsUpdate = true; }
   }
   // осквернённый алтарь: сам алтарь скрыт, вместо него обломки, красная надпись на полу
   const broken = {};
@@ -372,6 +377,56 @@ void main(){
       scene.add(g); broken[id] = g; }
     broken[id].visible = on;
   }
+  // ===== живой мир: стёкла, обломки, взрывы, горящие машины, предметы качаются от попаданий =====
+  const glassBroken = new Set();
+  const debris = []; for (let i = 0; i < 90; i++) { const m = new T.Mesh(geo.box, new T.MeshLambertMaterial({ color: 0xffffff })); m.visible = false; m.userData = { t: 9, v: new T.Vector3(), w: new T.Vector3() }; scene.add(m); debris.push(m); }
+  let debI = 0;
+  function debrisAt(v, n, col, sp = 90, size = 2.4) { for (let k = 0; k < n; k++) { const m = debris[debI++ % debris.length], u = m.userData; m.position.copy(v); m.material.color.setHex(col); const s = size * (.6 + Math.random() * .8); m.scale.set(s, s * (.4 + Math.random() * .6), s); u.v.set((Math.random() - .5) * sp * 2, sp * (.5 + Math.random()), (Math.random() - .5) * sp * 2); u.w.set(Math.random() * 12, Math.random() * 12, 0); u.t = 0; m.visible = true; } }
+  function breakGlass(id, objs) { glassBroken.add(id); const g = glassIdx[id]; if (glassMesh && g) { glassMesh.setMatrixAt(g[0], zero); glassMesh.instanceMatrix.needsUpdate = true; } const o = objs[id]; if (o) debrisAt(at(o.p, 36), 10, 0xcfeeff, 60, 1.8); }
+  const wob = new Map(); // id -> t
+  const WOBBLY = { crate: .16, barrel: .2, car: .04, truck: .03, tree: .05, pine: .05, bush: .12, fence: .1, ifence: .08, grave: .06, billboard: .05, antenna: .15, dish: .15, junk: .12, deadtree: .06 };
+  const MATC = { car: 0xffd080, truck: 0xffd080, barrel: 0xffd080, crate: 0x8a6a40, fence: 0x8a6a40, tree: 0x4a6b2a, pine: 0x2f5233, bush: 0x4a6b2a };
+  function hitNear(objs, end) { let best = null, bd = 30; for (const o of nearObjs(objs, end, 40)) { if (o.dead || !WOBBLY[o.type]) continue; const d = Math.max(0, dist(o.p, end) - o.rad); if (d < bd) { bd = d; best = o; } } if (!best) return;
+    wob.set(best.id, 0); if (MATC[best.type]) debrisAt(at(end, 18), 3, MATC[best.type], 50, 1.4); }
+  function reviveObj(id) { for (const [mesh, i, m] of objIdx[id] || []) { mesh.setMatrixAt(i, m); mesh.instanceMatrix.needsUpdate = true; } }
+  // взрыв: вспышка, огненный шар, дым, обломки, подпалина
+  const fires = [], burning = new Map(); // burning: id -> {p, s, t}
+  let scT = null; const scorchTex = () => scT || (scT = cvTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 2, 32, 32, 32); gr.addColorStop(0, 'rgba(15,10,6,.95)'); gr.addColorStop(.6, 'rgba(25,18,10,.6)'); gr.addColorStop(1, 'rgba(25,18,10,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); }));
+  const scorch = []; const mkScorch = () => { if (scorch.length) return; for (let i = 0; i < 12; i++) { const m = new T.Mesh(poolGeo, new T.MeshBasicMaterial({ map: scorchTex(), transparent: true, opacity: .8, depthWrite: false })); m.visible = false; m.userData = { t: 99 }; scene.add(m); scorch.push(m); } };
+  let scI = 0;
+  function boom(p, r) {
+    flashAt(at(p, 20), r * 1.6); flashAt(at(p, 40), r * 1.1);
+    fires.push({ p, t: 0, life: .7, n: 10, r });
+    for (let k = 0; k < 6; k++) { const sm = smokes.find(x => x.userData.t > 2.5); if (sm) { sm.userData.t = Math.random() * .5; sm.userData.p = [p[0] + (Math.random() - .5) * r * .5, p[1] + (Math.random() - .5) * r * .5]; sm.visible = true; } }
+    debrisAt(at(p, 12), 16, 0x2a2622, 160, 3); debrisAt(at(p, 12), 8, 0xff9a30, 120, 1.6);
+    mkScorch(); const m = scorch[scI++ % scorch.length]; m.position.set(p[0], .95, p[1]); m.scale.set(r * .9, 1, r * .9); m.rotation.y = Math.random() * 6; m.userData.t = 0; m.material.opacity = .7; m.visible = true;
+  }
+  // машины: 1 — дымит, 2 — сгорела (чёрная, горит), 0 — как новая
+  const objCol = {};
+  function darken(id) { if (objCol[id] || !objIdx[id]) return; objCol[id] = []; for (const [mesh, i] of objIdx[id]) { const c = new T.Color(); mesh.getColorAt(i, c); objCol[id].push(c.getHex()); mesh.setColorAt(i, new T.Color(0x1e1b18)); mesh.instanceColor.needsUpdate = true; } }
+  function objState(id, s, objs) {
+    const o = objs[id]; if (!o) return;
+    if (s === 2) { darken(id); burning.set(id, { p: o.p, s, t: 0 }); }
+    else if (false) { for (const [mesh, i] of objIdx[id] || []) { if (!objCol[id]) objCol[id] = []; const c = new T.Color(); mesh.getColorAt(i, c); objCol[id].push(c.getHex()); mesh.setColorAt(i, new T.Color(0x1e1b18)); mesh.instanceColor.needsUpdate = true; } burning.set(id, { p: o.p, s, t: 0 }); }
+    else if (s === 1) burning.set(id, { p: o.p, s, t: 0 });
+    else { const cs = objCol[id]; if (cs) (objIdx[id] || []).forEach(([mesh, i], k) => { mesh.setColorAt(i, new T.Color(cs[k])); mesh.instanceColor.needsUpdate = true; }); delete objCol[id]; burning.delete(id); }
+  }
+  const wobM = new T.Matrix4(), wobA = new T.Matrix4(), wobB = new T.Matrix4();
+  function worldFx(dt, now, objs) {
+    for (const m of debris) { if (!m.visible) continue; const u = m.userData; u.t += dt; if (u.t > 2.5) { m.visible = false; continue; } if (m.position.y > .8) { u.v.y -= 320 * dt; m.position.addScaledVector(u.v, dt); m.rotation.x += u.w.x * dt; m.rotation.y += u.w.y * dt; if (m.position.y < .8) { m.position.y = .8; u.v.multiplyScalar(.3); u.v.y = Math.abs(u.v.y) * .4; } } }
+    for (const m of scorch) { if (!m.visible) continue; m.userData.t += dt; if (m.userData.t > 40) m.material.opacity = Math.max(0, .7 - (m.userData.t - 40) / 8); if (m.userData.t > 48) m.visible = false; }
+    for (const [id, t] of wob) { const o = objs[id], k = Math.sin(t * 34) * Math.exp(-t * 7) * WOBBLY[o.type]; const nt = t + dt; if (nt > .6 || o.dead) { wob.delete(id); for (const [mesh, i, m] of objIdx[id] || []) { if (!o.dead) mesh.setMatrixAt(i, m); mesh.instanceMatrix.needsUpdate = true; } continue; } wob.set(id, nt);
+      wobA.makeTranslation(o.p[0], 0, o.p[1]); wobB.makeTranslation(-o.p[0], 0, -o.p[1]); wobM.makeRotationAxis(new T.Vector3(o.v[0], 0, o.v[1]).normalize(), k);
+      for (const [mesh, i, m] of objIdx[id] || []) { mesh.setMatrixAt(i, wobA.clone().multiply(wobM).multiply(wobB).multiply(m)); mesh.instanceMatrix.needsUpdate = true; } }
+    // огонь: взрывы и горящие машины (пул языков пламени)
+    let fi = 0; const put = (x, y, z, sx, sy) => { if (fi >= flames.length) return; const s = flames[fi++]; s.position.set(x, y, z); s.scale.set(sx, sy, 1); s.visible = true; };
+    for (const f of fires) { f.t += dt; const k = f.t / f.life; if (k >= 1) continue; for (let i = 0; i < f.n; i++) { const a = i * 2.4, rr = f.r * .35 * Math.sqrt(k + .1) * ((i % 3) / 3 + .4); put(f.p[0] + Math.cos(a) * rr, k * 30 * (i % 2), f.p[1] + Math.sin(a) * rr, f.r * .55 * (1 - k * .6), f.r * .9 * (1 - k * .5)); } }
+    for (let i = fires.length - 1; i >= 0; i--) if (fires[i].t > fires[i].life) fires.splice(i, 1);
+    for (const [id, b] of burning) { b.t += dt; if (b.s === 2 && b.t < 25 && Math.abs(b.p[0] - camP_[0]) < 900 && Math.abs(b.p[1] - camP_[1]) < 900) for (let i = 0; i < 4; i++) { const f = .75 + .3 * Math.sin(now / 80 + i * 1.9 + id); put(b.p[0] + (i - 1.5) * 12, 18, b.p[1] + Math.sin(i * 2.1) * 8, 22 * f, 38 * f); }
+      if (Math.random() < dt * (b.s === 2 ? 4 : 2.2)) { const sm = smokes.find(x => x.userData.t > 2.5); if (sm) { sm.userData.t = 0; sm.userData.p = [b.p[0] + (Math.random() - .5) * 20, b.p[1] + (Math.random() - .5) * 20]; sm.visible = true; } } }
+    return fi;
+  }
+  let camP_ = [0, 0];
   function killObj(id) { for (const [mesh, i] of objIdx[id] || []) { mesh.setMatrixAt(i, zero); mesh.instanceMatrix.needsUpdate = true; } }
 
   // ===== персонажи: реалистичные солдаты =====
@@ -527,18 +582,53 @@ void main(){
     else if (s === 2) add_(u.head, geo.cone7, 0xdfe3e8, 0, 6.4, 0, 4.4, 9, 4.4); // шапочка из фольги
     else if (s === 3) { add_(u.body, geo.box, 0x2f6ad8, 0, 32, 4.6, 13, 15, 1); add_(u.body, geo.box, 0xfafaf4, 0, 32, 5.2, 11, 13, .6); add_(u.body, geo.box, 0x2f6ad8, 0, 32, -4.6, 13, 15, 1); add_(u.body, geo.box, 0xd23a3a, 0, 33, 5.6, 7, 2, .4); } // плакат-бутерброд
   }
+  let curDT = .016, curNow = 0;
+  const angD = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
   function poseChar(c, p, aim, walk, opt = {}) {
-    c.position.set(p[0], opt.alt || 0, p[1]); c.rotation.set(0, Math.atan2(aim[0], aim[1]), 0);
-    const u = c.userData, s = Math.sin(walk), moving = opt.moving;
-    u.legL.rotation.x = moving ? s * .6 : 0; u.legR.rotation.x = moving ? -s * .6 : 0;
-    u.kneeL.rotation.x = moving ? Math.max(0, -s) * .9 : 0; u.kneeR.rotation.x = moving ? Math.max(0, s) * .9 : 0;
-    u.body.position.y = moving ? Math.abs(Math.cos(walk)) * 1.2 : 0;
-    u.vest.visible = !!opt.armor;
-    const hit = opt.hit ? 1 : 0; u.mats.shirt.emissive.setScalar(hit * .6); u.mats.skin.emissive.setScalar(hit * .6);
-    u.body.rotation.x = opt.dead ? 0 : -hit * .3; // попадание — откидывает назад
-    u.gunHold.position.z = opt.fire ? 5 : 8; // отдача
-    u.shadow.visible = !opt.alt;
+    const u = c.userData, dt = Math.min(.05, curDT), now = curNow / 1000, id = opt.id || 0;
+    if (!u.lp) { u.lp = [p[0], p[1]]; u.vx = u.vz = 0; u.yaw = Math.atan2(aim[0], aim[1]); u.amp = 0; u.fl = 0; u.rec = 0; u.wasHit = false; }
+    const dx = p[0] - u.lp[0], dz = p[1] - u.lp[1], jump = Math.hypot(dx, dz) > 60, kv = Math.min(1, dt * 9);
+    u.vx += ((jump ? 0 : dx / Math.max(dt, 1e-3)) - u.vx) * kv; u.vz += ((jump ? 0 : dz / Math.max(dt, 1e-3)) - u.vz) * kv; u.lp = [p[0], p[1]];
+    const spd = Math.hypot(u.vx, u.vz), tgt = Math.atan2(aim[0], aim[1]);
+    if (opt.dead) u.yaw = tgt; else if (jump) u.yaw = tgt; else u.yaw += angD(u.yaw, tgt) * Math.min(1, dt * (opt.fire ? 28 : 12)); // корпус поворачивается плавно
+    c.position.set(p[0], opt.alt || 0, p[1]); c.rotation.set(0, u.yaw, 0);
+    const sy = Math.sin(u.yaw), cy = Math.cos(u.yaw), fwd = u.vx * sy + u.vz * cy, side = u.vx * cy - u.vz * sy;
+    const B = u.body, armed = (opt.wb & 15) > 0;
+    // сброс позы
+    B.position.set(0, 0, 0); B.rotation.set(0, 0, 0); u.head.rotation.set(0, 0, 0);
+    u.vest.visible = !!opt.armor; u.shadow.visible = !opt.alt;
     if (u.civ && !u.sectLook) sectAcc(c, opt.sect ?? -1);
+    if (opt.dead) { // смерть: подкашиваются колени, падает от выстрела, отскок, руки разлетаются
+      const t = opt.deadT || 0, f = opt.fall || [-sy, -cy], lf = f[0] * sy + f[1] * cy, lr = f[0] * cy - f[1] * sy;
+      const kb = Math.min(1, t / .16), k = Math.max(0, Math.min(1, (t - .1) / .36)), e = 1 - Math.pow(1 - k, 3);
+      const ang = 1.52 * e + (t > .46 ? Math.sin((t - .46) * 16) * Math.exp(-(t - .46) * 7) * .1 : 0);
+      B.rotation.x = ang * lf; B.rotation.z = -ang * lr; B.rotation.y = ((id % 3) - 1) * .5 * e; B.position.y = -kb * 3 * (1 - e);
+      const sl = Math.min(1, t / .4); c.position.x += f[0] * (1 - Math.pow(1 - sl, 2)) * 12; c.position.z += f[1] * (1 - Math.pow(1 - sl, 2)) * 12;
+      u.kneeL.rotation.x = kb * 1.1 * (1 - e * .7); u.kneeR.rotation.x = kb * .8 * (1 - e * .6); u.legL.rotation.x = -kb * .5 * (1 - e) + e * .2; u.legR.rotation.x = -kb * .3 * (1 - e) - e * .15;
+      u.armL.rotation.set(-.6 - e * 1.4 * (id % 2 ? 1 : .4), 0, -.3 - e * .7); u.armR.rotation.set(-.4 - e * 1.1 * (id % 2 ? .5 : 1), 0, .3 + e * .8); u.elL.rotation.set(-.3, 0, 0); u.elR.rotation.set(-.4, 0, 0);
+      u.head.rotation.x = -e * .4 * lf; u.mats.shirt.emissive.setScalar(0); u.mats.skin.emissive.setScalar(0); u.gunHold.position.z = 8; return;
+    }
+    // походка: амплитуда от реальной скорости — шаг жителя и бег бойца отличаются
+    u.amp += (Math.min(1.2, spd / 150) * (opt.moving || spd > 25 ? 1 : 0) - u.amp) * Math.min(1, dt * 8);
+    const a = u.amp, ph = walk, s1 = Math.sin(ph), run = Math.max(0, (a - .55) / .65), limp = opt.hp !== undefined && opt.hp < 35 && a > .1;
+    const ampR = limp ? .45 : 1;
+    u.legL.rotation.x = s1 * (.55 + run * .3) * a; u.legR.rotation.x = -s1 * (.55 + run * .3) * a * ampR;
+    u.kneeL.rotation.x = (Math.max(0, -s1) * (.9 + run * .6) + run * .25) * a; u.kneeR.rotation.x = (Math.max(0, s1) * (.9 + run * .6) + run * .25) * a * ampR;
+    B.position.y = Math.abs(Math.cos(ph)) * (1.2 + run * 1.4) * a * (limp && s1 > 0 ? .3 : 1) + (a < .1 ? Math.sin(now * 2.2 + id) * .25 : 0);
+    B.rotation.y = s1 * .08 * a; // корпус качается в такт шагам
+    B.rotation.x = Math.max(-.12, Math.min(.22, fwd / SPEED * .2)) + run * .05; // наклон в беге
+    B.rotation.z = Math.max(-.14, Math.min(.14, -side / SPEED * .14)) + (limp ? Math.sin(ph) * .09 : 0);
+    if (!armed && u.civ) { // руки машут в противофазе ногам
+      u.armL.rotation.set(-s1 * (.5 + run * .4) * a, 0, -.12 - run * .1); u.armR.rotation.set(-.15 + s1 * (.5 + run * .4) * a, 0, .12 + run * .1);
+      u.elL.rotation.set(-.25 - run * .9 * a, 0, 0); u.elR.rotation.set(-.5 - run * .6 * a, 0, 0);
+      if (a < .1) u.head.rotation.y = Math.sin(now * .45 + id * 1.7) * .4; // стоит — оглядывается
+    }
+    // отдача и вздрагивание от попадания (откидывает назад)
+    if (opt.hit && !u.wasHit) u.fl = 1; u.wasHit = !!opt.hit; u.fl = Math.max(0, u.fl - dt * 5);
+    u.rec = opt.fire ? 1 : Math.max(0, u.rec - dt * 14);
+    const fl = u.fl * u.fl; B.rotation.x -= fl * .45 + u.rec * .05; u.head.rotation.x = -fl * .5; c.position.x -= sy * fl * 5; c.position.z -= cy * fl * 5;
+    u.gunHold.position.set(2.6, 32.5 + Math.sin(ph * 2) * .7 * a, 8 - u.rec * 3.5);
+    const em = fl * .7; u.mats.shirt.emissive.setRGB(em, em * .15, em * .1); u.mats.skin.emissive.setRGB(em, em * .15, em * .1);
   }
   // ===== лут =====
   const lootG = new Map();
@@ -637,6 +727,7 @@ void main(){
   function frame(st) {
     const { now, dt, objs, zone, plan, matchT, phase, loot, list, tracers, shipS, shipD, camP, inB, me, zoom } = st;
     { const z = zoom || 1; if (Math.abs(z - zoomCur) > .002) { zoomCur += (z - zoomCur) * Math.min(1, dt * 4); applyFrustum(); } }
+    curDT = dt || .016; curNow = now;
     meRing.visible = !!me; if (me) meRing.position.set(me[0], 1, me[1]);
     if (worldBuilt !== objs) { buildWorld(objs); worldBuilt = objs; }
     setInside(inB ?? -1);
@@ -652,8 +743,6 @@ void main(){
       if (!c || c.userData.ch !== e.ch) { if (c) scene.remove(c); c = chars[e.id] = makeChar(e.ch); c.userData.ch = e.ch; scene.add(c); }
       c.visible = true; setGun(c, e.wb); poseChar(c, e.p, e.aim, e.walk, e);
       if (e.fire && !c.userData.fired) { const tip = c.userData.gunHold.localToWorld(new T.Vector3(0, 0, 18)); flashAt(tip, 34); const rt = new T.Vector3(1, 0, 0).applyQuaternion(c.quaternion); shellAt(c.userData.gunHold.localToWorld(new T.Vector3(0, 2, 2)), rt); } c.userData.fired = e.fire;
-      if (e.dead) { c.userData.body.rotation.z = Math.min(1.57, e.deadT * 5) * (e.id % 2 ? 1 : -1); c.userData.body.position.y = 0; }
-      else c.userData.body.rotation.z = 0;
       // парашют
       if (e.alt) { if (!c.userData.chute) { const ch = new T.Group(); for (let i = 0; i < 6; i++) { const seg = new T.Mesh(new T.SphereGeometry(24, 6, 4, i * Math.PI / 3, Math.PI / 3, 0, Math.PI / 2), lam(i % 2 ? 0xd8d4c8 : CAMO[e.ch % 10][0])); ch.add(seg); } ch.position.y = 64; c.add(ch); c.userData.chute = ch; } c.userData.chute.visible = true; }
       else if (c.userData.chute) c.userData.chute.visible = false;
@@ -666,7 +755,7 @@ void main(){
       if (ti >= tracerPool.length) break; const l = tracerPool[ti++]; const a = l.geometry.attributes.position;
       a.setXYZ(0, t.from[0], 24, t.from[1]); a.setXYZ(1, t.end[0], 24, t.end[1]);
       a.needsUpdate = true; l.material.opacity = Math.max(0, 1 - t.t / .12); l.material.color.set((t.wb & 15) === 4 ? 0xffffff : 0xffe066); l.visible = true;
-      if (t.t < dt * 1.5) { if (t.wb & 128) bloodAt(t.end); else { flashAt(at(t.end, 24), 10); puffAt(at(t.end, 22)); } }
+      if (t.t < dt * 1.5) { if (t.wb & 128) bloodAt(t.end); else { flashAt(at(t.end, 24), 10); puffAt(at(t.end, 22)); hitNear(objs, t.end); } }
     }
     for (; ti < tracerPool.length; ti++) tracerPool[ti].visible = false;
     for (const s of sprays) { if (!s.visible) continue; const u = s.userData; u.t += dt; if (u.t > .5 || s.position.y < 1) { s.visible = false; continue; } u.v.y -= 260 * dt; s.position.addScaledVector(u.v, dt); }
@@ -675,7 +764,7 @@ void main(){
     for (const s of puffs) { if (!s.visible) continue; s.userData.t += dt; const k = s.userData.t / .45; if (k >= 1) { s.visible = false; continue; } s.scale.setScalar(6 + k * 18); s.material.opacity = .8 * (1 - k); s.position.y += dt * 12; }
     for (const s of flashes) { if (!s.visible) continue; s.userData.t += dt; const k = 1 - s.userData.t / .09; if (k <= 0) s.visible = false; else s.scale.setScalar(s.userData.size * (.6 + .4 * k)); }
     // языки пламени вдоль фронта — только рядом с камерой
-    let fi = 0;
+    camP_ = camP; let fi = worldFx(dt, now, objs);
     if (phase >= 1 && !zone.pre && zone.rho > 2) {
       const c = zone.c, N = Math.min(4000, Math.max(16, Math.ceil(zone.rho * 6.2832 / 24)));
       for (let i = 0; i < N && fi < flames.length; i++) {
@@ -693,5 +782,5 @@ void main(){
     if (transport.visible) { const sp = add(shipS, shipD, SHIP_V * matchT); transport.position.set(sp[0], 250, sp[1]); transport.rotation.set(0, Math.atan2(shipD[0], shipD[1]), 0); }
     renderer.render(scene, camera);
   }
-  return { frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt, altarBroken };
+  return { frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt, altarBroken, breakGlass, reviveObj, boom, objState, debris: (p, h, n, col, sp, sz) => debrisAt(at(p, h), n, col, sp, sz) };
 })();

@@ -100,8 +100,8 @@ const BIOMES = [
 // shape: 0 круг, 1 прямоугольник; pass — пули пролетают; nc — не мешает ходить
 const OT = {
   tree: { s: 0 }, pine: { s: 0 }, rock: { s: 0 }, hay: { s: 0 }, cactus: { s: 0 }, snowman: { s: 0 },
-  house: { s: 0 }, car: { s: 1 }, truck: { s: 1 }, crate: { s: 0, hp: 45 }, wall: { s: 1 }, igloo: { s: 0 }, tent: { s: 1 },
-  bw: { s: 1 }, furn: { s: 1, pass: 1 }, barrel: { s: 0 }, fence: { s: 1, pass: 1 }, bush: { s: 0, nc: 1, pass: 1 },
+  house: { s: 0 }, car: { s: 1, hp: 160 }, truck: { s: 1, hp: 240 }, crate: { s: 0, hp: 45 }, wall: { s: 1 }, igloo: { s: 0 }, tent: { s: 1 },
+  bw: { s: 1 }, furn: { s: 1, pass: 1 }, barrel: { s: 0, hp: 30 }, fence: { s: 1, pass: 1 }, bush: { s: 0, nc: 1, pass: 1 },
   grave: { s: 1, pass: 1 }, deadtree: { s: 0 }, ifence: { s: 1, pass: 1 }, antenna: { s: 0, pass: 1 }, billboard: { s: 1 }, dish: { s: 0, pass: 1 }, junk: { s: 0 },
 };
 // здания: план из комнат (BSP-деление), двери между комнатами, окна (пули и взгляд проходят, человек — нет)
