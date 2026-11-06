@@ -38,6 +38,7 @@ export class World {
     this.objs = genWorld(); this.hq = sectHQ(this.objs);
     this.loot = new Map(); this.lootId = 1; this.lAdd = []; this.lDel = []; this.shots = [];
     this.ents = []; // все люди мира: игроки (h), агенты сект (a), жители (r); индекс = id
+    this.svc = [0, 1, 2, 3].map(s => ({ st: 0, T: 50 + s * 35, n: 0 })); // службы в церквях: 0 нет, 1 скоро, 2 идёт
     this.spawnWorld();
   }
   // ===== мир: жители по домам, агенты сект, лут =====
@@ -103,7 +104,7 @@ export class World {
         const p = this.newEnt(id, 'h', name, CH_SECT + s, s, this.spawnPt(s)); p.c = c; c.pl = p;
         p.slots[0] = { w: 1, r: 0, mag: 12 }; p.ammo = [36, 0, 0, 0]; p.meds = 1; p.money = 60; p.xp = 0; p.trust = 100; p.res = 10;
         this.send(c, { t: 'w', me: id, hq: this.hq, ents: this.ents.filter(Boolean).map(e => this.entArr(e)), loot: [...this.loot.values()].map(lootArr), dead: this.objs.filter(o => o.dead).map(o => o.id) });
-        this.sendAll({ t: 'e', a: [this.entArr(p)] }); this.score(true);
+        this.sendAll({ t: 'e', a: [this.entArr(p)] }); this.score(true); this.svcSend(p.sect, p);
         this.toast(p, 'Ты в секте «' + SECTS[s].n + '». Вербуй жителей!', SECTS[s].col);
       } else if (m.t === 'buy' && c.pl && c.pl.alive) this.buy(c.pl, m.i | 0);
       else if (m.t === 'quit') { this.clients.delete(c); this.leave(c); try { c.ws.close(1000, 'quit'); } catch (e) { } }
@@ -166,6 +167,7 @@ export class World {
     // пожертвования: раз в 20 с каждый завербованный тобой платит $1
     if (this.tick % (20 * TICK) === 0) for (const r of this.ents) if (r && r.kind === 'r' && r.alive && r.by >= 0) { const h = this.ents[r.by]; if (h && h.kind === 'h' && h.sect === r.sect) h.money += 1; }
     // новые жители вместо погибших
+    if (this.tick % TICK === 0) this.svcStep();
     if (this.tick % (15 * TICK) === 0) { const free = []; for (let i = ID_R; i < ID_R + NRES; i++) if (!this.ents[i] || !this.ents[i].alive) free.push(i); if (free.length) { const B = this.objs.blds.filter(b => !this.hq.includes(b.id)), b = B[Math.floor(this.rnd() * B.length)]; const e = this.addResident(free[0], b, Math.floor(this.rnd() * b.rooms.length)); this.sendAll({ t: 'e', a: [this.entArr(e)] }); } }
     if (this.tick % (2 * TICK) === 0) this.score();
     // голуби: пугаются бегущих людей и улетают; новых подсаживаем
@@ -202,6 +204,12 @@ export class World {
   // кнопка «действие»: вербовать ближайшего жителя, иначе подобрать
   useAction(p) {
     if (p.actT > 0) return;
+    // у алтаря: в чужой церкви — сменить веру, в своей — помолиться
+    if (p.kind === 'h') { const cb = this.altarNear(p.p, 50);
+      if (cb) { if (cb.sect !== p.sect) { p.act = -3; p.actT = 3; p.actDur = 3; p.prayS = cb.sect; p.relT = 0; p.healT = 0; this.toast(p, '🙏 Молишься у алтаря «' + SECTS[cb.sect].n + '»…', SECTS[cb.sect].col); }
+        else if (p.prayT > this.t) this.toast(p, '🙏 Ты уже молился — приходи позже или на службу', '#adb5bd');
+        else { p.act = -4; p.actT = 2; p.actDur = 2; p.relT = 0; p.healT = 0; }
+        return; } }
     // Тёмный Орден: ритуал — съесть голубя на людях; вербует сразу нескольких, остальные в ужасе
     if (p.kind === 'h' && p.sect === 1 && p.res > 0 && this.ents.some(r => r && r.kind === 'r' && r.alive && r.sect !== 1 && dist(r.p, p.p) < 140)) {
       p.actT = SECTS[1].rec; p.actDur = p.actT; p.act = -2; p.relT = 0; p.healT = 0;
@@ -218,6 +226,8 @@ export class World {
   }
   actStep(p) {
     if (p.act === -2) { p.actT -= DT; if (p.actT <= 0) this.ritual(p); return; }
+    if (p.act === -3 || p.act === -4) { const cb = this.altarNear(p.p, 75); if (!cb) { p.actT = 0; return; } p.aim = dirTo(p.p, this.objs[cb.altar].p); p.actT -= DT; if (p.actT > 0) return;
+      if (p.act === -3) this.convert(p, p.prayS); else { p.prayT = this.t + 90; p.trust = Math.min(100, p.trust + 8); p.xp += 5; this.toast(p, '🙏 Вера крепнет: доверие +8', SECTS[p.sect].col); } return; }
     const r = this.ents[p.act];
     if (!r || !r.alive || dist(r.p, p.p) > 75 || r.sect === p.sect) { p.actT = 0; return; }
     p.aim = dirTo(p.p, r.p); r.aim = dirTo(r.p, p.p); r.talkT = this.t + .5;
@@ -244,7 +254,8 @@ export class World {
     if (p.kind === 'h') p.res--;
     let ch = .2 + r.aff[s] * .55 + lvl * .03 - (r.sect >= 0 ? .2 : 0);
     if (p.kind === 'h' && p.trust < 50) ch -= .15;
-    if (r.pc === 5 && r.sect >= 0) ch -= .3; // фанатика чужой секты почти не переманить
+    if (r.pc === 5 && r.sect >= 0) ch -= .3;
+    if (r.faithT > this.t && r.sect >= 0) ch -= .2; // недавно был на службе // фанатика чужой секты почти не переманить
     if (this.rnd() < ch) {
       const old = r.sect; r.sect = s; r.by = p.id; r.lead = -1; r.cool = this.t + 5; r.aff[s] = Math.min(1, r.aff[s] + .1); r.hostile.clear();
       if (!r.slots[0]) { r.slots[0] = { w: 1, r: 0, mag: 12 }; r.ammo[0] = 24; }
@@ -327,6 +338,43 @@ export class World {
       }
     }
     if (v.hp <= 0) this.kill(v, by, w);
+  }
+  altarNear(q, r) { for (const bi of this.hq) { const b = this.objs.blds[bi]; if (b.altar !== undefined && dist(this.objs[b.altar].p, q) < r) return b; } return null; }
+  // смена веры: молитва у алтаря чужой церкви
+  convert(p, s) {
+    const old = p.sect; if (s === old) return;
+    p.sect = s; p.ch = CH_SECT + s; p.trust = 50; p.res = 0;
+    for (const a of this.ents) if (a && a.alive && a.sect === old && a.kind !== 'h' && (a.kind === 'a' || a.slots[a.cur])) a.hostile.set(p.id, this.t + 60);
+    for (const r of this.ents) if (r && r.by === p.id) r.by = -1;
+    this.sendAll({ t: 'e', a: [this.entArr(p)] });
+    this.toast(p, '🙏 Теперь ты в «' + SECTS[s].n + '»', SECTS[s].col); this.toast(p, '⚠ Старая секта «' + SECTS[old].n + '» теперь считает тебя предателем!', '#ff6b6b');
+    for (const c of this.clients) if (c.pl && c.pl !== p && c.pl.sect === old) this.toast(c.pl, '⚠ ' + p.name + ' предал(а) нас и ушёл в «' + SECTS[s].n + '»', '#ff6b6b');
+    this.svcSend(s);
+  }
+  // службы: раз в ~3 минуты; сторонники идут в церковь, игрок на службе получает награду
+  svcSend(s, only) { const S = this.svc[s], m = { t: 'svc', st: S.st, T: Math.max(0, Math.round(S.T - this.t)), n: S.n }; for (const c of this.clients) if (c.pl && c.pl.sect === s && (!only || c.pl === only)) this.send(c, m); }
+  svcStep() {
+    this.svc.forEach((S, s) => {
+      const b = this.objs.blds[this.hq[s]];
+      if (S.st === 2) { S.n = this.ents.filter(r => r && r.kind === 'r' && r.alive && r.svc === s && r.bi === b.id).length; if (this.tick % (5 * TICK) === 0) this.svcSend(s); }
+      if (this.t < S.T) return;
+      if (S.st === 0) { S.st = 1; S.T = this.t + 20; S.n = 0;
+        for (const r of this.ents) if (r && r.kind === 'r' && r.alive && r.sect === s && !r.gossip && dist(r.p, b.p) < 1300 && this.rnd() < (r.pc === 5 ? 1 : r.pc === 4 ? .45 : .75)) { r.svc = s; r.svcP = null; r.wp = null; }
+        for (const c of this.clients) if (c.pl && c.pl.sect === s) this.toast(c.pl, '⛪ Через 20 с служба в церкви — приходи!', SECTS[s].col);
+      } else if (S.st === 1) { S.st = 2; S.T = this.t + 40;
+        for (const c of this.clients) if (c.pl && c.pl.sect === s) this.toast(c.pl, '⛪ Служба началась', SECTS[s].col);
+      } else {
+        const att = this.ents.filter(r => r && r.kind === 'r' && r.alive && r.svc === s && r.bi === b.id); let said = 0;
+        for (const r of att) { r.aff[s] = Math.min(1, r.aff[s] + .1); r.faithT = this.t + 300; if (said < 3 && this.rnd() < .4) { said++; this.say(r, RANDN(this.rnd, SECTS[s].hi)); } }
+        for (const r of this.ents) if (r && r.svc === s) { r.svc = -1; r.svcP = null; r.wp = null; r.wait = this.rnd() * 3; }
+        for (const c of this.clients) { const h = c.pl; if (!h || !h.alive || h.sect !== s) continue;
+          if (h.bi === b.id) { const n = att.length, l0 = lvlOf(h.xp); h.money += 10 + 4 * n; h.xp += 10 + 6 * n; h.trust = Math.min(100, h.trust + 10); h.prayT = 0;
+            this.toast(h, '⛪ Служба: ' + n + ' прихожан · +$' + (10 + 4 * n) + ' · доверие +10', SECTS[s].col); if (lvlOf(h.xp) > l0) this.toast(h, '⭐ Уровень ' + lvlOf(h.xp) + '!', '#ffd43b'); }
+          else this.toast(h, '⛪ Служба прошла без тебя (' + att.length + ' прихожан)', '#adb5bd'); }
+        S.st = 0; S.T = this.t + 150 + this.rnd() * 40; S.n = 0;
+      }
+      this.svcSend(s);
+    });
   }
   // свой игрок выстрелил по своему жителю: реакция зависит от характера
   ownHurt(by, v) {
@@ -440,6 +488,13 @@ export class World {
     // свой игрок проходит мимо — поздороваться и немного пройтись рядом
     if (r.sect >= 0 && !(r.greetT > this.t)) for (const c of this.clients) { const h = c.pl; if (h && h.alive && h.sect === r.sect && dist(h.p, r.p) < 90 && canSee(this.objs, r.p, h.p, r.bi ?? -1, h.bi ?? -1)) { r.greetT = this.t + 50 + this.rnd() * 40; r.lead = h.id; r.leadT = this.t + 4 + this.rnd() * 3; this.say(r, RANDN(this.rnd, SECTS[r.sect].hi)); break; } }
     if (r.lead >= 0) { const L = this.ents[r.lead]; if (!L || !L.alive || this.t > r.leadT) r.lead = -1; else { const d = dist(L.p, r.p); if (d > 50) this.move(r, add(L.p, dirTo(L.p, r.p), 36), .9); return; } }
+    // служба: идёт в церковь и стоит в проходе лицом к алтарю
+    if (r.svc >= 0) { const S = this.svc[r.svc];
+      if (r.sect !== r.svc || !S || S.st === 0) r.svc = -1;
+      else { const b = this.objs.blds[this.hq[r.svc]], R = b.rooms[0];
+        if (!r.svcP) r.svcP = toWorld(b, [R.x0 + 30 + this.rnd() * (R.x1 - R.x0 - 80), (R.y0 + R.y1) / 2 + (this.rnd() - .5) * 26]);
+        if (dist(r.p, r.svcP) > 12 && r.stuck < 80) this.move(r, r.svcP, .75); else if (b.altar !== undefined) r.aim = dirTo(r.p, this.objs[b.altar].p);
+        return; } }
     // иногда сторонник идёт в свою церковь
     if (r.sect >= 0 && !r.wp && this.rnd() < .002) { const hb = this.objs.blds[this.hq[r.sect]]; r.wp = this.roomPt(hb, hb.rooms[Math.floor(this.rnd() * hb.rooms.length)], this.rnd); }
     // к нему подошёл человек из другой секты — останавливается и слушает

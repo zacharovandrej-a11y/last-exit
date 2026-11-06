@@ -128,7 +128,7 @@ function connect() {
 }
 function toast(s, c) { toasts.unshift({ s, c: c || '#fff', t: 0 }); toasts.length = Math.min(toasts.length, 4); }
 function setNames(a) { for (const [id, n, ch, k, pc] of a) { names[id] = { n, ch, k, pc: pc || 0 }; delete ents[id]; } }
-const wits = {}; // болтуны, бегущие рассказывать про меня: id -> {p, t}
+let svc = { st: 0, end: 0, n: 0 }; const wits = {}; // болтуны, бегущие рассказывать про меня: id -> {p, t}
 function onJson(m) {
   if (m.t === 'w') { myId = m.me; names = {}; setNames(m.ents); loot = new Map(); for (const a of m.loot) addLootArr(a); for (const id of m.dead) if (objs[id]) { objs[id].dead = true; G3.killObj(id); } ents = {}; pending = []; predP = null; dead = null; }
   else if (m.t === 'e') setNames(m.a);
@@ -136,6 +136,7 @@ function onJson(m) {
   else if (m.t === 'x') { delete names[m.id]; delete ents[m.id]; }
   else if (m.t === 'rs') { if (m.id === myId) { dead = null; predP = null; pending = []; } }
   else if (m.t === 'sc') { score = m; }
+  else if (m.t === 'svc') svc = { st: m.st, end: performance.now() + m.T * 1000, n: m.n };
   else if (m.t === 'm') { toast(m.s, m.c); if (m.s.startsWith('✔')) sfx('win', .6); else if (m.s.startsWith('⚠') || m.s.startsWith('🚪') || m.s.startsWith('✖')) sfx('bad'); else sfx('pick', .6); }
   else if (m.t === 'l') { if (m.a) for (const a of m.a) addLootArr(a); if (m.d) for (const id of m.d) loot.delete(id); }
   else if (m.t === 'cr') { const o = objs[m.id]; if (o) { o.dead = true; G3.killObj(m.id); sfx(3, vol(o.p) * .7); } }
@@ -157,7 +158,7 @@ function onSnap(buf) {
   const tick = dv.getUint32(o, true); o += 4; const ph = u8(); worldT = u16() / 10; const ack = u16(); const mid = u8(); u8(); const n = u8();
   const pv = { hp: u8(), armor: u8(), cur: u8(), s: [[u8(), u8()], [u8(), u8()]], ammo: [u8(), u8(), u8(), u8()], meds: u8(), st: u8(), prog: u8(), kills: u8(), bl: u8() / 1000, mv: u8(),
     money: u16(), xp: u16(), trust: u8(), res: u8(), foll: u8(), sect: u8(), atHQ: u8() };
-  alive = ph === 1; myId = mid; priv = pv; if (!pv.atHQ) shopOpen = false;
+  alive = ph === 1; myId = mid; priv = pv; if (pv.sect !== mySect && pv.sect < 4) { mySect = pv.sect; try { localStorage.setItem('sect', mySect); } catch (e) { } } if (!pv.atHQ) shopOpen = false;
   const now = performance.now(), est = tick - now / 50;
   if (tickOff === null || est > tickOff || tick < lastTick - 100) tickOff = est; else tickOff += (est - tickOff) * .02;
   lastTick = tick; snapCount++;
@@ -331,7 +332,10 @@ function hud(now, dt, meAlive, mePos) {
   { const tot = Math.max(1, score.n.reduce((a, b) => a + b, 0)), bw = Math.min(300, W * .36), bx = CX - bw / 2; let x = bx;
     ctx.fillStyle = 'rgba(0,0,0,.5)'; rr(ctx, bx - 3, 7, bw + 6, 16, 6); ctx.fill();
     for (let s = 0; s < 4; s++) { const w = bw * score.n[s] / tot; ctx.fillStyle = SECTS[s].col; ctx.fillRect(x, 10, w, 10); if (w > 22) txt(String(score.n[s]), x + w / 2, 20, 10, '#fff', 'center', 800); x += w; }
-    txt(SECTS[ms].n, CX, 38, 13, SECTS[ms].col, 'center', 800); }
+    txt(SECTS[ms].n, CX, 38, 13, SECTS[ms].col, 'center', 800);
+    if (svc.st && P) { const sec = Math.max(0, Math.ceil((svc.end - now) / 1000)), inCh = mePos && bldAt(objs.blds, mePos) === HQ[ms];
+      const s_ = svc.st === 1 ? '⛪ Служба через ' + sec + ' с — иди в церковь' : '⛪ Идёт служба · ' + svc.n + ' прихожан · ' + sec + ' с' + (inCh ? ' · ты здесь ✓' : '');
+      ctx.font = '800 12px system-ui'; const w = ctx.measureText(s_).width + 16; ctx.fillStyle = 'rgba(0,0,0,.55)'; rr(ctx, CX - w / 2, 44, w, 18, 7); ctx.fill(); txt(s_, CX, 57, 12, inCh ? '#8ce99a' : '#ffe066', 'center', 800); } }
   minimap(now, from);
   // мои показатели под миникартой
   if (P) { const mb = ui('map'), x = mb.x + 4; let y = mb.y + mb.h + 18; const lv = lvlOf(P.xp), x0 = 40 * lv * lv, x1 = 40 * (lv + 1) * (lv + 1);
@@ -343,7 +347,7 @@ function hud(now, dt, meAlive, mePos) {
   feed.forEach((f, i) => { const age = (now - f.t) / 1000; if (age > 6) return; ctx.globalAlpha = Math.min(1, 6 - age); const y = 74 + i * 19; const a = f.k >= 0 ? (names[f.k] ? names[f.k].n : '?') : '☠', b = names[f.v] ? names[f.v].n : '?';
     txt(a + ' ✖ ' + b, 10, y, 12, '#ddd', 'left', 700); ctx.globalAlpha = 1; });
   // всплывающие сообщения
-  toasts.forEach((t, i) => { t.t += dt; const a = Math.min(1, (3.5 - t.t) * 2); if (a <= 0) return; ctx.globalAlpha = a; const y = 62 + i * 24; ctx.font = '800 15px system-ui'; const w = ctx.measureText(t.s).width + 20;
+  toasts.forEach((t, i) => { t.t += dt; const a = Math.min(1, (3.5 - t.t) * 2); if (a <= 0) return; ctx.globalAlpha = a; const y = 62 + (svc.st ? 22 : 0) + i * 24; ctx.font = '800 15px system-ui'; const w = ctx.measureText(t.s).width + 20;
     ctx.fillStyle = 'rgba(0,0,0,.6)'; rr(ctx, CX - w / 2, y - 16, w, 22, 8); ctx.fill(); txt(t.s, CX, y, 15, t.c, 'center', 800); ctx.globalAlpha = 1; });
   toasts = toasts.filter(t => t.t < 3.5);
   if (meAlive && P) {
@@ -363,14 +367,16 @@ function hud(now, dt, meAlive, mePos) {
     if (!touchUI) for (let i = 0; i < 2; i++) { const b = ui('slot' + i); txt(String(i + 1), b.x + 9, b.y + 15, 12, '#ffd43b', 'center', 800); }
     const hb2 = ui('heal'); btn(hb2, P.meds ? '#ff6b6b' : null); txt('✚' + P.meds, hb2.x + hb2.w / 2, hb2.y + hb2.h * .66, 18, P.meds ? '#ff8787' : '#666');
     const rb = ui('reload'); btn(rb, null); txt('⟳', rb.x + rb.w / 2, rb.y + rb.h * .7, 24, '#fff');
-    if (P.st) { const k = P.prog / 255, c = P.st & 4 ? SECTS[ms].col : P.st & 2 ? '#ff6b6b' : '#fff'; const [mx, my] = G3.project(mePos, 30); ctx.strokeStyle = c; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(mx, my, 30, -1.57, -1.57 + 6.2832 * k); ctx.stroke(); if (P.st & 4) txt('🗣', mx, my - 38, 20); }
+    if (P.st) { const k = P.prog / 255, c = P.st & 4 ? SECTS[ms].col : P.st & 2 ? '#ff6b6b' : '#fff'; const [mx, my] = G3.project(mePos, 30); ctx.strokeStyle = c; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(mx, my, 30, -1.57, -1.57 + 6.2832 * k); ctx.stroke(); if (P.st & 4) txt(actShow && actShow.pray !== undefined ? '🙏' : '🗣', mx, my - 38, 20); }
     // кнопка действия: вербовать / подобрать
     actShow = null; let bd = 1e9;
     for (const id in ents) { const e = ents[id]; if (+id === myId || e.seen < 0 || !e.disp || !names[id] || names[id].k !== 2 || e.sect === ms) continue; const d = dist(e.disp, mePos); if (d < 50 && d < bd) { bd = d; actShow = { r: +id }; } }
     if (ms === 1 && P.res > 0) { let crowd = 0; for (const id in ents) { const e = ents[id]; if (e.seen >= 0 && e.disp && names[id] && names[id].k === 2 && e.sect !== 1 && dist(e.disp, mePos) < 140) crowd++; } actShow = crowd ? { rit: crowd } : null; }
+    for (const ci of objs.churches || []) { const cb = objs.blds[ci]; if (cb.altar !== undefined && dist(objs[cb.altar].p, mePos) < 50) actShow = { pray: cb.sect }; }
     if (!actShow) for (const it of loot.values()) { const d = dist(it.p, mePos); if (d < PR + 30 && d < bd && it.k === 0) { bd = d; actShow = { it }; } }
     if (actShow && !(P.st & 4)) { const b = ui('act');
-      if (actShow.rit) { btn(b, SECTS[1].col, .75); txt('🕊 Ритуал', b.x + b.w / 2, b.y + b.h * .48, 16, '#fff', 'center', 900); txt('съесть голубя при ' + actShow.rit + ' зрителях' + (touchUI ? '' : '  [E]'), b.x + b.w / 2, b.y + b.h * .82, 11, '#d0b0ff', 'center', 700); }
+      if (actShow.pray !== undefined) { const s_ = actShow.pray, own = s_ === ms; btn(b, SECTS[s_].col, .75); txt('🙏 Помолиться' + (touchUI ? '' : '  [E]'), b.x + b.w / 2, b.y + b.h * .48, 15, '#fff', 'center', 900); txt(own ? 'укрепить веру' : 'перейти: ' + SECTS[s_].n, b.x + b.w / 2, b.y + b.h * .82, 11, own ? '#ccc' : SECTS[s_].col, 'center', 700); }
+      else if (actShow.rit) { btn(b, SECTS[1].col, .75); txt('🕊 Ритуал', b.x + b.w / 2, b.y + b.h * .48, 16, '#fff', 'center', 900); txt('съесть голубя при ' + actShow.rit + ' зрителях' + (touchUI ? '' : '  [E]'), b.x + b.w / 2, b.y + b.h * .82, 11, '#d0b0ff', 'center', 700); }
       else if (actShow.r !== undefined) { const e = ents[actShow.r], nm = names[actShow.r].n, other = e.sect >= 0; btn(b, SECTS[ms].col, .75); const pc = CHARS[names[actShow.r].pc || 0]; txt('🗣 ' + nm + (pc.i ? '  ' + pc.i + ' ' + pc.n : ''), b.x + b.w / 2, b.y + b.h * .48, 14, '#fff', 'center', 800); txt((other ? 'переманить: ' + SECTS[e.sect].n : 'завербовать') + (touchUI ? '' : '  [E]'), b.x + b.w / 2, b.y + b.h * .82, 11, other ? sectCol(e.sect) : '#ccc', 'center', 700); }
       else { const it = actShow.it; btn(b, RARITY[it.r], .7); ctx.save(); ctx.translate(b.x + b.w * .25, b.y + b.h * .5); gunShape(ctx, it.x, b.h * .3, RARITY[it.r]); ctx.restore(); txt(touchUI ? '✋' : 'E', b.x + b.w - 18, b.y + b.h * .65, 18); } }
     // магазин в штабе

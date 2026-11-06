@@ -246,7 +246,7 @@ function genWorld() {
   many('tree', null, 0, 44, 44, 420); many('rock', null, 0, 36, 36, 110); many('bush', null, 0, 34, 34, 260, 10);
   // убираем «лишнюю» мебель и перенумеровываем
   const keep = objs.filter(o => !o.gone), idm = new Map(); objs.length = 0; keep.forEach((o, i) => { idm.set(o.id, i); o.id = i; objs.push(o); });
-  for (const b of blds) { b.walls = b.walls.map(i => idm.get(i)); b.furn = b.furn.filter(i => idm.has(i)).map(i => idm.get(i)); }
+  for (const b of blds) { b.walls = b.walls.map(i => idm.get(i)); b.furn = b.furn.filter(i => idm.has(i)).map(i => idm.get(i)); if (b.altar !== undefined) b.altar = idm.get(b.altar); }
   objs.blds = blds; objs.churches = churches; gridBuild(objs);
   return objs;
 }
