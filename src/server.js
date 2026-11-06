@@ -68,7 +68,7 @@ export class World {
   addResident(id, b, ri) {
     const rnd = this.rnd, kind = Math.floor(rnd() * CIVK.length), K = CIVK[kind];
     const e = this.newEnt(id, 'r', RANDN(rnd, K.names), 100 + kind, -1, this.roomPt(b, b.rooms[ri], rnd));
-    e.home = b.id; e.room = ri; e.aff = K.aff.map(a => Math.max(0, Math.min(1, a + (rnd() - .5) * .3))); e.cool = 0; e.by = -1; e.lead = -1; e.wait = rnd() * 6;
+    e.pc = pickW(rnd, CHARS); e.home = b.id; e.room = ri; e.aff = K.aff.map(a => Math.max(0, Math.min(1, a + (rnd() - .5) * .3))); e.cool = 0; e.by = -1; e.lead = -1; e.wait = rnd() * 6;
     return e;
   }
   addAgent(id, s) {
@@ -93,7 +93,7 @@ export class World {
   send(c, m) { try { c.ws.send(typeof m === 'string' || m instanceof ArrayBuffer ? m : JSON.stringify(m)); } catch (e) { } }
   sendAll(o) { const s = JSON.stringify(o); for (const c of this.clients) if (c.pl) this.send(c, s); }
   toast(p, s, col) { if (p && p.c) this.send(p.c, { t: 'm', s, c: col || '#fff' }); }
-  entArr(e) { return [e.id, e.name, e.ch, e.kind === 'h' ? 0 : e.kind === 'a' ? 1 : 2]; }
+  entArr(e) { return [e.id, e.name, e.ch, e.kind === 'h' ? 0 : e.kind === 'a' ? 1 : 2, e.pc || 0]; }
   onMsg(c, data) {
     if (typeof data === 'string') {
       let m; try { m = JSON.parse(data); } catch (e) { return; }
@@ -244,6 +244,7 @@ export class World {
     if (p.kind === 'h') p.res--;
     let ch = .2 + r.aff[s] * .55 + lvl * .03 - (r.sect >= 0 ? .2 : 0);
     if (p.kind === 'h' && p.trust < 50) ch -= .15;
+    if (r.pc === 5 && r.sect >= 0) ch -= .3; // фанатика чужой секты почти не переманить
     if (this.rnd() < ch) {
       const old = r.sect; r.sect = s; r.by = p.id; r.lead = -1; r.cool = this.t + 5; r.aff[s] = Math.min(1, r.aff[s] + .1); r.hostile.clear();
       if (!r.slots[0]) { r.slots[0] = { w: 1, r: 0, mag: 12 }; r.ammo[0] = 24; }
@@ -295,7 +296,7 @@ export class World {
     }
     p.bloom = Math.min(W.maxB, (p.bloom || 0) + W.bloom);
     // выстрел пугает жителей рядом
-    for (const r of this.ents) if (r && r.kind === 'r' && r.alive && !r.slots[r.cur] && dist(r.p, p.p) < 300) r.panic = this.t + 6;
+    for (const r of this.ents) if (r && r.kind === 'r' && r.alive) { const d = dist(r.p, p.p); if (r.pc === 4 ? d < 480 : !r.slots[r.cur] && d < 300) r.panic = Math.max(r.panic || 0, this.t + (r.pc === 4 ? 12 : 6)); }
     if (s.mag <= 0) this.startReload(p);
   }
   hitscan(p, d, range, rt) {
@@ -321,11 +322,49 @@ export class World {
       // доверие: стреляешь по своим — оно падает, свои перебегают
       if (by.kind === 'h' && v.sect === by.sect && v !== by) {
         by.trust = Math.max(0, by.trust - dmg * .5);
-        if (v.kind === 'r' && v.hp > 0 && this.rnd() < (90 - by.trust) / 90) { const ns = (by.sect + 1 + Math.floor(this.rnd() * 3)) % 4; v.sect = ns; v.by = -1; v.lead = -1; v.hostile.set(by.id, this.t + 60); this.toast(by, '⚠ ' + v.name + ' перешёл(шла) к «' + SECTS[ns].s + '»!', '#ff6b6b'); }
-        if (by.trust < 40) for (const r of this.ents) if (r && r.alive && r.kind === 'r' && r.sect === by.sect && r.by === by.id && dist(r.p, by.p) < 260 && this.rnd() < .25) { r.sect = -1; r.by = -1; r.lead = -1; }
+        if (v.kind === 'r' && v.hp > 0) this.ownHurt(by, v);
+        if (by.trust < 40) for (const r of this.ents) if (r && r.alive && r.kind === 'r' && r.sect === by.sect && r.by === by.id && r.pc !== 5 && dist(r.p, by.p) < 260 && this.rnd() < .25) { r.sect = -1; r.by = -1; r.lead = -1; }
       }
     }
     if (v.hp <= 0) this.kill(v, by, w);
+  }
+  // свой игрок выстрелил по своему жителю: реакция зависит от характера
+  ownHurt(by, v) {
+    const nm = v.name, leave = () => { v.sect = -1; v.by = -1; v.lead = -1; };
+    switch (v.pc) {
+      case 1: leave(); v.gossip = { by: by.id, sect: by.sect, n: 0, until: this.t + 45, told: [], tgt: -1, sayT: 0 }; v.hostile.clear();
+        this.say(v, '🗣 Он стреляет в своих!'); this.toast(by, '🗣 ' + nm + ' бежит рассказать соседям! Догони!', '#ff6b6b'); break;
+      case 2: { const ns = (by.sect + 1 + Math.floor(this.rnd() * 3)) % 4; v.sect = ns; v.by = -1; v.lead = -1; v.hostile.set(by.id, this.t + 120); v.panic = 0;
+        if (!v.slots[0]) { v.slots[0] = { w: 1, r: 0, mag: 12 }; v.ammo[0] = 36; } this.say(v, '😠 Ты пожалеешь!'); this.toast(by, '😠 ' + nm + ' ушёл(ла) в «' + SECTS[ns].n + '» и мстит!', '#ff6b6b'); break; }
+      case 3: leave(); this.say(v, '😐 Да ну вас всех…'); this.toast(by, '😐 ' + nm + ' ушёл(ла) из секты', '#ffa94d'); break;
+      case 4: leave(); v.panic = this.t + 20; v.hostile.clear(); this.say(v, '😰 Не стреляй!!'); this.toast(by, '😰 ' + nm + ' в ужасе сбежал(а) из секты', '#ffa94d'); break;
+      case 5: v.hostile.delete(by.id); v.panic = 0; this.say(v, '🔥 Прощаю тебя, брат!'); break;
+      default: if (this.rnd() < (90 - by.trust) / 90) { const ns = (by.sect + 1 + Math.floor(this.rnd() * 3)) % 4; v.sect = ns; v.by = -1; v.lead = -1; v.hostile.set(by.id, this.t + 60); this.toast(by, '⚠ ' + nm + ' перешёл(шла) в «' + SECTS[ns].n + '»!', '#ff6b6b'); }
+    }
+  }
+  // кто-то видел убийство — может стать новым свидетелем
+  witness(by, v) {
+    let best = null, bd = 230;
+    for (const r of this.ents) if (r && r.kind === 'r' && r.alive && r !== v && r.pc !== 5 && !r.gossip && r.sect === by.sect) { const d = dist(r.p, v.p); if (d < bd && canSee(this.objs, r.p, v.p, r.bi ?? -1, v.bi ?? -1)) { bd = d; best = r; } }
+    if (!best || this.rnd() > .6) return;
+    best.sect = -1; best.by = -1; best.lead = -1; best.gossip = { by: by.id, sect: by.sect, n: 0, until: this.t + 45, told: [], tgt: -1, sayT: 0 };
+    this.say(best, '👀 Я всё видел(а)!'); this.toast(by, '👀 ' + best.name + ' всё видел(а) и бежит рассказать!', '#ff6b6b');
+  }
+  // болтун бегает по соседям своей бывшей секты и рассказывает — те уходят
+  gossipStep(r) {
+    const G = r.gossip; if (this.t > G.until || G.n >= 3) { r.gossip = null; return false; }
+    let T = this.ents[G.tgt];
+    if (!T || !T.alive || T.sect !== G.sect) { G.tgt = -1; let bd = 520; for (const o of this.ents) if (o && o.kind === 'r' && o.alive && o !== r && o.sect === G.sect && !G.told.includes(o.id)) { const d = dist(o.p, r.p); if (d < bd) { bd = d; G.tgt = o.id; } } T = this.ents[G.tgt]; if (!T) { r.gossip = null; return false; } }
+    if (this.tick % 8 === 0) { const h = this.ents[G.by]; if (h && h.c) this.send(h.c, { t: 'wit', id: r.id, p: [Math.round(r.p[0]), Math.round(r.p[1])] }); }
+    if (this.t > G.sayT) { G.sayT = this.t + 3.5; this.say(r, '🗣 ' + RANDN(this.rnd, ['Он стреляет в своих!', 'Все сюда! Беда!', 'Не верьте ему!'])); }
+    if (dist(T.p, r.p) < 38) {
+      G.told.push(T.id); G.n++; T.aim = dirTo(T.p, r.p); T.wait = 2;
+      if (T.pc === 5) this.say(T, '🔥 Враньё! Не верю!');
+      else if (this.rnd() < .75) { T.sect = -1; T.by = -1; T.lead = -1; this.say(T, '😨 Правда?! Я ухожу!'); const h = this.ents[G.by]; if (h && h.alive) { h.trust = Math.max(0, h.trust - 5); this.toast(h, '🗣 ' + T.name + ' узнал(а) и ушёл(ла) из секты', '#ff6b6b'); } }
+      else this.say(T, '🤔 Хм… не может быть');
+      G.tgt = -1;
+    } else this.move(r, T.p, 1);
+    return true;
   }
   kill(v, by, w) {
     if (!v.alive) return;
@@ -339,6 +378,8 @@ export class World {
       if (v.kind === 'a' && v.sect !== by.sect) { by.xp += 10; }
       if (v.kind === 'r' && v.sect < 0) { for (const r of this.ents) if (r && r.kind === 'r' && r.alive && dist(r.p, v.p) < 320) r.aff[by.sect] = Math.max(0, r.aff[by.sect] - .1); this.toast(by, '😨 Жители боятся тебя', '#ff8787'); }
       if (v.sect === by.sect) by.trust = Math.max(0, by.trust - 25);
+      if (v.kind === 'r' && v.gossip && v.gossip.by === by.id) { this.toast(by, '🤫 ' + v.name + ' уже никому не расскажет', '#adb5bd'); this.witness(by, v); }
+      else if (v.kind === 'r' && v.sect === by.sect) this.witness(by, v);
     }
     this.sendAll({ t: 'k', k: by ? by.id : -1, v: v.id, w });
     if (v.kind === 'h' && v.c) this.send(v.c, { t: 'dead', by: by ? by.id : -1 });
@@ -390,11 +431,12 @@ export class World {
     if (r.talkT > this.t) return; // с ним разговаривают
     const s = r.slots[r.cur], W = s ? WEAPONS[s.w] : null;
     if (s && s.mag <= 0) this.startReload(r);
-    const t = W ? this.enemyOf(r) : null; r.fight = !!t;
+    if (r.gossip && this.gossipStep(r)) return;
+    const t = W && r.pc !== 4 ? this.enemyOf(r) : null; r.fight = !!t;
     if (t) { if (!r.tgt || r.tgt !== t.id) r.react = Math.round((.6 + (1 - r.skill)) * TICK / 2); r.tgt = t.id; const los = this.shootAt(r, t, W); if (!los) this.move(r, t.p, .8); return; }
     // паника: бежит домой
     const home = this.objs.blds[r.home];
-    if (r.panic > this.t && !W) { if (r.bi !== r.home) this.move(r, home.rooms[r.room] ? this.roomCenter(home, r.room) : home.p, 1); return; }
+    if (r.panic > this.t && (!W || r.pc === 4)) { if (r.bi !== r.home) this.move(r, home.rooms[r.room] ? this.roomCenter(home, r.room) : home.p, 1); return; }
     // свой игрок проходит мимо — поздороваться и немного пройтись рядом
     if (r.sect >= 0 && !(r.greetT > this.t)) for (const c of this.clients) { const h = c.pl; if (h && h.alive && h.sect === r.sect && dist(h.p, r.p) < 90 && canSee(this.objs, r.p, h.p, r.bi ?? -1, h.bi ?? -1)) { r.greetT = this.t + 50 + this.rnd() * 40; r.lead = h.id; r.leadT = this.t + 4 + this.rnd() * 3; this.say(r, RANDN(this.rnd, SECTS[r.sect].hi)); break; } }
     if (r.lead >= 0) { const L = this.ents[r.lead]; if (!L || !L.alive || this.t > r.leadT) r.lead = -1; else { const d = dist(L.p, r.p); if (d > 50) this.move(r, add(L.p, dirTo(L.p, r.p), 36), .9); return; } }

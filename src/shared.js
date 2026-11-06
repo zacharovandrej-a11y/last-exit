@@ -102,6 +102,7 @@ const OT = {
   tree: { s: 0 }, pine: { s: 0 }, rock: { s: 0 }, hay: { s: 0 }, cactus: { s: 0 }, snowman: { s: 0 },
   house: { s: 0 }, car: { s: 1 }, truck: { s: 1 }, crate: { s: 0, hp: 45 }, wall: { s: 1 }, igloo: { s: 0 }, tent: { s: 1 },
   bw: { s: 1 }, furn: { s: 1, pass: 1 }, barrel: { s: 0 }, fence: { s: 1, pass: 1 }, bush: { s: 0, nc: 1, pass: 1 },
+  grave: { s: 1, pass: 1 }, deadtree: { s: 0 }, ifence: { s: 1, pass: 1 }, antenna: { s: 0, pass: 1 }, billboard: { s: 1 }, dish: { s: 0, pass: 1 }, junk: { s: 0 },
 };
 // здания: план из комнат (BSP-деление), двери между комнатами, окна (пули и взгляд проходят, человек — нет)
 // style: стены/пол/крыша; hall — большой зал без деления; maxRoom — размер комнаты
@@ -116,6 +117,11 @@ const BKIND = {
   barn: { w: 200, h: 130, maxRoom: 80, doors: 2, style: 'wood', floor: 'dirt', roof: 'gable', furn: 'barn', hall: .7, door: 64 },
   market: { w: 400, h: 270, maxRoom: 90, doors: 4, style: 'concrete', floor: 'tile', roof: 'flat', furn: 'store', hall: .68, door: 60 },
   lodge: { w: 230, h: 160, maxRoom: 90, doors: 2, style: 'wood', floor: 'wood', roof: 'gable', furn: 'home' },
+  // церкви сект: один зал, алтарь в конце
+  ch0: { door: 60, w: 200, h: 130, maxRoom: 300, doors: 2, style: 'hallbrick', floor: 'tile', roof: 'lowgable', furn: 'church', church: 0 },
+  ch1: { door: 60, w: 170, h: 120, maxRoom: 300, doors: 2, style: 'stone', floor: 'concrete', roof: 'steep', furn: 'church', church: 1 },
+  ch2: { door: 60, w: 170, h: 130, maxRoom: 300, doors: 2, style: 'concrete', floor: 'concrete', roof: 'foil', furn: 'church', church: 2, slit: 1 },
+  ch3: { door: 60, w: 230, h: 150, maxRoom: 300, doors: 2, style: 'white', floor: 'tile', roof: 'billboards', furn: 'church', church: 3 },
   adobe: { w: 200, h: 170, maxRoom: 85, doors: 2, style: 'adobe', floor: 'dirt', roof: 'flat', furn: 'home' },
 };
 const WIN = 30; // ширина окна
@@ -165,7 +171,8 @@ function genWorld() {
     const sides = [[true, H2 - t / 2, -W2, W2, 1], [true, -H2 + t / 2, -W2, W2, -1], [false, -W2 + t / 2, -H2 + t, H2 - t, -1], [false, W2 - t / 2, -H2 + t, H2 - t, 1]];
     const doorsAt = sides.map(() => []);
     const sk = sides.map(sd => (sd[3] - sd[2]) + (rnd() - .5) * 40), order = [0, 1, 2, 3].sort((i, j) => sk[j] - sk[i] || i - j); // без рандома внутри sort — мир одинаковый везде
-    for (let k = 0; k < K.doors; k++) doorsAt[order[k % 4]].push(1);
+    if (K.church !== undefined) doorsAt[2].push(1); // церковь: вход в торце, напротив алтаря
+    else for (let k = 0; k < K.doors; k++) doorsAt[order[k % 4]].push(1);
     sides.forEach(([hor, c, s0, s1, sg], si) => {
       const joins = splits.filter(o => o.hor !== hor && (Math.abs(o.s0 - (hor ? c - sg * t / 2 : c - sg * t / 2)) < 10 || Math.abs(o.s1 - (c - sg * t / 2)) < 10)).map(o => o.c);
       const gaps = [], clear = g => joins.every(j => Math.abs(j - g) > 24) && gaps.every(([x, w]) => Math.abs(x - g) > w / 2 + 20) && g - 26 > s0 + 10 && g + 26 < s1 - 10;
@@ -182,6 +189,10 @@ function genWorld() {
     const SETS = { home: [['bed', 24, 40], ['table', 30, 20], ['sofa', 40, 16], ['shelf', 34, 10], ['desk', 28, 14]], office: [['desk', 30, 16], ['desk', 30, 16], ['shelf', 40, 10], ['table', 40, 22]], barracks: [['bunk', 20, 40], ['bunk', 20, 40], ['shelf', 30, 10], ['crate', 30, 30]], store: [['shelf', 50, 12], ['crate', 30, 30], ['barrel', 18, 18]], barn: [['hay', 30, 30], ['crate', 30, 30], ['hay', 30, 30]] };
     for (const r of b.rooms) {
       const set = SETS[K.furn], rw = r.x1 - r.x0, rh = r.y1 - r.y0;
+      if (K.furn === 'church') { // церковь: алтарь у дальней стены, скамьи рядами, проход посередине
+        const al = fu('altar' + K.church, r.x1 - 16, (r.y0 + r.y1) / 2, 20, 44); if (al) b.altar = al.id;
+        const bw = Math.max(20, rh / 2 - 34); for (let x = r.x0 + 48; x < r.x1 - 52; x += 30) { fu('bench', x, r.y0 + 8 + bw / 2, 12, bw); fu('bench', x, r.y1 - 8 - bw / 2, 12, bw); }
+        continue; }
       if (r.hall) { // зал: ряды стеллажей
         const rowsY = Math.floor((rh - 60) / 56); for (let i = 0; i < rowsY; i++) { const y = r.y0 + 45 + i * 56; for (let x = r.x0 + 50; x < r.x1 - 50; x += 90) fu(K.furn === 'barn' ? 'hay' : rnd() < .7 ? 'shelf' : 'crate', x, y, K.furn === 'barn' ? 30 : 60, K.furn === 'barn' ? 30 : 12); } continue; }
       const n = 1 + Math.floor(rnd() * 2.5);
@@ -207,6 +218,18 @@ function genWorld() {
     for (let k = 0; k < tries; k++) { const p = cen ? nearPt(rnd, cen, r) : rndMap(rnd, m); if (inMap(p, m) && free(p, m)) { building(kind, p); break; } } } }
   const B = BIOMES;
   building('market', B[3].c);
+  // церкви сект (ставим первыми, чтобы нашлось место)
+  const CHP = [[B[0].c[0] + 420, B[0].c[1] + 330], [-1560, -40], [B[1].c[0] - 330, B[1].c[1] + 360], [B[3].c[0] + 60, B[3].c[1] + 330]], churches = [];
+  CHP.forEach((c, i) => { const K = BKIND['ch' + i], m = Math.hypot(K.w, K.h) / 2 + 40; for (let k = 0; k < 60; k++) { const p = k ? nearPt(rnd, c, 40 + k * 6) : c; if (inMap(p, m) && free(p, m)) { const b = building('ch' + i, p); b.sect = i; churches.push(b.id); break; } } });
+  // кладбище вокруг обители Ордена: могилы рядами, мёртвые деревья, ограда с проходами
+  { const ob = blds[churches[1]], R = 230;
+    for (let gx = -R + 30; gx <= R - 30; gx += 34) for (let gy = -R + 30; gy <= R - 30; gy += 30) { const p = add(ob.p, [gx + (rnd() - .5) * 8, gy + (rnd() - .5) * 6]); if (rnd() < .78 && free(p, 12)) putA('grave', p, 14, 7, (rnd() - .5) * .25); }
+    for (let i = 0; i < 9; i++) { const p = nearPt(rnd, ob.p, R); if (free(p, 26)) put('deadtree', p, 34, 34); }
+    for (const [sx, sy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let t = -R; t < R; t += 100) { if (Math.abs(t + 50) < 70) continue; const c = sx ? [ob.p[0] + sx * R, ob.p[1] + t + 50] : [ob.p[0] + t + 50, ob.p[1] + sy * R]; if (free(c, 8)) putA('ifence', c, 92, 4, sx ? 1.5708 : 0); } }
+  // у бункера Заговора: сломанные антенны, тарелки, хлам
+  { const zb = blds[churches[2]]; for (let i = 0; i < 7; i++) { const p = nearPt(rnd, zb.p, zb.rad + 70); if (dist(p, zb.p) > zb.rad + 15 && free(p, 16)) put(i % 3 === 2 ? 'junk' : i % 3 ? 'dish' : 'antenna', p, 24, 24); } }
+  // у собора Плаката: билборды вокруг
+  { const pb = blds[churches[3]]; for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283 + .3, p = add(pb.p, [Math.cos(a) * (pb.rad + 55), Math.sin(a) * (pb.rad + 55)]); if (free(p, 30)) putA('billboard', p, 70, 8, a + 1.5708); } }
   manyB(['apart', 'office', 'apart', 'villa', 'house'], B[0].c, 520, 11); manyB(['house', 'villa'], B[0].c, 560, 6);
   manyB(['barracks', 'hangar', 'barracks'], B[1].c, 440, 5); manyB(['bunker'], B[1].c, 460, 5);
   manyB(['barn'], B[2].c, 470, 3); manyB(['house', 'villa'], B[2].c, 500, 4);
@@ -224,7 +247,7 @@ function genWorld() {
   // убираем «лишнюю» мебель и перенумеровываем
   const keep = objs.filter(o => !o.gone), idm = new Map(); objs.length = 0; keep.forEach((o, i) => { idm.set(o.id, i); o.id = i; objs.push(o); });
   for (const b of blds) { b.walls = b.walls.map(i => idm.get(i)); b.furn = b.furn.filter(i => idm.has(i)).map(i => idm.get(i)); }
-  objs.blds = blds; gridBuild(objs);
+  objs.blds = blds; objs.churches = churches; gridBuild(objs);
   return objs;
 }
 // сетка для быстрых проверок (какие объекты рядом)
@@ -318,9 +341,20 @@ const CIVK = [
 ];
 const NRES = 150;   // жителей в городе
 const ID_H = 0, ID_A = 16, ID_R = 32; // номера: люди 0–15, агенты сект 16–31, жители 32+
+// характеры жителей: как реагируют, если свой игрок стреляет по ним
+const CHARS = [
+  { n: 'обычный', i: '', w: 22 },
+  { n: 'болтун', i: '🗣', w: 9 },     // бежит рассказать соседям — те уходят из веры (можно догнать)
+  { n: 'мститель', i: '😠', w: 14 },  // переходит к врагу и нападает
+  { n: 'равнодушный', i: '😐', w: 22 }, // просто уходит из секты
+  { n: 'трус', i: '😰', w: 21 },      // убегает и прячется, от выстрелов паникует
+  { n: 'фанатик', i: '🔥', w: 12 },   // не уходит из веры, защищает секту, переманить трудно
+];
+const pickW = (rnd, a) => { let x = rnd() * a.reduce((m, o) => m + o.w, 0); for (let i = 0; i < a.length; i++) { x -= a[i].w; if (x < 0) return i; } return 0; };
 const CH_SECT = 120; // вид членов сект-агентов и игроков: 120 + секта
 // штабы сект — конкретные здания (одинаково у сервера и клиента)
 function sectHQ(objs) {
+  if (objs.churches && objs.churches.length === 4) return objs.churches;
   const B = objs.blds, near = (kinds, c) => { let best = null, bd = 1e9; for (const b of B) if (kinds.includes(b.kind)) { const d = dist(b.p, c); if (d < bd) { bd = d; best = b; } } return best; };
   const hq = [near(['villa', 'house'], BIOMES[0].c), near(['barn', 'lodge'], BIOMES[2].c), near(['bunker', 'barracks'], BIOMES[1].c), near(['office', 'apart'], BIOMES[3].c)];
   return hq.map((b, i) => (b || B[i]).id);

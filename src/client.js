@@ -127,10 +127,12 @@ function connect() {
   ws.onclose = () => { if (ws === s && started) setTimeout(() => { if (started && ws === s) connect(); }, 1500); };
 }
 function toast(s, c) { toasts.unshift({ s, c: c || '#fff', t: 0 }); toasts.length = Math.min(toasts.length, 4); }
-function setNames(a) { for (const [id, n, ch, k] of a) { names[id] = { n, ch, k }; delete ents[id]; } }
+function setNames(a) { for (const [id, n, ch, k, pc] of a) { names[id] = { n, ch, k, pc: pc || 0 }; delete ents[id]; } }
+const wits = {}; // болтуны, бегущие рассказывать про меня: id -> {p, t}
 function onJson(m) {
   if (m.t === 'w') { myId = m.me; names = {}; setNames(m.ents); loot = new Map(); for (const a of m.loot) addLootArr(a); for (const id of m.dead) if (objs[id]) { objs[id].dead = true; G3.killObj(id); } ents = {}; pending = []; predP = null; dead = null; }
   else if (m.t === 'e') setNames(m.a);
+  else if (m.t === 'wit') wits[m.id] = { p: m.p, t: performance.now() };
   else if (m.t === 'x') { delete names[m.id]; delete ents[m.id]; }
   else if (m.t === 'rs') { if (m.id === myId) { dead = null; predP = null; pending = []; } }
   else if (m.t === 'sc') { score = m; }
@@ -299,7 +301,7 @@ function render(dt, now) {
     if (l.id === myId) continue;
     const [x, y, v] = G3.project(l.p, 76); if (!v) continue;
     const d = dist(l.p, mp), col = sectCol(l.sect);
-    if (l.k !== 2 || d < 220) { const nm = names[l.id] ? names[l.id].n : ''; txt(nm, x, y - 10, l.k === 2 ? 11 : 12, l.k === 2 ? '#fff' : col, 'center', 800); }
+    if (l.k !== 2 || d < 220) { const N = names[l.id], nm = N ? N.n + (l.k === 2 && N.pc && d < 140 ? ' ' + CHARS[N.pc].i : '') : ''; txt(nm, x, y - 10, l.k === 2 ? 11 : 12, l.k === 2 ? '#fff' : col, 'center', 800); }
     blob(ctx, x, y - 1, l.sect >= 0 ? 4.5 : 3, col); ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(x, y - 1, l.sect >= 0 ? 4.5 : 3, 0, 6.2832); ctx.stroke();
     if (l.hp < 100) { ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(x - 16, y + 5, 32, 4); ctx.fillStyle = l.hp > 40 ? '#51cf66' : '#ff6b6b'; ctx.fillRect(x - 16, y + 5, 32 * l.hp / 100, 4); }
     if (l.talk) txt('💬', x + 14, y - 6, 14);
@@ -329,7 +331,7 @@ function hud(now, dt, meAlive, mePos) {
   { const tot = Math.max(1, score.n.reduce((a, b) => a + b, 0)), bw = Math.min(300, W * .36), bx = CX - bw / 2; let x = bx;
     ctx.fillStyle = 'rgba(0,0,0,.5)'; rr(ctx, bx - 3, 7, bw + 6, 16, 6); ctx.fill();
     for (let s = 0; s < 4; s++) { const w = bw * score.n[s] / tot; ctx.fillStyle = SECTS[s].col; ctx.fillRect(x, 10, w, 10); if (w > 22) txt(String(score.n[s]), x + w / 2, 20, 10, '#fff', 'center', 800); x += w; }
-    txt(SECTS[ms].s, CX, 38, 13, SECTS[ms].col, 'center', 800); }
+    txt(SECTS[ms].n, CX, 38, 13, SECTS[ms].col, 'center', 800); }
   minimap(now, from);
   // мои показатели под миникартой
   if (P) { const mb = ui('map'), x = mb.x + 4; let y = mb.y + mb.h + 18; const lv = lvlOf(P.xp), x0 = 40 * lv * lv, x1 = 40 * (lv + 1) * (lv + 1);
@@ -347,6 +349,7 @@ function hud(now, dt, meAlive, mePos) {
   if (meAlive && P) {
     // штаб — значок у края экрана
     const hb = objs.blds[HQ[ms]]; edgeIcon(hb.doors[0].o, from, '🏠', SECTS[ms].col);
+    for (const id in wits) { if (now - wits[id].t > 1800) { delete wits[id]; continue; } const e = ents[id]; edgeIcon(e && e.seen >= 0 && e.disp ? e.disp : wits[id].p, from, '🗣', '#ff6b6b'); }
     const bw = Math.min(260, W * .42), bx = CX - bw / 2, by = H - 24;
     ctx.fillStyle = 'rgba(0,0,0,.55)'; rr(ctx, bx - 2, by - 2, bw + 4, 16, 6); ctx.fill();
     ctx.fillStyle = P.hp > 40 ? '#51cf66' : '#ff6b6b'; rr(ctx, bx, by, bw * P.hp / 100, 12, 5); ctx.fill();
@@ -368,7 +371,7 @@ function hud(now, dt, meAlive, mePos) {
     if (!actShow) for (const it of loot.values()) { const d = dist(it.p, mePos); if (d < PR + 30 && d < bd && it.k === 0) { bd = d; actShow = { it }; } }
     if (actShow && !(P.st & 4)) { const b = ui('act');
       if (actShow.rit) { btn(b, SECTS[1].col, .75); txt('🕊 Ритуал', b.x + b.w / 2, b.y + b.h * .48, 16, '#fff', 'center', 900); txt('съесть голубя при ' + actShow.rit + ' зрителях' + (touchUI ? '' : '  [E]'), b.x + b.w / 2, b.y + b.h * .82, 11, '#d0b0ff', 'center', 700); }
-      else if (actShow.r !== undefined) { const e = ents[actShow.r], nm = names[actShow.r].n, other = e.sect >= 0; btn(b, SECTS[ms].col, .75); txt('🗣 ' + nm, b.x + b.w / 2, b.y + b.h * .48, 15, '#fff', 'center', 800); txt((other ? 'переманить у «' + SECTS[e.sect].s + '»' : 'завербовать') + (touchUI ? '' : '  [E]'), b.x + b.w / 2, b.y + b.h * .82, 11, other ? sectCol(e.sect) : '#ccc', 'center', 700); }
+      else if (actShow.r !== undefined) { const e = ents[actShow.r], nm = names[actShow.r].n, other = e.sect >= 0; btn(b, SECTS[ms].col, .75); const pc = CHARS[names[actShow.r].pc || 0]; txt('🗣 ' + nm + (pc.i ? '  ' + pc.i + ' ' + pc.n : ''), b.x + b.w / 2, b.y + b.h * .48, 14, '#fff', 'center', 800); txt((other ? 'переманить: ' + SECTS[e.sect].n : 'завербовать') + (touchUI ? '' : '  [E]'), b.x + b.w / 2, b.y + b.h * .82, 11, other ? sectCol(e.sect) : '#ccc', 'center', 700); }
       else { const it = actShow.it; btn(b, RARITY[it.r], .7); ctx.save(); ctx.translate(b.x + b.w * .25, b.y + b.h * .5); gunShape(ctx, it.x, b.h * .3, RARITY[it.r]); ctx.restore(); txt(touchUI ? '✋' : 'E', b.x + b.w - 18, b.y + b.h * .65, 18); } }
     // магазин в штабе
     if (P.atHQ) { const b = ui('shop'); btn(b, '#ffd43b', .7); txt('🛒', b.x + b.w / 2, b.y + 30, 22); txt(touchUI ? 'магазин' : 'магазин [B]', b.x + b.w / 2, b.y + 46, 10, '#ffd43b', 'center', 800); }
@@ -402,7 +405,7 @@ function hud(now, dt, meAlive, mePos) {
 }
 function drawShop(P) {
   ctx.fillStyle = 'rgba(8,4,24,.8)'; ctx.fillRect(0, 0, W, H);
-  txt('🛒 Штаб «' + SECTS[P.sect].s + '»   💵 ' + P.money, CX, 40, 20, '#ffd43b');
+  txt('🛒 ' + SECTS[P.sect].n + '   💵 ' + P.money, CX, 40, 20, '#ffd43b');
   const cols = W > 700 ? 5 : 4, bw = Math.min(130, (W - 40) / cols - 10), bh = 70, gx = (W - cols * (bw + 10)) / 2;
   shopBoxes = [];
   SHOP.forEach((it, i) => { const x = gx + (i % cols) * (bw + 10), y = 60 + Math.floor(i / cols) * (bh + 10), b = { x, y, w: bw, h: bh, i };
@@ -429,6 +432,7 @@ function minimap(now, from) {
   ctx.restore(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   HQ.forEach((bi, s) => { const [x, y] = mm(objs.blds[bi].p); txt('★', x, y + 4, big ? 18 : 11, SECTS[s].col); });
   for (const id in ents) { const e = ents[id]; if (e.seen < 0 || +id === myId || !e.disp) continue; const [x, y] = mm(e.disp); blob(ctx, x, y, big ? 4 : 2.2, sectCol(e.sect)); }
+  for (const id in wits) { const [x, y] = mm(wits[id].p); txt('🗣', x, y + 4, big ? 16 : 11, '#ff6b6b'); }
   const [mx, my] = mm(from); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(mx, my - 7); ctx.lineTo(mx + 5, my + 5); ctx.lineTo(mx - 5, my + 5); ctx.closePath(); ctx.fill(); ctx.stroke();
 }
 
@@ -438,8 +442,8 @@ try { myName = localStorage.getItem('le_name') || ''; const c = localStorage.get
 const nameIn = document.getElementById('name'), pv = document.getElementById('pv'), sbox = document.getElementById('sects'), sdesc = document.getElementById('sdesc');
 nameIn.value = myName;
 const SDESC = ['Ходят по домам с листовками и обещают счастливую жизнь. Вербуют быстрее всех.', 'Ловят голубей на улицах и съедают их при людях — ритуал вербует сразу нескольких (а остальных пугает).', 'Ищут улики и «открывают глаза». Улики лежат в домах.', 'Плакаты, мероприятия и борьба за улицы.'];
-const SICON = ['🩴', '🕯', '👁', '🪧'];
-function drawSects() { sbox.innerHTML = ''; SECTS.forEach((s, i) => { const b = document.createElement('button'); b.style.setProperty('--c', s.col); b.className = i === mySect ? 'on' : ''; b.textContent = SICON[i] + ' ' + s.s; b.onclick = () => { mySect = i; drawSects(); }; sbox.appendChild(b); }); sdesc.innerHTML = '<b style="color:' + SECTS[mySect].col + '">' + SECTS[mySect].n + '</b><br>' + SDESC[mySect]; }
+const SICON = ['🩴', '🕊', '👁', '🪧'];
+function drawSects() { sbox.innerHTML = ''; SECTS.forEach((s, i) => { const b = document.createElement('button'); b.style.setProperty('--c', s.col); b.className = i === mySect ? 'on' : ''; b.textContent = SICON[i] + ' ' + s.n; b.onclick = () => { mySect = i; drawSects(); }; sbox.appendChild(b); }); sdesc.innerHTML = '<b style="color:' + SECTS[mySect].col + '">' + SECTS[mySect].n + '</b><br>' + SDESC[mySect]; }
 drawSects();
 document.getElementById('play').onclick = () => {
   myName = (nameIn.value || '').trim().slice(0, 12) || 'Игрок' + Math.floor(Math.random() * 100);

@@ -159,12 +159,28 @@ void main(){
       if (k === 'table') return [[geo.box, 0x6b4a2e, M(0, 13, 0, w, 2.5, h)], [geo.box, 0x4a3624, M(w * .4, 6, h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(-w * .4, 6, h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(w * .4, 6, -h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(-w * .4, 6, -h * .35, 2, 12, 2)], [geo.box, 0xe8e4da, M(w * .15, 15, 0, 6, 1.5, 5)]];
       if (k === 'desk') return [[geo.box, 0x5a4a3a, M(0, 13, 0, w, 2.5, h)], [geo.box, 0x4a3c2e, M(w * .3, 6, 0, w * .35, 12, h * .9)], [geo.box, 0x2a2a2a, M(-w * .1, 18, 0, 8, 7, 2)], [geo.box, 0x34342f, M(-w * .1, 7, h * .7, 8, 14, 8)]];
       if (k === 'sofa') return [[geo.box, 0x5a3a3a, M(0, 5, 0, w, 10, h)], [geo.box, 0x4a2e2e, M(0, 12, -h * .35, w, 14, h * .3)], [geo.box, 0x4a2e2e, M(w * .45, 9, 0, w * .1, 10, h)], [geo.box, 0x4a2e2e, M(-w * .45, 9, 0, w * .1, 10, h)]];
+      if (k === 'bench') return [[geo.box, 0x6b4a2e, M(0, 8, 0, w, 2.5, h)], [geo.box, 0x5a3c24, M(-w * .42, 14, 0, 2, 12, h)], [geo.box, 0x4a3220, M(0, 4, h * .42, w * .8, 8, 2)], [geo.box, 0x4a3220, M(0, 4, -h * .42, w * .8, 8, 2)]];
+      if (k === 'altar0') return [[geo.box, 0xf2efe6, M(0, 11, 0, w, 22, h)], [geo.box, 0xff7eb0, M(0, 22.5, 0, w * .9, 1.5, h * .5)], [geo.box, 0xff7eb0, M(-1, 26, -6, 12, 4, 20)], [geo.dome, 0xff9ec4, M(-1, 26, -16, 6, 5, 6)], [geo.box, 0xffffff, M(-1, 29, -4, 12, 2, 4)], [geo.box, 0x6b4a2e, M(-2, 24, 12, 8, 3, 10)]];
+      if (k === 'altar1') return [[geo.box, 0x2a2630, M(0, 10, 0, w, 20, h)], [geo.box, 0x7a1020, M(0, 20.5, 0, w * 1.02, 1.5, h * .8)], ...[-16, -6, 6, 16].map(z => [geo.cyl6, 0xe8dcc0, M(-4, 25, z, 1.4, 8, 1.4)]), ...[-16, -6, 6, 16].map(z => [geo.cone7, 0xffb347, M(-4, 30.5, z, 1.2, 3, 1.2)]), [geo.sph, 0x8a8a90, M(2, 25, 0, 5, 4, 4)], [geo.cone7, 0xd8a040, M(-3, 25, 0, 1.4, 4, 1.4, 0, 1.57)], [geo.box, 0xa259ff, M(9, 30, 0, 1.5, 20, 30)]];
+      if (k === 'altar2') return [[geo.box, 0x5a4a3a, M(0, 12, 0, w, 2.5, h)], [geo.box, 0x4a3c2e, M(0, 6, 0, w * .8, 12, h * .9)], [geo.box, 0xa8784a, M(8, 32, 0, 2, 30, h * 1.1)], ...[[-12, 38], [8, 40], [14, 28], [-6, 26], [0, 34]].map(([z, y]) => [geo.box, 0xf2efe6, M(6.6, y, z, .5, 6, 7)]), [geo.box, 0xd02020, M(6.2, 34, 0, .4, .8, 28, 0, 0)], [geo.box, 0xd02020, M(6.2, 33, 2, .4, 14, .8, .0, 0)], [geo.dome, 0xd8dde2, M(-3, 14, 10, 5, 6, 5)]];
+      if (k === 'altar3') return [[geo.box, 0x2a4a8a, M(0, 9, 0, w * .7, 18, h * .4)], [geo.box, 0x3d8bff, M(0, 19, 0, w * .8, 2, h * .5)], [geo.box, 0x55595e, M(8, 30, -14, 2, 40, 2)], [geo.box, 0x55595e, M(8, 30, 14, 2, 40, 2)], [geo.box, 0xffd43b, M(8, 42, 0, 1.5, 24, h)], [geo.box, 0x3d8bff, M(7, 42, 0, .5, 18, h * .85)], [geo.box, 0xffffff, M(6.6, 44, 0, .4, 3, h * .6)]];
       return [[geo.box, 0x6e6a62, M(0, 15, 0, w, 30, h)], [geo.box, 0xa8543a, M(-w * .2, 21, 0, w * .35, 6, h * .8)], [geo.box, 0x5a7a8a, M(w * .22, 21, 0, w * .3, 6, h * .8)], [geo.box, 0xc9a85a, M(0, 9, 0, w * .8, 6, h * .8)]]; },
     barrel: (w) => [[geo.cyl10, 0x4a5a3a, M(0, 12, 0, w / 2, 24, w / 2)], [geo.cyl10, 0x2e3a26, M(0, 8, 0, w / 2 + .3, 1.5, w / 2 + .3)], [geo.cyl10, 0x2e3a26, M(0, 17, 0, w / 2 + .3, 1.5, w / 2 + .3)]],
     fence: (w) => [[geo.box, 0x6b5238, M(0, 10, 0, w, 2, 2)], [geo.box, 0x6b5238, M(0, 18, 0, w, 2, 2)], ...[-.5, -.25, 0, .25, .5].map(k => [geo.box, 0x5a4430, M(w * k * .96, 11, 0, 3, 22, 3)])],
     bush: (w) => { const k = w / 34; return [[geo.dod, 'leaf2', M(0, 8 * k, 0, 15 * k, 11 * k, 15 * k)], [geo.dod, 'leaf', M(7 * k, 11 * k, 4 * k, 9 * k, 9 * k, 9 * k, 1)], [geo.dod, 'leaf', M(-6 * k, 10 * k, -3 * k, 9 * k, 8 * k, 9 * k, 2)]]; },
     wall: (w, h) => [[geo.box, 0x8d8d86, M(0, 11, 0, w, 22, h)], [geo.box, 0x76766f, M(0, 22.5, 0, w * 1.02, 2, h * 1.3)]],
     tent: (w, h) => [[geo.roof, 0x5a5a3a, M(0, 0, 0, w, 30, h)], [geo.box, 0x2e2e20, M(w / 2 + .3, 8, 0, .8, 14, 8)]],
+    grave: (w, h, o) => { const v = o.id % 4, st = 0x8a8a84, mound = [geo.box, 0x5a4a36, M(0, 1.5, 12, 12, 3, 18)];
+      if (v === 0) return [mound, [geo.box, st, M(0, 8, 0, 14, 16, 5)], [geo.cyl10, st, MX(0, 16, 0, 7, 5, 7)]];
+      if (v === 1) return [mound, [geo.box, 0x6e6e6a, M(0, 3, 0, 12, 6, 8)], [geo.box, 0x7a7a76, M(0, 18, 0, 6, 26, 6)], [geo.cone7, 0x7a7a76, M(0, 34, 0, 4.5, 7, 4.5)]];
+      if (v === 2) return [mound, [geo.box, 0x76746c, M(0, 7, 0, 14, 14, 4.5, 0, .25)]];
+      return [mound, [geo.box, 0x9a968c, M(0, 9, 0, 13, 18, 4)], [geo.box, 0x6e5a8a, M(0, 3, 6, 3, 6, 3)]]; },
+    deadtree: (w) => { const k = w / 34; return [[geo.cyl6, 0x3a3430, M(0, 22 * k, 0, 3 * k, 44 * k, 3 * k)], [geo.cyl6, 0x3a3430, M(7 * k, 36 * k, 0, 1.5 * k, 22 * k, 1.5 * k, 0, -.8)], [geo.cyl6, 0x3a3430, M(-6 * k, 32 * k, 3 * k, 1.4 * k, 18 * k, 1.4 * k, 1, .9)], [geo.cyl6, 0x3a3430, M(2 * k, 46 * k, -3 * k, 1.2 * k, 14 * k, 1.2 * k, 2, .5)]]; },
+    ifence: (w) => [[geo.box, 0x1e1e22, M(0, 6, 0, w, 2, 2)], [geo.box, 0x1e1e22, M(0, 26, 0, w, 2, 2)], ...[...Array(12)].map((_, i) => [geo.box, 0x1e1e22, M((i / 11 - .5) * w * .96, 15, 0, 1.6, 30, 1.6)]), ...[...Array(12)].map((_, i) => [geo.cone7, 0x1e1e22, M((i / 11 - .5) * w * .96, 32, 0, 2, 5, 2)])],
+    antenna: () => [[geo.box, 0x6a6e72, M(0, 2, 0, 12, 4, 12)], [geo.cyl6, 0x9aa0a6, M(0, 24, 0, 1.6, 44, 1.6, 0, .35)], [geo.box, 0x9aa0a6, M(-5, 30, 0, 22, 1.2, 1.2, 0, .55)], [geo.box, 0x9aa0a6, M(-9, 40, 0, 16, 1.2, 1.2, 0, .1)], [geo.cyl6, 0x9aa0a6, M(14, 1.5, 6, 1.4, 30, 1.4, 0, 1.5)]],
+    dish: () => [[geo.cyl6, 0x777b80, M(0, 9, 0, 2, 18, 2)], [geo.dome, 0xd8dde2, M(2, 22, 0, 13, 4, 13, 0, 1.9)], [geo.cyl6, 0x555a60, M(-4, 21, 0, 1, 12, 1, 0, 1.2)]],
+    junk: () => [[geo.box, 0x7a6a4a, M(0, 6, 0, 18, 12, 14, .4)], [geo.box, 0x8a8e92, M(8, 4, -6, 12, 8, 10, 1.1)], [geo.lay, 0x1c1c1c, M(-8, 4, 8, 4, 4, 10)], [geo.box, 0xd8dde2, M(-2, 13, 0, 12, 3, 10, .2, .3)]],
+    billboard: (w) => [[geo.box, 0x55595e, M(-w * .3, 22, 0, 3, 44, 3)], [geo.box, 0x55595e, M(w * .3, 22, 0, 3, 44, 3)], [geo.box, 0xf2f0ea, M(0, 56, 0, w, 32, 3)], [geo.box, 0x3d8bff, M(0, 56, 1.8, w * .9, 26, .6)], [geo.box, 0xffd43b, M(-w * .1, 62, 2.3, w * .55, 4, .4)], [geo.box, 0xffffff, M(0, 54, 2.3, w * .7, 3, .4)], [geo.box, 0xffffff, M(-w * .08, 48, 2.3, w * .5, 3, .4)], [geo.box, 0xff5a5a, M(0, 56, -1.8, w * .9, 26, .6)], [geo.box, 0xffffff, M(w * .05, 60, -2.3, w * .6, 4, .4)], [geo.box, 0xffd43b, M(0, 50, -2.3, w * .4, 3, .4)]],
   };
   // лёгкая разница в размерах деревьев и камней
   const sizeVar = o => (o.type === 'tree' || o.type === 'pine' || o.type === 'rock' || o.type === 'cactus') ? .82 + ((o.id * 37) % 36) / 100 : 1;
@@ -234,13 +250,67 @@ void main(){
     plaster: { tex: 'plaster', cols: [0xe0d6c2, 0xd8cfbe, 0xcdbfa6, 0xd9c9b0] }, plaster2: { tex: 'plaster', cols: [0xc9c2b4, 0xbcb4a6, 0xd6cfc0, 0xb8a990] },
     brick: { tex: 'brick', cols: [0xb8705a, 0xa86450, 0xc08068] }, concrete: { tex: 'concrete', cols: [0xbdb8ae, 0xaaa69e, 0x9c988f] },
     wood: { tex: 'wood', cols: [0x8a5a3a, 0x7a3a2c, 0x6e5238] }, metal: { tex: 'metal', cols: [0x8a8f86, 0x7a8478, 0x9a9488] }, adobe: { tex: 'adobe', cols: [0xd9b88a, 0xcfa878, 0xe0c49a] },
+    hallbrick: { tex: 'brick', cols: [0xe0c49a] }, stone: { tex: 'concrete', cols: [0x5a5660] }, white: { tex: 'plaster', cols: [0xf4f2ec] },
   };
   const FLOOR = { wood: ['fwood', 0x9a7350], tile: ['tile', 0xb8b4aa], concrete: ['floorc', 0x99968e], dirt: ['dirt', 0x8a7556] };
   const ROOFC = [0x7e3a2c, 0x4a4f57, 0x6b4a3a, 0x5b4636, 0x8a4a34];
-  const bInst = {}, bParts = []; let insideB = -1;
+  const bInst = {}, bParts = []; let insideB = -1; const deco = {};
+  // вывеска с текстом: всегда повёрнута к камере, чтобы читалась
+  function sign(bid, wp, y, w, h, lines, bg, fg, frame) {
+    const c = document.createElement('canvas'), k = 6; c.width = w * k; c.height = h * k; const g = c.getContext('2d');
+    g.fillStyle = frame || bg; g.fillRect(0, 0, c.width, c.height); g.fillStyle = bg; g.fillRect(k * 1.2, k * 1.2, c.width - k * 2.4, c.height - k * 2.4);
+    g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+    lines.forEach(([t, sz], i) => { g.font = '900 ' + (sz * k) + 'px system-ui,sans-serif'; const mw = g.measureText(t).width, lim = c.width - k * 5; if (mw > lim) g.font = '900 ' + Math.floor(sz * k * lim / mw) + 'px system-ui,sans-serif'; g.fillText(t, c.width / 2, c.height * (i + .5) / lines.length + (lines.length > 1 ? (i ? -k : k) : 0)); });
+    const tx = new T.CanvasTexture(c); tx.anisotropy = 4;
+    const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: tx, side: T.DoubleSide }));
+    m.position.set(wp[0], y, wp[1]); m.rotation.order = 'YXZ'; m.rotation.y = Math.atan2(CAM_OFF.x, CAM_OFF.z); m.rotation.x = -.25; scene.add(m); (deco[bid] = deco[bid] || []).push(m); return m;
+  }
+  // уникальный вид церквей сект
+  function churchDeco(b, K, pcs) {
+    const d = b.doors[0], dc = lerp(d.i, d.o, .5), rr_ = sub(dc, b.p), lx = dot(rr_, b.u), ly = dot(rr_, b.v), n = sub(d.o, d.i), nl = [dot(n, b.u), dot(n, b.v)], ax = Math.abs(nl[0]) > Math.abs(nl[1]);
+    const fx = ax ? Math.sign(nl[0]) : 0, fz = ax ? 0 : Math.sign(nl[1]); // наружу от двери
+    const out = (k, side = 0) => [lx + fx * k + (ax ? 0 : side), ly + fz * k + (ax ? side : 0)]; // точка перед дверью
+    const wpt = q => add(add(b.p, b.u, q[0]), b.v, q[1]);
+    const P = (g, col, m, role = 'roof', tx = 'plaster') => pcs.push([g, tx, 48, col, m, role]);
+    // табличка на столбиках со стороны камеры (чтобы читалась)
+    const lawn = (y, w, h, lines, bg, fg, fr, side = 0) => { const cd = norm([CAM_OFF.x, CAM_OFF.z]), wp = add(add(b.p, cd, b.rad * .8 + 30), [-cd[1], cd[0]], side), q = sub(add(wp, cd, -3.5), b.p), lq = [dot(q, b.u), dot(q, b.v)];
+      for (const sd of [-1, 1]) { const o = [Math.cos(Math.atan2(CAM_OFF.x, CAM_OFF.z)) * sd * w * .38, -Math.sin(Math.atan2(CAM_OFF.x, CAM_OFF.z)) * sd * w * .38], oq = [dot(o, b.u), dot(o, b.v)]; P(geo.box, 0x55595e, M(lq[0] + oq[0], y / 2, lq[1] + oq[1], 2.4, y, 2.4), 'prop'); }
+      sign(b.id, wp, y + h / 2 - 2, w, h, lines, bg, fg, fr); };
+    const W = b.w, H = b.h, top = WALLH;
+    if (K.church === 0) { // «Зал Вечного Тапка»: аккуратный низкий зал, газон, кусты, стойка с литературой, гигантский тапок на крыше
+      const rh = Math.min(W, H) * .2;
+      const sa = .3, sx_ = Math.cos(sa), sz_ = -Math.sin(sa), at = (k, y) => [k * sx_, top + rh + y, k * sz_];
+      { const [x, y, z] = at(4, 3); P(geo.box, 0xff7eb0, M(x, y, z, 70, 4, 30, sa)); } { const [x, y, z] = at(-35, 3); P(geo.cyl10, 0xff7eb0, M(x, y, z, 15, 4, 15)); } { const [x, y, z] = at(39, 3); P(geo.cyl10, 0xff7eb0, M(x, y, z, 15, 4, 15)); }
+      { const [x, y, z] = at(-20, 9); P(geo.box, 0xd94a8a, M(x, y, z, 14, 9, 33, sa)); } { const [x, y, z] = at(-20, 15); P(geo.box, 0xffffff, M(x, y, z, 6, 3, 18, sa)); }
+      for (const sd of [-1, 1]) for (let k = 0; k < 4; k++) { const q = out(18, sd * (36 + k * 20)); P(geo.dod, 0x3f6a2a, M(q[0], 7, q[1], 9, 8, 9), 'prop', 'plaster'); }
+      const q = out(26, 34); P(geo.box, 0x4a4f57, M(q[0], 10, q[1], 10, 20, 10), 'prop'); P(geo.box, 0xff7eb0, M(q[0] + fx * 5.2, 13, q[1] + fz * 5.2, ax ? .6 : 8, 12, ax ? 8 : .6), 'prop'); P(geo.box, 0xffd43b, M(q[0] + fx * 5.3, 8, q[1] + fz * 5.3, ax ? .6 : 6, 3, ax ? 6 : .6), 'prop');
+      lawn(16, 80, 24, [['ЗАЛ ВЕЧНОГО ТАПКА', 8], ['собрания по средам и воскресеньям', 4.5]], '#fff8ee', '#c2185b', '#7a8a9a');
+    } else if (K.church === 1) { // «Обитель» Тёмного Ордена: крутая чёрная крыша, шпиль со сферой, каменные голуби на углах, свечи у входа
+      const rh = Math.min(W, H) * .75;
+      P(geo.cone7, 0x1e1c24, M(0, top + rh + 26, 0, 9, 56, 9), 'roof'); P(geo.sph, 0xa259ff, M(0, top + rh + 58, 0, 6, 6, 6), 'roof');
+      for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { const x = sx * (W / 2 - 4), z = sz * (H / 2 - 4); P(geo.box, 0x4a4650, M(x, top + 4, z, 12, 8, 12)); P(geo.sph, 0x6e6a74, M(x, top + 13, z, 6, 6, 5)); P(geo.sph, 0x6e6a74, M(x + 4, top + 19, z, 3.4, 3.4, 3.4)); P(geo.cone7, 0x9a8a50, M(x + 8, top + 19, z, 1.3, 3.5, 1.3, 0, -1.57)); }
+      for (let k = -2; k <= 2; k++) { if (!k) continue; const q = out(14, k * 12); P(geo.cyl6, 0xe8dcc0, M(q[0], 5, q[1], 1.6, 10, 1.6), 'prop'); P(geo.cone7, 0xffa040, M(q[0], 11.5, q[1], 1.3, 3, 1.3), 'prop'); }
+      for (const sd of [-1, 1]) { const q = out(WALLT / 2 + .8, sd * 34); P(geo.box, 0x5a1f8a, M(q[0], 38, q[1], ax ? 1 : 14, 34, ax ? 14 : 1), 'wall'); }
+      lawn(14, 64, 20, [['ОБИТЕЛЬ ТЬМЫ', 9], ['голуби принимаются', 4.5]], '#14101a', '#b07cff', '#3a2a50');
+    } else if (K.church === 2) { // бункер «Великого Заговора»: крыша в фольге, сломанные антенны, тарелки
+      for (let i = 0; i < 16; i++) { const x = ((i * 37) % 100 / 100 - .5) * W * .85, z = ((i * 61) % 100 / 100 - .5) * H * .85; P(geo.box, i % 2 ? 0xeef2f6 : 0xc8ced6, M(x, top + 4 + (i % 3), z, 26 + i % 4 * 6, 2.5, 20 + i % 3 * 7, i * .7, (i % 5 - 2) * .06), 'roof', 'metal'); }
+      for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let k = -1; k <= 1; k++) { const x = sx ? sx * (W / 2 + 2) : k * W * .3, z = sz ? sz * (H / 2 + 2) : k * H * .3; P(geo.box, 0xd8dde2, M(x, top - 6, z, sx ? 2 : 24, 16, sx ? 22 : 2, 0, sx * .12), 'roof', 'metal'); }
+      P(geo.cyl6, 0x9aa0a6, M(W * .25, top + 34, -H * .2, 1.8, 60, 1.8, 0, .25), 'roof'); P(geo.box, 0x9aa0a6, M(W * .25 - 8, top + 52, -H * .2, 26, 1.4, 1.4, 0, .9), 'roof'); P(geo.box, 0x9aa0a6, M(W * .25 - 4, top + 42, -H * .2, 18, 1.4, 1.4, .5, -.4), 'roof');
+      P(geo.cyl6, 0x9aa0a6, M(-W * .3, top + 18, H * .2, 1.5, 30, 1.5, 0, -.6), 'roof'); P(geo.cyl6, 0x9aa0a6, M(-W * .3 + 14, top + 5, H * .2 + 6, 1.4, 26, 1.4, .6, 1.45), 'roof');
+      P(geo.dome, 0xe0e4e8, M(-W * .1, top + 14, -H * .28, 15, 5, 15, .8, 1.7), 'roof'); P(geo.cyl6, 0x777b80, M(-W * .1, top + 8, -H * .28, 2, 10, 2), 'roof');
+      lawn(12, 66, 22, [['ОНИ СЛЕДЯТ!', 9], ['шапку не снимать', 4.5]], '#c8a06a', '#b01010', '#7a5a34');
+    } else { // «собор» Святого Плаката: белое здание, шпиль из билбордов
+      const cols = [0x3d8bff, 0xffd43b, 0xff5a5a, 0x3d8bff];
+      for (let t = 0; t < 4; t++) { const s = 1 - t * .2; for (let r = 0; r < 2; r++) P(geo.box, cols[(t + r) % 4], M(0, top + 22 + t * 30, 0, 90 * s, 28, 3, r * 1.5708 + t * .4), 'roof'); P(geo.box, 0x55595e, M(0, top + 8 + t * 30, 0, 4, 30, 4), 'roof'); }
+      P(geo.cone7, 0xffd43b, M(0, top + 150, 0, 8, 22, 8), 'roof');
+      for (let i = 0; i < 10; i++) { const x = (i / 9 - .5) * (W - 20); for (const sd of [-1, 1]) P(geo.box, cols[(i + (sd > 0 ? 1 : 0)) % 4], M(x, 34, sd * (H / 2 + 3.6), 16, 20, .8), 'wall'); }
+      for (const sd of [-1, 1]) { const q = out(20, sd * 30); P(geo.cyl10, 0xd8d4ca, M(q[0], 6, q[1], 5, 12, 5), 'prop'); P(geo.box, 0xf2efe6, M(q[0], 12.4, q[1], 7, .8, 7), 'prop'); }
+      sign(b.id, add(b.p, [0, 0]), top + 100 + 22, 80, 24, [['СЛАВА ПЛАКАТУ!', 10]], '#3d8bff', '#ffffff', '#ffd43b');
+    }
+  }
   function buildBuildings(objs) {
     for (const k in bInst) { scene.remove(bInst[k].mesh); if (bInst[k].mesh.userData.outline) scene.remove(bInst[k].mesh.userData.outline); delete bInst[k]; }
-    bParts.length = 0; insideB = -1;
+    bParts.length = 0; insideB = -1; for (const k in deco) { deco[k].forEach(m => scene.remove(m)); delete deco[k]; }
     const plan = {}, Y = new T.Vector3(0, 1, 0), ONE = new T.Vector3(1, 1, 1);
     for (const b of objs.blds || []) {
       const K = BKIND[b.kind], S = BSTY[K.style], base = new T.Matrix4().compose(new T.Vector3(b.p[0], 0, b.p[1]), new T.Quaternion().setFromAxisAngle(Y, -b.a), ONE);
@@ -263,10 +333,12 @@ void main(){
       for (const [x, y] of b.idoors) { const onV = b.walls.some(i => { const o = objs[i]; return !o.hor && Math.abs(o.lx - x) < 1; }); pcs.push([geo.box, wm, 48, wc, M(x, WALLH - 8, y, onV ? WALLT : DOOR + 2, 16, onV ? DOOR + 2 : WALLT), 'top']); }
       // крыша
       const rc = ROOFC[b.id % ROOFC.length];
-      if (K.roof === 'gable') { const along = b.w >= b.h; pcs.push([geo.roof, 'rooftile', 24, K.style === 'metal' ? 0x7a807a : rc, along ? M(0, WALLH, 0, b.w * 1.04, Math.min(b.h, b.w) * .38, b.h * 1.08) : M(0, WALLH, 0, b.h * 1.04, Math.min(b.h, b.w) * .38, b.w * 1.08, 1.5708), 'roof']); }
-      else { pcs.push([geo.box, 'gravel', 32, 0x8a867e, M(0, WALLH + 1.5, 0, b.w + 2, 3, b.h + 2), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, WALLH + 4.5, b.h / 2 - 1, b.w + 3, 6, 3), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, WALLH + 4.5, -b.h / 2 + 1, b.w + 3, 6, 3), 'roof']);
+      const GR = { gable: [.38, K.style === 'metal' ? 0x7a807a : rc], lowgable: [.2, 0x5a6068], steep: [.75, 0x2a2730] }[K.roof];
+      if (GR) { const along = b.w >= b.h; pcs.push([geo.roof, 'rooftile', 24, GR[1], along ? M(0, WALLH, 0, b.w * 1.04, Math.min(b.h, b.w) * GR[0], b.h * 1.08) : M(0, WALLH, 0, b.h * 1.04, Math.min(b.h, b.w) * GR[0], b.w * 1.08, 1.5708), 'roof']); }
+      else { pcs.push([geo.box, K.roof === 'foil' ? 'metal' : 'gravel', K.roof === 'foil' ? 9 : 32, K.roof === 'foil' ? 0xdfe4ea : 0x8a867e, M(0, WALLH + 1.5, 0, b.w + 2, 3, b.h + 2), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, WALLH + 4.5, b.h / 2 - 1, b.w + 3, 6, 3), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, WALLH + 4.5, -b.h / 2 + 1, b.w + 3, 6, 3), 'roof']);
         pcs.push([geo.box, wm, 48, wc, M(b.w / 2 - 1, WALLH + 4.5, 0, 3, 6, b.h), 'roof']); pcs.push([geo.box, wm, 48, wc, M(-b.w / 2 + 1, WALLH + 4.5, 0, 3, 6, b.h), 'roof']);
-        pcs.push([geo.box, 'metal', 24, 0x9a9a92, M(b.w * .22, WALLH + 7, -b.h * .15, 22, 10, 16), 'roof']); }
+        if (!K.church) pcs.push([geo.box, 'metal', 24, 0x9a9a92, M(b.w * .22, WALLH + 7, -b.h * .15, 22, 10, 16), 'roof']); }
+      if (K.church !== undefined) churchDeco(b, K, pcs);
       bParts[b.id] = [];
       for (const [g, tx, sc, col, lm, role, low] of pcs) { const key = g.uuid + '|' + tx + '|' + sc + '|' + (role === 'floor' ? 'f' : 'w'); (plan[key] = plan[key] || { g, tx, sc, items: [] }).items.push([b.id, col, base.clone().multiply(lm), role, low ? base.clone().multiply(low) : null]); }
     }
@@ -281,8 +353,9 @@ void main(){
   // игрок внутри здания: крыша исчезает, стены опускаются — видно, что внутри
   function setInside(bid) {
     if (bid === insideB) return;
-    const set = (id, open) => { for (const [mesh, i, m, role, low] of bParts[id] || []) { mesh.setMatrixAt(i, !open || role === 'floor' ? m : low || zero); mesh.instanceMatrix.needsUpdate = true; } };
+    const set = (id, open) => { for (const [mesh, i, m, role, low] of bParts[id] || []) { mesh.setMatrixAt(i, !open || role === 'floor' || role === 'prop' ? m : low || zero); mesh.instanceMatrix.needsUpdate = true; } };
     if (insideB >= 0) set(insideB, false); insideB = bid; if (bid >= 0) set(bid, true);
+    for (const k in deco) for (const m of deco[k]) m.visible = +k !== bid;
   }
   function killObj(id) { for (const [mesh, i] of objIdx[id] || []) { mesh.setMatrixAt(i, zero); mesh.instanceMatrix.needsUpdate = true; } }
 
