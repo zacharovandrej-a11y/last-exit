@@ -400,19 +400,24 @@ void main(){
     armR.rotation.set(-.35, 0, .12); elR.rotation.x = -1.25;
     armL.rotation.set(-1.0, 0, -.45); elL.rotation.set(-.5, 0, .35);
     const gunHold = new T.Group(); gunHold.position.set(2.6, 32.5, 8); body.add(gunHold);
+    const itemG = new T.Group(); elR.add(itemG);
     if (cv) { // жители без оружия: руки вниз, в руке — своя вещь
       armL.rotation.set(0, 0, -.12); elL.rotation.set(-.25, 0, 0); armR.rotation.set(-.2, 0, .12); elR.rotation.x = -.5;
-      const it = (gg, c, x, y, z, sx, sy, sz, rx = 0) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.x = rx; elR.add(o); };
+      const it = (gg, c, x, y, z, sx, sy, sz, rx = 0) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.x = rx; itemG.add(o); };
       const items = { bag: () => it(geo.box, 0x4a2e1e, 0, -12, 0, 3, 7, 7), case: () => it(geo.box, 0x2a1e14, 0, -13, 0, 2.6, 8, 10), leaflets: () => it(geo.box, 0xfafafa, 0, -10, 2.5, 5, 1.6, 6.5), candle: () => { it(geo.cyl6, 0xf2e6c0, 0, -8, 3, 1, 6, 1); it(geo.sph, 0xffb020, 0, -4.4, 3, 1, 1.6, 1); }, folder: () => it(geo.box, 0xc9a85a, 0, -10, 2.5, 1.4, 8, 6), roll: () => it(geo.cyl10, 0xf6f6f2, 0, -9, 3, 1.6, 14, 1.6, 1.4) };
       if (cv.item) items[cv.item](); }
     const shadow = new T.Mesh(new T.CircleGeometry(11, 16), new T.MeshBasicMaterial({ color: 0, transparent: true, opacity: .22, depthWrite: false })); shadow.rotation.x = -Math.PI / 2; shadow.position.y = .6; g.add(shadow);
     body.traverse(o => { if (o.isMesh) o.castShadow = true; }); if (STYLE === 'toon') { const ms = []; body.traverse(o => { if (o.isMesh) ms.push(o); }); ms.forEach(o => addOutline(o, OUT_C)); }
-    g.userData = { body, legL, legR, kneeL, kneeR, armL, armR, head, torso, vest, gunHold, gunKey: '', mats, shadow };
+    g.userData = { body, legL, legR, kneeL, kneeR, armL, armR, elL, elR, itemG, civ: !!cv, head, torso, vest, gunHold, gunKey: '', mats, shadow };
     return g;
   }
   function setGun(c, wb) {
     const u = c.userData; if (u.gunKey === wb) return; u.gunKey = wb;
-    u.gunHold.clear(); const w = wb & 15; if (w) { const gm = gunMesh(w, wb >> 4); gm.traverse(o => { if (o.isMesh) o.castShadow = true; }); u.gunHold.add(gm); }
+    u.gunHold.clear(); const w = wb & 15;
+    if (u.civ) { // житель взял оружие — руки в стойку, вещь убираем
+      if (w) { u.armR.rotation.set(-.35, 0, .12); u.elR.rotation.set(-1.25, 0, 0); u.armL.rotation.set(-1, 0, -.45); u.elL.rotation.set(-.5, 0, .35); } else { u.armL.rotation.set(0, 0, -.12); u.elL.rotation.set(-.25, 0, 0); u.armR.rotation.set(-.2, 0, .12); u.elR.rotation.set(-.5, 0, 0); }
+      u.itemG.visible = !w; }
+    if (w) { const gm = gunMesh(w, wb >> 4); gm.traverse(o => { if (o.isMesh) o.castShadow = true; }); u.gunHold.add(gm); }
   }
   function poseChar(c, p, aim, walk, opt = {}) {
     c.position.set(p[0], opt.alt || 0, p[1]); c.rotation.set(0, Math.atan2(aim[0], aim[1]), 0);
