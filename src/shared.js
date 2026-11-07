@@ -119,7 +119,7 @@ const BKIND = {
   lodge: { w: 230, h: 160, maxRoom: 90, doors: 2, style: 'wood', floor: 'wood', roof: 'gable', furn: 'home' },
   // церкви сект: один зал, алтарь в конце
   ch0: { door: 72, w: 360, h: 240, maxRoom: 600, wallHeight: 88, window: 40, doors: 2, style: 'hallplaster', floor: 'tile', roof: 'lowgable', furn: 'church', church: 0 },
-  ch1: { door: 60, w: 170, h: 120, maxRoom: 300, doors: 2, style: 'stone', floor: 'concrete', roof: 'steep', furn: 'church', church: 1 },
+  ch1: { door: 64, w: 300, h: 210, maxRoom: 600, wallHeight: 94, window: 28, doors: 2, style: 'orderstone', floor: 'concrete', roof: 'steep', furn: 'church', church: 1 },
   ch2: { door: 60, w: 170, h: 130, maxRoom: 300, doors: 2, style: 'concrete', floor: 'concrete', roof: 'foil', furn: 'church', church: 2, slit: 1 },
   ch3: { door: 60, w: 230, h: 150, maxRoom: 300, doors: 2, style: 'white', floor: 'tile', roof: 'billboards', furn: 'church', church: 3 },
   adobe: { w: 200, h: 170, maxRoom: 85, doors: 2, style: 'adobe', floor: 'dirt', roof: 'flat', furn: 'home' },
@@ -147,7 +147,7 @@ function genWorld() {
     const K = BKIND[kind], W2 = K.w / 2, H2 = K.h / 2, t = WALLT, D = DOOR, ED = K.door || DOOR;
     const randomAngle = Math.floor(rnd() * 4) * 1.5708 + (rnd() - .5) * .3;
     // Вход церкви находится на локальной стороне -X; сохраняем оба вызова rnd для угла.
-    const a = K.church !== undefined ? Math.atan2(p[1], p[0]) + (K.church === 0 ? .32 : 0) : randomAngle, u = [Math.cos(a), Math.sin(a)], v = perp(u);
+    const a = K.church !== undefined ? Math.atan2(p[1], p[0]) + (K.church <= 1 ? .32 : 0) : randomAngle, u = [Math.cos(a), Math.sin(a)], v = perp(u);
     const b = { id: blds.length, kind, p, a, u, v, w: K.w, h: K.h, rad: Math.hypot(K.w, K.h) / 2, walls: [], furn: [], doors: [], rooms: [], idoors: [] };
     const L = (x, y) => add(add(p, u, x), v, y);
     const seg = (x0, y0, x1, y1, win) => { const ln = Math.hypot(x1 - x0, y1 - y0); if (ln < 3) return; const hor = Math.abs(y1 - y0) < 1e-6;
@@ -234,7 +234,10 @@ function genWorld() {
       const Q = [0]; seen[0] = 1; while (Q.length) { const k = Q.pop(), i = k % nx, j = (k / nx) | 0; for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a2 = i + di, c = j + dj; if (a2 < 0 || c < 0 || a2 >= nx || c >= ny) continue; const q = c * nx + a2; if (!seen[q] && ok[q]) { seen[q] = 1; Q.push(q); } } }
       return b.rooms.every(r => { for (let j = Math.ceil((r.y0 + Y) / S); -Y + j * S < r.y1; j++) for (let i = Math.ceil((r.x0 + X) / S); -X + i * S < r.x1; i++) if (seen[j * nx + i]) return true; return false; }); };
     for (let k = b.furn.length - 1; k >= 0 && !allOk(); k--) { const o = objs[b.furn[k]]; o.gone = 1; }
-    blds.push(b); if (K.yard) { b.yard = K.yard; housePlots.push(b); } return b;
+    blds.push(b); if (K.yard) { b.yard = K.yard; housePlots.push(b);
+      // За калитками тоже нужен свободный подход, иначе случайный объект запирает двор.
+      for (const d of b.doors) hqApproaches.push([d.o, add(d.o, norm(sub(d.o, d.i)), Math.max(...K.yard) / 2 + 80 - dist(d.o, p))]);
+    } return b;
   }
   function manyB(kinds, cen, r, n, tries = 30) { for (let i = 0; i < n; i++) { const kind = kinds[Math.floor(rnd() * kinds.length)], K = BKIND[kind], m = Math.hypot(...(K.yard || [K.w, K.h])) / 2 + 30;
     for (let k = 0; k < tries; k++) { const p = cen ? nearPt(rnd, cen, r) : rndMap(rnd, m); if (inMap(p, m) && free(p, m) && blds.every(b => BKIND[b.kind].church === undefined || dist(p, b.p) >= 250 + m)) { building(kind, p); break; } } } }
@@ -245,7 +248,7 @@ function genWorld() {
   CHP.forEach((c, i) => { const K = BKIND['ch' + i], m = Math.hypot(K.w, K.h) / 2 + 40; for (let k = 0; k < 60; k++) { const p = k ? nearPt(rnd, c, 40 + k * 6) : c; if (inMap(p, m) && free(p, m)) { const b = building('ch' + i, p); b.sect = i; churches.push(b.id); break; } } });
   for (const id of churches) { const d = blds[id].doors[0]; hqApproaches.push([d.o, add(d.o, norm(sub(d.o, d.i)), 260)]); }
   // кладбище вокруг обители Ордена: могилы рядами, мёртвые деревья, ограда с проходами
-  { const ob = blds[churches[1]], R = 230;
+  { const ob = blds[churches[1]], R = 290;
     for (let gx = -R + 30; gx <= R - 30; gx += 34) for (let gy = -R + 30; gy <= R - 30; gy += 30) { const p = add(ob.p, [gx + (rnd() - .5) * 8, gy + (rnd() - .5) * 6]); if (rnd() < .78 && free(p, 12)) putA('grave', p, 14, 7, (rnd() - .5) * .25); }
     for (let i = 0; i < 9; i++) { const p = nearPt(rnd, ob.p, R); if (free(p, 26)) put('deadtree', p, 34, 34); }
     for (const [sx, sy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let t = -R; t < R; t += 100) { if (Math.abs(t + 50) < 70) continue; const c = sx ? [ob.p[0] + sx * R, ob.p[1] + t + 50] : [ob.p[0] + t + 50, ob.p[1] + sy * R]; if (free(c, 47)) putA('ifence', c, 92, 4, sx ? 1.5708 : 0); } }
