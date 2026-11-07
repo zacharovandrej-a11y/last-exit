@@ -118,7 +118,7 @@ const BKIND = {
   market: { w: 400, h: 270, maxRoom: 90, doors: 4, style: 'concrete', floor: 'tile', roof: 'flat', furn: 'store', hall: .68, door: 60 },
   lodge: { w: 230, h: 160, maxRoom: 90, doors: 2, style: 'wood', floor: 'wood', roof: 'gable', furn: 'home' },
   // церкви сект: один зал, алтарь в конце
-  ch0: { door: 60, w: 200, h: 130, maxRoom: 300, doors: 2, style: 'hallbrick', floor: 'tile', roof: 'lowgable', furn: 'church', church: 0 },
+  ch0: { door: 72, w: 360, h: 240, maxRoom: 600, wallHeight: 88, window: 40, doors: 2, style: 'hallplaster', floor: 'tile', roof: 'lowgable', furn: 'church', church: 0 },
   ch1: { door: 60, w: 170, h: 120, maxRoom: 300, doors: 2, style: 'stone', floor: 'concrete', roof: 'steep', furn: 'church', church: 1 },
   ch2: { door: 60, w: 170, h: 130, maxRoom: 300, doors: 2, style: 'concrete', floor: 'concrete', roof: 'foil', furn: 'church', church: 2, slit: 1 },
   ch3: { door: 60, w: 230, h: 150, maxRoom: 300, doors: 2, style: 'white', floor: 'tile', roof: 'billboards', furn: 'church', church: 3 },
@@ -133,7 +133,7 @@ function genWorld() {
     const v = sub(b, a), t = Math.max(0, Math.min(1, dot(sub(p, a), v) / dot(v, v)));
     return dist(p, add(a, v, t)) < 60 + m;
   });
-  const free = (p, m) => { if (blocksApproach(p, m) || housePlots.some(b => { const r = sub(p, b.p); return Math.hypot(Math.max(0, Math.abs(dot(r, b.u)) - b.yard[0] / 2), Math.max(0, Math.abs(dot(r, b.v)) - b.yard[1] / 2)) < m; })) return false; for (const o of objs) if (o.bid === undefined && dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + b.rad) return false; return true; };
+  const free = (p, m) => { if (blocksApproach(p, m) || housePlots.some(b => { const r = sub(p, b.p); return Math.hypot(Math.max(0, Math.abs(dot(r, b.u)) - b.yard[0] / 2), Math.max(0, Math.abs(dot(r, b.v)) - b.yard[1] / 2)) < m; })) return false; for (const o of objs) if (o.bid === undefined && dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + (b.kind === 'ch0' ? 370 : b.rad)) return false; return true; };
   function putA(type, p, w, h, a) {
     const u = [Math.cos(a), Math.sin(a)];
     const o = { id: objs.length, type, p, a, u, v: perp(u), w, h, rad: Math.hypot(w, h) / 2, sh: OT[type].s };
@@ -147,7 +147,7 @@ function genWorld() {
     const K = BKIND[kind], W2 = K.w / 2, H2 = K.h / 2, t = WALLT, D = DOOR, ED = K.door || DOOR;
     const randomAngle = Math.floor(rnd() * 4) * 1.5708 + (rnd() - .5) * .3;
     // Вход церкви находится на локальной стороне -X; сохраняем оба вызова rnd для угла.
-    const a = K.church !== undefined ? Math.atan2(p[1], p[0]) : randomAngle, u = [Math.cos(a), Math.sin(a)], v = perp(u);
+    const a = K.church !== undefined ? Math.atan2(p[1], p[0]) + (K.church === 0 ? .32 : 0) : randomAngle, u = [Math.cos(a), Math.sin(a)], v = perp(u);
     const b = { id: blds.length, kind, p, a, u, v, w: K.w, h: K.h, rad: Math.hypot(K.w, K.h) / 2, walls: [], furn: [], doors: [], rooms: [], idoors: [] };
     const L = (x, y) => add(add(p, u, x), v, y);
     const seg = (x0, y0, x1, y1, win) => { const ln = Math.hypot(x1 - x0, y1 - y0); if (ln < 3) return; const hor = Math.abs(y1 - y0) < 1e-6;
@@ -253,6 +253,9 @@ function genWorld() {
   { const zb = blds[churches[2]]; for (let i = 0; i < 7; i++) { const p = nearPt(rnd, zb.p, zb.rad + 70); if (dist(p, zb.p) > zb.rad + 15 && free(p, 16)) put(i % 3 === 2 ? 'junk' : i % 3 ? 'dish' : 'antenna', p, 24, 24); } }
   // у собора Плаката: билборды вокруг
   { const pb = blds[churches[3]]; for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283 + .3, p = add(pb.p, [Math.cos(a) * (pb.rad + 55), Math.sin(a) * (pb.rad + 55)]); if (free(p, 36)) putA('billboard', p, 70, 8, a + 1.5708); } }
+  // Два жилых участка размещаем до случайной плотной застройки: образцы не должны исчезать.
+  for (const p of [[740, 260], [-1530, 215]]) { const m = Math.hypot(...BKIND.house.yard) / 2 + 30;
+    if (inMap(p, m) && free(p, m)) building('house', p); }
   manyB(['apart', 'office', 'apart', 'villa', 'house'], B[0].c, 520, 11); manyB(['house', 'villa'], B[0].c, 560, 6);
   manyB(['barracks', 'hangar', 'barracks'], B[1].c, 440, 5); manyB(['bunker'], B[1].c, 460, 5);
   manyB(['barn'], B[2].c, 470, 3); manyB(['house', 'villa'], B[2].c, 500, 4);
