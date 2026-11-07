@@ -121,7 +121,7 @@ const BKIND = {
   ch0: { door: 72, w: 360, h: 240, maxRoom: 600, wallHeight: 88, window: 40, doors: 2, style: 'hallplaster', floor: 'tile', roof: 'lowgable', furn: 'church', church: 0 },
   ch1: { door: 64, w: 300, h: 210, maxRoom: 600, wallHeight: 94, window: 28, doors: 2, style: 'orderstone', floor: 'concrete', roof: 'steep', furn: 'church', church: 1 },
   ch2: { door: 64, w: 320, h: 220, maxRoom: 600, wallHeight: 78, doors: 2, style: 'bunkercoat', floor: 'concrete', roof: 'foil', furn: 'church', church: 2, slit: 1 },
-  ch3: { door: 60, w: 230, h: 150, maxRoom: 300, doors: 2, style: 'white', floor: 'tile', roof: 'billboards', furn: 'church', church: 3 },
+  ch3: { door: 72, w: 380, h: 260, maxRoom: 600, wallHeight: 96, window: 40, doors: 2, style: 'civic', floor: 'tile', roof: 'billboards', furn: 'church', church: 3 },
   adobe: { w: 200, h: 170, maxRoom: 85, doors: 2, style: 'adobe', floor: 'dirt', roof: 'flat', furn: 'home' },
 };
 const WIN = 30; // ширина окна
@@ -133,7 +133,7 @@ function genWorld() {
     const v = sub(b, a), t = Math.max(0, Math.min(1, dot(sub(p, a), v) / dot(v, v)));
     return dist(p, add(a, v, t)) < 60 + m;
   });
-  const free = (p, m) => { if (blocksApproach(p, m) || housePlots.some(b => { const r = sub(p, b.p); return Math.hypot(Math.max(0, Math.abs(dot(r, b.u)) - b.yard[0] / 2), Math.max(0, Math.abs(dot(r, b.v)) - b.yard[1] / 2)) < m; })) return false; for (const o of objs) if (o.bid === undefined && dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + (b.kind === 'ch0' ? 370 : b.rad)) return false; return true; };
+  const free = (p, m) => { if (blocksApproach(p, m) || housePlots.some(b => { const r = sub(p, b.p); return Math.hypot(Math.max(0, Math.abs(dot(r, b.u)) - b.yard[0] / 2), Math.max(0, Math.abs(dot(r, b.v)) - b.yard[1] / 2)) < m; })) return false; for (const o of objs) if (o.bid === undefined && dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + (b.kind === 'ch0' ? 370 : b.kind === 'ch3' ? 330 : b.rad)) return false; return true; };
   function putA(type, p, w, h, a) {
     const u = [Math.cos(a), Math.sin(a)];
     const o = { id: objs.length, type, p, a, u, v: perp(u), w, h, rad: Math.hypot(w, h) / 2, sh: OT[type].s };
@@ -147,7 +147,7 @@ function genWorld() {
     const K = BKIND[kind], W2 = K.w / 2, H2 = K.h / 2, t = WALLT, D = DOOR, ED = K.door || DOOR;
     const randomAngle = Math.floor(rnd() * 4) * 1.5708 + (rnd() - .5) * .3;
     // Вход церкви находится на локальной стороне -X; сохраняем оба вызова rnd для угла.
-    const a = K.church !== undefined ? Math.atan2(p[1], p[0]) + (K.church <= 1 ? .32 : K.church === 2 ? -.32 : 0) : randomAngle, u = [Math.cos(a), Math.sin(a)], v = perp(u);
+    const a = K.church !== undefined ? Math.atan2(p[1], p[0]) + (K.church === 2 ? -.32 : .32) : randomAngle, u = [Math.cos(a), Math.sin(a)], v = perp(u);
     const b = { id: blds.length, kind, p, a, u, v, w: K.w, h: K.h, rad: Math.hypot(K.w, K.h) / 2, walls: [], furn: [], doors: [], rooms: [], idoors: [] };
     const L = (x, y) => add(add(p, u, x), v, y);
     const seg = (x0, y0, x1, y1, win) => { const ln = Math.hypot(x1 - x0, y1 - y0); if (ln < 3) return; const hor = Math.abs(y1 - y0) < 1e-6;
