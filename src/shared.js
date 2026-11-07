@@ -127,7 +127,13 @@ const BKIND = {
 const WIN = 30; // ширина окна
 function genWorld() {
   const rnd = mkRng(424242), objs = [], blds = [];
-  const free = (p, m) => { for (const o of objs) if (o.bid === undefined && dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + b.rad) return false; return true; };
+  const hqApproaches = [];
+  // Коридор от входа: ширина 120, длина 260. Не занимаем его декором и случайными объектами.
+  const blocksApproach = (p, m) => hqApproaches.some(([a, b]) => {
+    const v = sub(b, a), t = Math.max(0, Math.min(1, dot(sub(p, a), v) / dot(v, v)));
+    return dist(p, add(a, v, t)) < 60 + m;
+  });
+  const free = (p, m) => { if (blocksApproach(p, m)) return false; for (const o of objs) if (o.bid === undefined && dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + b.rad) return false; return true; };
   function putA(type, p, w, h, a) {
     const u = [Math.cos(a), Math.sin(a)];
     const o = { id: objs.length, type, p, a, u, v: perp(u), w, h, rad: Math.hypot(w, h) / 2, sh: OT[type].s };
@@ -139,7 +145,9 @@ function genWorld() {
   }
   function building(kind, p) {
     const K = BKIND[kind], W2 = K.w / 2, H2 = K.h / 2, t = WALLT, D = DOOR, ED = K.door || DOOR;
-    const a = Math.floor(rnd() * 4) * 1.5708 + (rnd() - .5) * .3, u = [Math.cos(a), Math.sin(a)], v = perp(u);
+    const randomAngle = Math.floor(rnd() * 4) * 1.5708 + (rnd() - .5) * .3;
+    // Вход церкви находится на локальной стороне -X; сохраняем оба вызова rnd для угла.
+    const a = K.church !== undefined ? Math.atan2(p[1], p[0]) : randomAngle, u = [Math.cos(a), Math.sin(a)], v = perp(u);
     const b = { id: blds.length, kind, p, a, u, v, w: K.w, h: K.h, rad: Math.hypot(K.w, K.h) / 2, walls: [], furn: [], doors: [], rooms: [], idoors: [] };
     const L = (x, y) => add(add(p, u, x), v, y);
     const seg = (x0, y0, x1, y1, win) => { const ln = Math.hypot(x1 - x0, y1 - y0); if (ln < 3) return; const hor = Math.abs(y1 - y0) < 1e-6;
@@ -216,21 +224,22 @@ function genWorld() {
     blds.push(b); return b;
   }
   function manyB(kinds, cen, r, n, tries = 30) { for (let i = 0; i < n; i++) { const kind = kinds[Math.floor(rnd() * kinds.length)], K = BKIND[kind], m = Math.hypot(K.w, K.h) / 2 + 30;
-    for (let k = 0; k < tries; k++) { const p = cen ? nearPt(rnd, cen, r) : rndMap(rnd, m); if (inMap(p, m) && free(p, m)) { building(kind, p); break; } } } }
+    for (let k = 0; k < tries; k++) { const p = cen ? nearPt(rnd, cen, r) : rndMap(rnd, m); if (inMap(p, m) && free(p, m) && blds.every(b => BKIND[b.kind].church === undefined || dist(p, b.p) >= 250 + m)) { building(kind, p); break; } } } }
   const B = BIOMES;
   building('market', B[3].c);
   // церкви сект (ставим первыми, чтобы нашлось место)
-  const CHP = [[B[0].c[0] + 420, B[0].c[1] + 330], [-1560, -40], [B[1].c[0] - 330, B[1].c[1] + 360], [B[3].c[0] + 60, B[3].c[1] + 330]], churches = [];
+  const CHP = [[-1400, -1400], [-1400, 1400], [1400, -1400], [1400, 1400]], churches = [];
   CHP.forEach((c, i) => { const K = BKIND['ch' + i], m = Math.hypot(K.w, K.h) / 2 + 40; for (let k = 0; k < 60; k++) { const p = k ? nearPt(rnd, c, 40 + k * 6) : c; if (inMap(p, m) && free(p, m)) { const b = building('ch' + i, p); b.sect = i; churches.push(b.id); break; } } });
+  for (const id of churches) { const d = blds[id].doors[0]; hqApproaches.push([d.o, add(d.o, norm(sub(d.o, d.i)), 260)]); }
   // кладбище вокруг обители Ордена: могилы рядами, мёртвые деревья, ограда с проходами
   { const ob = blds[churches[1]], R = 230;
     for (let gx = -R + 30; gx <= R - 30; gx += 34) for (let gy = -R + 30; gy <= R - 30; gy += 30) { const p = add(ob.p, [gx + (rnd() - .5) * 8, gy + (rnd() - .5) * 6]); if (rnd() < .78 && free(p, 12)) putA('grave', p, 14, 7, (rnd() - .5) * .25); }
     for (let i = 0; i < 9; i++) { const p = nearPt(rnd, ob.p, R); if (free(p, 26)) put('deadtree', p, 34, 34); }
-    for (const [sx, sy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let t = -R; t < R; t += 100) { if (Math.abs(t + 50) < 70) continue; const c = sx ? [ob.p[0] + sx * R, ob.p[1] + t + 50] : [ob.p[0] + t + 50, ob.p[1] + sy * R]; if (free(c, 8)) putA('ifence', c, 92, 4, sx ? 1.5708 : 0); } }
+    for (const [sx, sy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let t = -R; t < R; t += 100) { if (Math.abs(t + 50) < 70) continue; const c = sx ? [ob.p[0] + sx * R, ob.p[1] + t + 50] : [ob.p[0] + t + 50, ob.p[1] + sy * R]; if (free(c, 47)) putA('ifence', c, 92, 4, sx ? 1.5708 : 0); } }
   // у бункера Заговора: сломанные антенны, тарелки, хлам
   { const zb = blds[churches[2]]; for (let i = 0; i < 7; i++) { const p = nearPt(rnd, zb.p, zb.rad + 70); if (dist(p, zb.p) > zb.rad + 15 && free(p, 16)) put(i % 3 === 2 ? 'junk' : i % 3 ? 'dish' : 'antenna', p, 24, 24); } }
   // у собора Плаката: билборды вокруг
-  { const pb = blds[churches[3]]; for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283 + .3, p = add(pb.p, [Math.cos(a) * (pb.rad + 55), Math.sin(a) * (pb.rad + 55)]); if (free(p, 30)) putA('billboard', p, 70, 8, a + 1.5708); } }
+  { const pb = blds[churches[3]]; for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283 + .3, p = add(pb.p, [Math.cos(a) * (pb.rad + 55), Math.sin(a) * (pb.rad + 55)]); if (free(p, 36)) putA('billboard', p, 70, 8, a + 1.5708); } }
   manyB(['apart', 'office', 'apart', 'villa', 'house'], B[0].c, 520, 11); manyB(['house', 'villa'], B[0].c, 560, 6);
   manyB(['barracks', 'hangar', 'barracks'], B[1].c, 440, 5); manyB(['bunker'], B[1].c, 460, 5);
   manyB(['barn'], B[2].c, 470, 3); manyB(['house', 'villa'], B[2].c, 500, 4);
