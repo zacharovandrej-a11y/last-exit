@@ -187,7 +187,7 @@ function onSnap(buf) {
   const nh = u8();
   for (let i = 0; i < nh; i++) { const tid = u8(), d = u8(); const e = ents[tid]; nums.push({ p: e && e.disp ? e.disp : null, tid, d, t: 0, crate: tid === 255 }); if (tid !== myId && tid !== 255) { sfx('hit', .9); hitMark = performance.now(); } }
   if (o < dv.byteLength) { const nn = u8(); for (let i = 0; i < nn; i++) { const k = u8(), p = rdPos(dv, o); o += 4; const d = [dv.getInt8(o) / 127, dv.getInt8(o + 1) / 127]; o += 2;
-    marks.push({ k: k & 15, side: k >> 4, p, d, t: 0 }); if ((k & 15) === 2) sfx(2, vol(p) * .6); } }
+    if ((k & 15) !== 1) marks.push({ k: k & 15, side: k >> 4, p, d, t: 0 }); if ((k & 15) === 2) sfx(2, vol(p) * .6); } }
 }
 function vol(p) { const d = dist(predP || camP, p); return Math.max(0, 1 - d / 900); }
 const seqAfter = (a, b) => ((a - b) & 0xffff) > 0 && ((a - b) & 0xffff) < 32768;
@@ -302,12 +302,9 @@ function render(dt, now) {
   // ===== 2D поверх 3D =====
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
   ctx.textAlign = 'center';
-  // следы шагов и выстрелы за стеной
+  // выстрелы за стеной (следы шагов отключены)
   for (const m of marks) { m.t += dt; const [x, y] = G3.project(m.p, 0);
-    if (m.k === 1) { const life = 3; if (m.t > life) continue; const [x2, y2] = G3.project(add(m.p, m.d, 10), 0), a = Math.atan2(y2 - y, x2 - x), sd = m.side ? 1 : -1;
-      ctx.save(); ctx.translate(x - Math.sin(a) * sd * 4, y + Math.cos(a) * sd * 4); ctx.rotate(a); ctx.globalAlpha = Math.min(1, (life - m.t) / 1.2) * .9;
-      ctx.fillStyle = 'rgba(245,235,210,.95)'; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.ellipse(2, 0, 5, 2.6, 0, 0, 6.2832); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(-4.5, 0, 2.2, 2, 0, 0, 6.2832); ctx.fill(); ctx.stroke(); ctx.restore(); }
-    else if (m.k === 2 && m.t < 1.4) { const k = m.t / 1.4; ctx.globalAlpha = 1 - k; ctx.strokeStyle = '#ff922b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 8 + k * 34, 0, 6.2832); ctx.stroke();
+    if (m.k === 2 && m.t < 1.4) { const k = m.t / 1.4; ctx.globalAlpha = 1 - k; ctx.strokeStyle = '#ff922b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 8 + k * 34, 0, 6.2832); ctx.stroke();
       if (x < 0 || x > W || y < 0 || y > H) { const a = Math.atan2(y - CY, x - CX), r = Math.min(W, H) * .44; txt('💥', CX + Math.cos(a) * r, CY + Math.sin(a) * r + 6, 18); } else txt('💥', x, y + 6, 16); ctx.globalAlpha = 1; } }
   marks = marks.filter(m => m.t < 3);
   // подписи: секта цветом, имя рядом, полоска здоровья у раненых
