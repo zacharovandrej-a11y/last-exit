@@ -1,4 +1,111 @@
 // ===== LAST EXIT — 3D-мир (Three.js, low-poly), изометрическая камера над плоской картой =====
+// Визуальные улицы строятся по реальным препятствиям, без вмешательства в генератор мира.
+function planStreets(objs) {
+  const step = 30, radius = 28, size = Math.floor((HALF * 2 - 160) / step), origin = -HALF + 80;
+  const point = k => [origin + k % size * step, origin + Math.floor(k / size) * step];
+  const clear = (p, r, publicRoad = true) => {
+    if (!inMap(p, r + 50)) return false;
+    for (const b of objs.blds) {
+      const q = sub(p, b.p), x = Math.abs(dot(q, b.u)), y = Math.abs(dot(q, b.v));
+      const w = publicRoad && b.yard ? b.yard[0] : b.w, h = publicRoad && b.yard ? b.yard[1] : b.h;
+      if (x < w / 2 + r && y < h / 2 + r) return false;
+    }
+    return !nearObjs(objs, p, r).some(o => !o.nc && objPush(o, p, r));
+  };
+  const segment = (a, b, r, road = true) => {
+    const n = Math.ceil(dist(a, b) / 12);
+    for (let i = 0; i <= n; i++) if (!clear(lerp(a, b, i / Math.max(1, n)), r, road)) return false;
+    return true;
+  };
+  const free = new Uint8Array(size * size);
+  for (let k = 0; k < free.length; k++) free[k] = clear(point(k), radius) ? 1 : 0;
+  const ends = [];
+  for (const b of objs.blds) for (const d of b.doors) {
+    const outward = norm(sub(d.o, d.i)), threshold = lerp(d.i, d.o, .5);
+    const start = b.yard ? add(b.p, outward, b.yard[1] / 2 + 65) : d.o;
+    ends.push({ bid: b.id, points: b.yard ? [threshold, d.o, start] : [threshold, d.o], start });
+  }
+  const closest = (p, reachable = null) => {
+    let best = -1, distance = 200;
+    const cx = Math.round((p[0] - origin) / step), cy = Math.round((p[1] - origin) / step);
+    for (let y = Math.max(0, cy - 5); y < Math.min(size, cy + 6); y++) for (let x = Math.max(0, cx - 5); x < Math.min(size, cx + 6); x++) {
+      const k = y * size + x; if (!free[k] || reachable && !Number.isFinite(reachable[k])) continue;
+      const q = point(k), d = dist(p, q); if (d < distance && segment(p, q, PR + 2, false)) { best = k; distance = d; }
+    }
+    return best;
+  };
+  const root = closest(ends[0].start), distance = new Float64Array(free.length).fill(Infinity), parent = new Int32Array(free.length).fill(-1);
+  if (root < 0) return { roads: [], walks: [], missed: ends.map(e => e.bid) };
+  const heap = [];
+  const push = (k, d) => { let i = heap.length; heap.push([k, d]); while (i > 0) { const p = (i - 1) >> 1; if (heap[p][1] <= d) break; heap[i] = heap[p]; i = p; } heap[i] = [k, d]; };
+  const pop = () => { const first = heap[0], last = heap.pop(); if (heap.length) { let i = 0; while (i * 2 + 1 < heap.length) { let c = i * 2 + 1; if (c + 1 < heap.length && heap[c + 1][1] < heap[c][1]) c++; if (heap[c][1] >= last[1]) break; heap[i] = heap[c]; i = c; } heap[i] = last; } return first; };
+  distance[root] = 0; push(root, 0);
+  while (heap.length) {
+    const [k, cost] = pop(); if (cost !== distance[k]) continue;
+    const x = k % size, y = Math.floor(k / size);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const xx = x + dx, yy = y + dy, next = yy * size + xx;
+      if (xx < 0 || yy < 0 || xx >= size || yy >= size || !free[next]) continue;
+      const nd = cost + step; if (nd >= distance[next] || !segment(point(k), point(next), radius)) continue;
+      distance[next] = nd; parent[next] = k; push(next, nd);
+    }
+  }
+  // Узкий выход возле забора или берега может требовать обхода, а не прямого отрезка.
+  const detour = start => {
+    const fine = 20, n = Math.ceil((HALF * 2 - 160) / fine), key = (x, y) => y * n + x;
+    const pos = k => [origin + k % n * fine, origin + Math.floor(k / n) * fine];
+    const cx = Math.round((start[0] - origin) / fine), cy = Math.round((start[1] - origin) / fine), prev = new Map(), queue = [];
+    for (let y = cy - 1; y <= cy + 1; y++) for (let x = cx - 1; x <= cx + 1; x++) {
+      if (x < 0 || y < 0 || x >= n || y >= n) continue;
+      const k = key(x, y); if (segment(start, pos(k), PR + 2, false)) { prev.set(k, -1); queue.push(k); }
+    }
+    for (let i = 0; i < queue.length && i < 5000; i++) {
+      const k = queue[i], p = pos(k), gx = Math.round((p[0] - origin) / step), gy = Math.round((p[1] - origin) / step);
+      for (let yy = gy - 1; yy <= gy + 1; yy++) for (let xx = gx - 1; xx <= gx + 1; xx++) {
+        const target = yy * size + xx;
+        if (xx < 0 || yy < 0 || xx >= size || yy >= size || !Number.isFinite(distance[target]) || !segment(p, point(target), PR + 2, false)) continue;
+        const route = []; for (let a = k; a >= 0; a = prev.get(a)) route.push(pos(a));
+        return { target, points: route.reverse() };
+      }
+      const x = k % n, y = Math.floor(k / n);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const xx = x + dx, yy = y + dy, next = key(xx, yy);
+        if (xx < 0 || yy < 0 || xx >= n || yy >= n || prev.has(next) || dist(start, pos(next)) > 500 || !segment(p, pos(next), PR + 2, false)) continue;
+        prev.set(next, k); queue.push(next);
+      }
+    }
+    return null;
+  };
+  const edges = new Map(), walks = [], missed = [];
+  for (const e of ends) {
+    let k = closest(e.start, distance), extra = [];
+    if (k < 0) { const route = detour(e.start); if (!route) { missed.push(e.bid); continue; } k = route.target; extra = route.points; }
+    walks.push({ bid: e.bid, points: e.points.concat(extra, [point(k)]) });
+    for (let i = k; parent[i] >= 0; i = parent[i]) { const j = parent[i], key = Math.min(i, j) + ':' + Math.max(i, j); edges.set(key, [point(i), point(j)]); }
+  }
+  // Убираем ступеньки сетки между развилками, сохраняя подключения всех дверей.
+  const graph = new Map(), coordinates = new Map(), key = p => p.join(','), used = new Set();
+  for (const [a, b] of edges.values()) for (const [p, q] of [[a, b], [b, a]]) {
+    const k = key(p); coordinates.set(k, p); if (!graph.has(k)) graph.set(k, []); graph.get(k).push(key(q));
+  }
+  const stops = new Set(walks.map(w => key(w.points[w.points.length - 1])));
+  for (const [k, next] of graph) if (next.length !== 2) stops.add(k);
+  const roads = [], edgeKey = (a, b) => a < b ? a + ':' + b : b + ':' + a;
+  for (const start of stops) for (const neighbor of graph.get(start) || []) {
+    if (used.has(edgeKey(start, neighbor))) continue;
+    const chain = [coordinates.get(start)]; let previous = start, current = neighbor;
+    used.add(edgeKey(previous, current)); chain.push(coordinates.get(current));
+    while (!stops.has(current)) {
+      const next = graph.get(current).find(k => k !== previous); used.add(edgeKey(current, next));
+      previous = current; current = next; chain.push(coordinates.get(current));
+    }
+    for (let i = 0; i < chain.length - 1;) {
+      let next = chain.length - 1; while (next > i + 1 && !segment(chain[i], chain[next], radius)) next--;
+      roads.push([chain[i], chain[next]]); i = next;
+    }
+  }
+  return { roads, walks, missed };
+}
 const G3 = (() => {
   const T = THREE;
   const glc = document.getElementById('g');
@@ -246,6 +353,7 @@ void main(){
       scene.add(mesh); inst[key] = { mesh }; if (OUTLINE_ALL) addOutline(mesh, OUT_B);
     }
     buildBuildings(objs);
+    buildStreets(objs);
     for (const [id, ob] of brokenOn) if (ob) altarBroken(id, true, ob);
     for (const k in objCol) delete objCol[k]; for (const [id, b] of burning) if (b.s === 2) darken(id);
   }
@@ -254,6 +362,7 @@ void main(){
   function tex(f, n = 128) { const c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d'); f(g, n, mkRng(n * 7 + f.length)); const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.magFilter = GROUNDED ? T.LinearFilter : T.NearestFilter; t.anisotropy = GROUNDED ? Math.max(1, Math.min(lowEnd ? 2 : 4, renderer.capabilities.getMaxAnisotropy())) : 1; return t; }
   const noiseFill = (g, n, rnd, base, amp, k = 1800) => { g.fillStyle = `rgb(${base},${base},${base})`; g.fillRect(0, 0, n, n); for (let i = 0; i < k; i++) { const v = base + (rnd() - .5) * amp | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(rnd() * n | 0, rnd() * n | 0, 1 + (rnd() * 2 | 0), 1 + (rnd() * 2 | 0)); } };
   const TX = {
+    asphalt: tex((g, n, rnd) => { noiseFill(g, n, rnd, 170, 26, 5000); }),
     ashlar: tex((g, n, rnd) => { noiseFill(g, n, rnd, 230, 14, 1400); g.fillStyle = '#b8b4bc'; for (let y = 0; y < n; y += 32) { g.fillRect(0, y, n, 2); for (let x = (y / 32) % 2 ? 32 : 0; x < n; x += 64) g.fillRect(x, y, 2, 32); } }),
     paving: tex((g, n, rnd) => { noiseFill(g, n, rnd, 237, 9, 1600); g.fillStyle = '#c5c1b8'; for (let i = 0; i < n; i += 64) { g.fillRect(i, 0, 1, n); g.fillRect(0, i, n, 1); } }),
     stucco: tex((g, n, rnd) => { noiseFill(g, n, rnd, 245, 10, 1200); }),
@@ -327,10 +436,6 @@ void main(){
       // Ухоженный двор и светлая терраса: тихий фон вместо пёстрой травы под входом.
       const gu = ground.material.uniforms; gu.hallC.value.set(...b.p); gu.hallU.value.set(...b.u); gu.hallHalf.value.set(W / 2 + 90, H / 2 + 90);
       Q(geo.box, 0xaaa18c, M(0, .6, 0, W + 76, .5, H + 64), 'floor', 'paving');
-      { const q = out(107); Q(geo.box, 0xb8aa8e, M(q[0], .9, q[1], ax ? 214 : 110, .4, ax ? 110 : 214), 'floor', 'paving'); }
-      // Разреженные плиты продолжают дорожку в город, без резкого обрыва у газона.
-      for (let i = 0; i < 4; i++) { const q = out(230 + i * 22, (i % 2 ? 1 : -1) * 4), width = 56 - i * 7;
-        Q(geo.box, 0xa99b80, M(q[0], .5, q[1], ax ? 15 : width, .4, ax ? width : 15), 'floor', 'paving'); }
       // Каменный цоколь отдельными сегментами — проёмы не зашиваем.
       for (const id of b.walls) { const o = objs[id];
         if (!o || (o.hor ? Math.abs(o.ly) < H / 2 - WALLT : Math.abs(o.lx) < W / 2 - WALLT)) continue;
@@ -420,9 +525,6 @@ void main(){
         Q(geo.box, edge, M(q[0], 38, q[1], ax ? 13 : 10, 76, ax ? 10 : 13), 'top'); }
       { const q = out(6); Q(geo.box, stone, M(q[0], 77, q[1], ax ? 14 : 108, 14, ax ? 108 : 14)); }
       sign(b.id, wpt(out(13.5)), 77, 100, 12, [['ОБИТЕЛЬ ТЬМЫ', 10]], '#55505f', '#e3d7ba', '#a18c61', n);
-      // Путь из отдельных плит не создаёт квадратной подложки поверх мира.
-      for (let i = 0; i < 7; i++) { const q = out(24 + i * 28, (i % 2 ? 1 : -1) * 3);
-        Q(geo.box, 0x918a91, M(q[0], .7, q[1], ax ? 22 : 70 - i * 4, .5, ax ? 70 - i * 4 : 22), 'floor', 'paving'); }
       // Голуби на карнизах вместо религиозных символов.
       for (const side of [-1, 1]) { const x = -W / 2 + 12, z = side * (H / 2 - 10);
         Q(geo.box, edge, M(x, top + 2, z, 22, 5, 22));
@@ -467,8 +569,6 @@ void main(){
         Q(geo.box, ochre, M(q[0] + fx * 10, 31, q[1] + fz * 10, ax ? 2 : 5, 52, ax ? 5 : 2), 'top'); }
       { const q = out(7); Q(geo.box, dark, M(q[0], 65, q[1], ax ? 22 : 116, 12, ax ? 116 : 22)); }
       sign(b.id, wpt(out(18.5)), 65, 108, 10, [['ОНИ СЛЕДЯТ!', 10]], '#b5a16a', '#30382f', '#56604e', n);
-      for (let i = 0; i < 6; i++) { const q = out(28 + i * 30, (i % 2 ? 1 : -1) * 4);
-        Q(geo.box, 0x8b9288, M(q[0], .7, q[1], ax ? 24 : 70, .4, ax ? 70 : 24), 'floor', 'paving'); }
       { const q = out(68, 100); Q(geo.box, dark, M(q[0], 29, q[1], ax ? 4 : 64, 29, ax ? 64 : 4), 'prop');
         for (const side of [-1, 1]) Q(geo.box, concrete, M(q[0] + (ax ? 0 : side * 24), 9, q[1] + (ax ? side * 24 : 0), 4, 18, 4), 'prop'); }
       sign(b.id, wpt(out(70.5, 100)), 29, 60, 25, [['ПРИЁМ СИГНАЛА', 6], ['шапку не снимать', 4.5]], '#b5bba7', '#394432', '#687357', n);
@@ -516,8 +616,6 @@ void main(){
       sign(b.id, wpt([W * .36 + 6.2, 0]), top + 43, 84, 54, [['СЛАВА', 14], ['ПЛАКАТУ!', 11]], '#dfc274', '#315678', '#b8ad91', b.u);
       // Мощение только под галереей и проходом, а не цветной прямоугольник поверх газона.
       for (const side of [-1, 1]) Q(geo.box, stone, M(side * (W / 2 + 28), .8, 0, 66, .5, H + 36), 'floor', 'paving');
-      for (let i = 0; i < 5; i++) { const q = out(78 + i * 28, (i % 2 ? 1 : -1) * 3);
-        Q(geo.box, 0xaaa28d, M(q[0], .7, q[1], ax ? 22 : 74 - i * 6, .4, ax ? 74 - i * 6 : 22), 'floor', 'paving'); }
       for (const side of [-1, 1]) { const q = out(80, side * 105);
         Q(geo.box, blue, M(q[0], 12, q[1], 28, 24, 28), 'prop');
         for (let i = -1; i <= 1; i++) Q(geo.dod, 0x57794a, M(q[0] + i * 7, 27, q[1], 10, 8, 10), 'prop');
@@ -535,12 +633,6 @@ void main(){
       const K = BKIND[b.kind], S = BSTY[K.style], base = new T.Matrix4().compose(new T.Vector3(b.p[0], 0, b.p[1]), new T.Quaternion().setFromAxisAngle(Y, -b.a), ONE);
       const wc = S.cols[b.id % S.cols.length], wm = S.tex, pcs = [], wallH = K.wallHeight || WALLH;
       const sill = K.slit ? 36 : b.kind === 'house' || K.church === 0 ? 28 : 24, winTop = K.slit ? 44 : K.church === 0 ? 68 : K.church === 1 || K.church === 3 ? 78 : b.kind === 'house' ? 60 : 50;
-      if (b.yard) {
-        const yh = b.yard[1];
-        // В огороженном дворе остаётся общая земля, без зелёной прямоугольной подложки.
-        for (const side of [-1, 1]) { const length = (yh - b.h) / 2;
-          pcs.push([geo.box, 'gravel', 32, 0xb7aa8c, M(0, .4, side * (b.h / 2 + length / 2), 62, .3, length), 'floor']); }
-      }
       const [ft, fc] = FLOOR[K.floor]; pcs.push([geo.box, ft, 48, fc, M(0, .8, 0, b.w - 2, 1.6, b.h - 2), 'floor']);
       for (const id of b.walls) {
         const o = objs[id], L = o.len, sx = o.hor ? L : WALLT, sz = o.hor ? WALLT : L, X = o.lx, Z = o.ly;
@@ -596,6 +688,23 @@ void main(){
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       scene.add(mesh); bInst[key] = { mesh }; if (OUTLINE_ALL && !key.endsWith('f')) addOutline(mesh, OUT_B);
     }
+  }
+  const streetPlane = new T.PlaneGeometry(1, 1); streetPlane.rotateX(-Math.PI / 2);
+  let streetMeshes = [];
+  function buildStreets(objs) {
+    for (const m of streetMeshes) scene.remove(m); streetMeshes = [];
+    const plan = planStreets(objs), paths = [];
+    for (const walk of plan.walks) for (let i = 1; i < walk.points.length; i++) paths.push([walk.points[i - 1], walk.points[i]]);
+    const layer = (segments, width, y, tx, color) => {
+      const mesh = new T.InstancedMesh(streetPlane, texMat(tx, 48), segments.length);
+      segments.forEach(([a, b], i) => { const d = sub(b, a), length = len(d);
+        mesh.setMatrixAt(i, M((a[0] + b[0]) / 2, y, (a[1] + b[1]) / 2, width, 1, length + (tx === 'asphalt' || width === 56 ? width : 2), Math.atan2(d[0], d[1])));
+        mesh.setColorAt(i, new T.Color(color)); });
+      mesh.receiveShadow = true; mesh.frustumCulled = false; scene.add(mesh); streetMeshes.push(mesh);
+    };
+    layer(plan.roads, 56, .04, 'paving', 0x7c8074);
+    layer(plan.roads, 50, .08, 'asphalt', 0x646965);
+    layer(paths, 28, .16, 'paving', 0xa7a08d);
   }
   // игрок внутри здания: крыша исчезает, стены опускаются — видно, что внутри
   function setInside(bid) {
