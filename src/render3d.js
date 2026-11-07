@@ -61,7 +61,7 @@ vec4 wp_=modelMatrix*p_;vec3 wn_=normalize(mat3(modelMatrix)*normalize(nm_*norma
   const crateTex = typeof ART === 'object' && ART.crate ? loader.load(ART.crate) : null;
   const gsize = HALF * 2 + 4000, gg = new T.PlaneGeometry(gsize, gsize, 1, 1); gg.rotateX(-Math.PI / 2);
   const ground = new T.Mesh(gg, new T.ShaderMaterial({
-    uniforms: Object.assign(T.UniformsUtils.clone(T.UniformsLib.lights), { grass: { value: grassTex }, hasGrass: { value: grassTex ? 1 : 0 }, bc: { value: BIOMES.map(b => new T.Vector2(b.c[0], b.c[1])) }, bcol: { value: BIOMES.map(b => new T.Color(b.col)) }, brad: { value: BIOMES.map(b => b.r) }, hallC: { value: new T.Vector2(1e6, 1e6) }, hallU: { value: new T.Vector2(1, 0) }, hallHalf: { value: new T.Vector2() } }, U),
+    uniforms: Object.assign(T.UniformsUtils.clone(T.UniformsLib.lights), { grass: { value: grassTex }, hasGrass: { value: grassTex ? 1 : 0 }, bc: { value: BIOMES.map(b => new T.Vector2(b.c[0], b.c[1])) }, bcol: { value: BIOMES.map(b => new T.Color(b.col)) }, brad: { value: BIOMES.map(b => b.r) }, hallC: { value: new T.Vector2(1e6, 1e6) }, hallU: { value: new T.Vector2(1, 0) }, hallHalf: { value: new T.Vector2() }, orderC: { value: new T.Vector2(1e6, 1e6) } }, U),
     lights: true,
     vertexShader: '#include <common>\n#include <shadowmap_pars_vertex>\nvarying vec2 vP;void main(){vec3 transformedNormal=normalMatrix*vec3(0.,1.,0.);vec4 worldPosition=modelMatrix*vec4(position,1.);vP=worldPosition.xz;gl_Position=projectionMatrix*viewMatrix*worldPosition;\n#include <shadowmap_vertex>\n}',
     fragmentShader: `
@@ -70,7 +70,7 @@ vec4 wp_=modelMatrix*p_;vec3 wn_=normalize(mat3(modelMatrix)*normalize(nm_*norma
 #include <shadowmap_pars_fragment>
 uniform vec2 zc;uniform float zrho;uniform vec2 nc;uniform float nrho;uniform float t;
 uniform vec2 bc[6];uniform vec3 bcol[6];uniform float brad[6];uniform sampler2D grass;uniform float hasGrass;
-uniform vec2 hallC;uniform vec2 hallU;uniform vec2 hallHalf;
+uniform vec2 hallC;uniform vec2 hallU;uniform vec2 hallHalf;uniform vec2 orderC;
 varying vec2 vP;
 float hash(vec2 p){p=fract(p*vec2(.1031,.1030));p+=dot(p,p.yx+33.33);return fract((p.x+p.y)*p.x);}
 float noise(vec2 x){vec2 i=floor(x);vec2 f=fract(x);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),f.x),f.y);}
@@ -94,6 +94,11 @@ void main(){
  float lawn=1.-smoothstep(-16.,34.,hedge);
  vec3 lawnCol=mix(vec3(.25,.36,.16),grassBase*.62,.25)*(.94+.12*nb);
  col=mix(col,lawnCol,lawn*.94);
+ // Приглушённая земля кладбища, также на общей поверхности и с мягким краем.
+ vec2 oe=abs(vP-orderC)-vec2(235.);
+ float od=length(max(oe,vec2(0.)))+min(max(oe.x,oe.y),0.)-70.+(nb-.5)*22.;
+ float cemetery=1.-smoothstep(-18.,38.,od);
+ col=mix(col,vec3(.34,.33,.31)*(.9+.18*nb),cemetery*.94);
  // берег и вода по краю карты
  float e=max(abs(vP.x),abs(vP.y))-${HALF.toFixed(1)}+(noise(vP*.02)-.5)*40.;
  col=mix(col,vec3(.93,.84,.62)*(.92+.12*nb),smoothstep(-55.,-45.,e));
@@ -131,6 +136,7 @@ void main(){
   };
   // prism: после поворотов — треугольник в плоскости YZ? подгоняем отдельно ниже
   geo.roof = (() => { const s = new T.Shape(); s.moveTo(-.5, 0); s.lineTo(.5, 0); s.lineTo(0, 1); s.closePath(); const g = new T.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false }); g.translate(0, 0, -.5); g.rotateY(Math.PI / 2); return g; })(); // гребень вверх, длина по X, ширина по Z
+  geo.pointedArch = (() => { const s = new T.Shape(); s.moveTo(-.5, 0); s.lineTo(-.5, .6); s.quadraticCurveTo(-.5, .8, 0, 1); s.quadraticCurveTo(.5, .8, .5, .6); s.lineTo(.5, 0); s.closePath(); return new T.ShapeGeometry(s, 6); })();
   geo.slipperSole = (() => { const s = new T.Shape(); s.moveTo(-42, -21); s.quadraticCurveTo(-65, -21, -65, 0); s.quadraticCurveTo(-65, 21, -42, 21); s.lineTo(38, 24); s.quadraticCurveTo(66, 24, 66, 0); s.quadraticCurveTo(66, -24, 38, -24); s.closePath(); const g = new T.ExtrudeGeometry(s, { depth: 5, bevelEnabled: false, curveSegments: 6 }); g.rotateX(-Math.PI / 2); return g; })();
   geo.slipperStrap = (() => { const s = new T.Shape(); s.moveTo(-24, 0); s.quadraticCurveTo(0, 48, 24, 0); s.lineTo(18, 0); s.quadraticCurveTo(0, 34, -18, 0); s.closePath(); const g = new T.ExtrudeGeometry(s, { depth: 30, bevelEnabled: false, curveSegments: 6 }); g.translate(0, 0, -15); g.rotateY(Math.PI / 2); return g; })();
   const M = (x, y, z, sx, sy, sz, ry = 0, rz = 0) => new T.Matrix4().compose(new T.Vector3(x, y, z), new T.Quaternion().setFromEuler(new T.Euler(0, ry, rz)), new T.Vector3(sx, sy, sz));
@@ -237,6 +243,7 @@ void main(){
   function tex(f, n = 128) { const c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d'); f(g, n, mkRng(n * 7 + f.length)); const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.magFilter = T.NearestFilter; return t; }
   const noiseFill = (g, n, rnd, base, amp, k = 1800) => { g.fillStyle = `rgb(${base},${base},${base})`; g.fillRect(0, 0, n, n); for (let i = 0; i < k; i++) { const v = base + (rnd() - .5) * amp | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(rnd() * n | 0, rnd() * n | 0, 1 + (rnd() * 2 | 0), 1 + (rnd() * 2 | 0)); } };
   const TX = {
+    ashlar: tex((g, n, rnd) => { noiseFill(g, n, rnd, 230, 14, 1400); g.fillStyle = '#b8b4bc'; for (let y = 0; y < n; y += 32) { g.fillRect(0, y, n, 2); for (let x = (y / 32) % 2 ? 32 : 0; x < n; x += 64) g.fillRect(x, y, 2, 32); } }),
     paving: tex((g, n, rnd) => { noiseFill(g, n, rnd, 237, 9, 1600); g.fillStyle = '#c5c1b8'; for (let i = 0; i < n; i += 64) { g.fillRect(i, 0, 1, n); g.fillRect(0, i, n, 1); } }),
     stucco: tex((g, n, rnd) => { noiseFill(g, n, rnd, 245, 10, 1200); }),
     slate: tex((g, n) => { g.fillStyle = '#eeeeee'; g.fillRect(0, 0, n, n); g.fillStyle = '#d4d4d4'; for (let x = 0; x < n; x += 32) g.fillRect(x, 0, 2, n); }),
@@ -269,6 +276,7 @@ void main(){
   }
   const BSTY = {
     hallplaster: { tex: 'stucco', cols: [0xc8b795] },
+    orderstone: { tex: 'ashlar', cols: [0x817987] },
     plaster: { tex: 'plaster', cols: [0xe0d6c2, 0xd8cfbe, 0xcdbfa6, 0xd9c9b0] }, plaster2: { tex: 'plaster', cols: [0xc9c2b4, 0xbcb4a6, 0xd6cfc0, 0xb8a990] },
     brick: { tex: 'brick', cols: [0xb8705a, 0xa86450, 0xc08068] }, concrete: { tex: 'concrete', cols: [0xbdb8ae, 0xaaa69e, 0x9c988f] },
     wood: { tex: 'wood', cols: [0x8a5a3a, 0x7a3a2c, 0x6e5238] }, metal: { tex: 'metal', cols: [0x8a8f86, 0x7a8478, 0x9a9488] }, adobe: { tex: 'adobe', cols: [0xd9b88a, 0xcfa878, 0xe0c49a] },
@@ -369,12 +377,51 @@ void main(){
         for (const side of [-1, 1]) Q(geo.box, teal, M(q[0] + (ax ? 0 : side * 23), 10, q[1] + (ax ? side * 23 : 0), 3, 20, 3), 'prop'); }
       sign(b.id, wpt(out(122, -158)), 30, 58, 27, [['ВАС УЖЕ ЛЮБЯТ', 6], ['осталось подписать', 4]], '#fff2df', '#a84d71', '#d4b474', n);
     } else if (K.church === 1) { // «Обитель» Тёмного Ордена: крутая чёрная крыша, шпиль со сферой, каменные голуби на углах, свечи у входа
-      const rh = Math.min(W, H) * .75;
-      P(geo.cone7, 0x1e1c24, M(0, top + rh + 26, 0, 9, 56, 9), 'roof'); P(geo.sph, 0xa259ff, M(0, top + rh + 58, 0, 6, 6, 6), 'roof');
-      for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { const x = sx * (W / 2 - 4), z = sz * (H / 2 - 4); P(geo.box, 0x4a4650, M(x, top + 4, z, 12, 8, 12)); P(geo.sph, 0x6e6a74, M(x, top + 13, z, 6, 6, 5)); P(geo.sph, 0x6e6a74, M(x + 4, top + 19, z, 3.4, 3.4, 3.4)); P(geo.cone7, 0x9a8a50, M(x + 8, top + 19, z, 1.3, 3.5, 1.3, 0, -1.57)); }
-      for (let k = -2; k <= 2; k++) { if (!k) continue; const q = out(14, k * 12); P(geo.cyl6, 0xe8dcc0, M(q[0], 5, q[1], 1.6, 10, 1.6), 'prop'); P(geo.cone7, 0xffa040, M(q[0], 11.5, q[1], 1.3, 3, 1.3), 'prop'); }
-      for (const sd of [-1, 1]) { const q = out(WALLT / 2 + .8, sd * 34); P(geo.box, 0x5a1f8a, M(q[0], 38, q[1], ax ? 1 : 14, 34, ax ? 14 : 1), 'wall'); }
-      lawn(14, 64, 20, [['ОБИТЕЛЬ ТЬМЫ', 9], ['голуби принимаются', 4.5]], '#14101a', '#b07cff', '#3a2a50');
+      const Q = (g, c, m, role = 'roof', tx = 'stucco') => pcs.push([g, tx, 48, c, m, role]);
+      const stone = 0x77717f, edge = 0xaaa1ad, roof = 0x302d40, brass = 0xaf945d;
+      ground.material.uniforms.orderC.value.set(...b.p);
+      // Стрельчатые витражи и каменные обрамления читаются на боковом фасаде.
+      for (const id of b.walls) { const o = objs[id];
+        if (o.hor ? Math.abs(o.ly) < H / 2 - WALLT : Math.abs(o.lx) < W / 2 - WALLT) continue;
+        Q(geo.box, stone, M(o.lx, 6, o.ly, o.hor ? o.len : 10, 12, o.hor ? 10 : o.len), 'wall', 'ashlar');
+        if (!o.win) continue;
+        const nx = o.hor ? 0 : Math.sign(o.lx), nz = o.hor ? Math.sign(o.ly) : 0, a = Math.atan2(nx, nz);
+        Q(geo.pointedArch, edge, M(o.lx + nx * 4, 23, o.ly + nz * 4, o.len + 8, 62, 1, a), 'win');
+        Q(geo.pointedArch, 0x69528c, M(o.lx + nx * 4.3, 28, o.ly + nz * 4.3, o.len - 2, 51, 1, a), 'win');
+        Q(geo.box, brass, M(o.lx + nx * 4.8, 47, o.ly + nz * 4.8, o.hor ? 2 : 1, 36, o.hor ? 1 : 2), 'win');
+      }
+      // Контрфорсы отделяют пролёты, расширенный цоколь привязывает стены к земле.
+      for (const side of [-1, 1]) for (const x of [-W / 2 + 7, 0, W / 2 - 7]) {
+        Q(geo.box, stone, M(x, 36, side * (H / 2 + 5), 14, 72, 18), 'top', 'ashlar');
+        Q(geo.box, edge, M(x, 5, side * (H / 2 + 7), 22, 10, 24), 'wall');
+        Q(geo.box, edge, M(x, 74, side * (H / 2 + 4), 18, 5, 18), 'top');
+      }
+      // Асимметричный шпиль: силуэт виден даже над крышами соседних домов.
+      const towerX = W * .24, towerZ = -H * .25;
+      Q(geo.cyl10, stone, M(towerX, top + 38, towerZ, 29, 92, 29), 'roof', 'ashlar');
+      Q(geo.cyl10, edge, M(towerX, top + 85, towerZ, 33, 6, 33));
+      Q(geo.cone7, roof, M(towerX, top + 133, towerZ, 36, 90, 36));
+      Q(geo.sph, brass, M(towerX, top + 181, towerZ, 4, 4, 4));
+      // Портал: колонны вне прохода, физически закреплённая надпись над входом.
+      for (const side of [-1, 1]) { const q = out(5, side * 45);
+        Q(geo.box, edge, M(q[0], 38, q[1], ax ? 13 : 10, 76, ax ? 10 : 13), 'top'); }
+      { const q = out(6); Q(geo.box, stone, M(q[0], 77, q[1], ax ? 14 : 108, 14, ax ? 108 : 14)); }
+      sign(b.id, wpt(out(13.5)), 77, 100, 12, [['ОБИТЕЛЬ ТЬМЫ', 10]], '#55505f', '#e3d7ba', '#a18c61', n);
+      // Путь из отдельных плит не создаёт квадратной подложки поверх мира.
+      for (let i = 0; i < 7; i++) { const q = out(24 + i * 28, (i % 2 ? 1 : -1) * 3);
+        Q(geo.box, 0x918a91, M(q[0], .7, q[1], ax ? 22 : 70 - i * 4, .5, ax ? 70 - i * 4 : 22), 'floor', 'paving'); }
+      // Голуби на карнизах вместо религиозных символов.
+      for (const side of [-1, 1]) { const x = -W / 2 + 12, z = side * (H / 2 - 10);
+        Q(geo.box, edge, M(x, top + 2, z, 22, 5, 22));
+        Q(geo.sph, stone, M(x, top + 11, z, 7, 7, 10));
+        Q(geo.sph, edge, M(x - 5, top + 19, z + 3, 4, 4, 4));
+        Q(geo.cone7, brass, M(x - 9, top + 19, z + 3, 1.5, 5, 1.5, 0, 1.57));
+      }
+      for (const side of [-1, 1]) { const q = out(42, side * 82);
+        Q(geo.cyl10, stone, M(q[0], 5, q[1], 13, 10, 13), 'prop');
+        for (const dx of [-5, 4]) { Q(geo.cyl6, 0xcbbfa4, M(q[0] + dx, 14, q[1], 2.2, 14, 2.2), 'prop');
+          Q(geo.cone7, 0xf2bc66, M(q[0] + dx, 23, q[1], 2, 5, 2), 'prop'); }
+      }
     } else if (K.church === 2) { // бункер «Великого Заговора»: крыша в фольге, сломанные антенны, тарелки
       for (let i = 0; i < 16; i++) { const x = ((i * 37) % 100 / 100 - .5) * W * .85, z = ((i * 61) % 100 / 100 - .5) * H * .85; P(geo.box, i % 2 ? 0xeef2f6 : 0xc8ced6, M(x, top + 4 + (i % 3), z, 26 + i % 4 * 6, 2.5, 20 + i % 3 * 7, i * .7, (i % 5 - 2) * .06), 'roof', 'metal'); }
       for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let k = -1; k <= 1; k++) { const x = sx ? sx * (W / 2 + 2) : k * W * .3, z = sz ? sz * (H / 2 + 2) : k * H * .3; P(geo.box, 0xd8dde2, M(x, top - 6, z, sx ? 2 : 24, 16, sx ? 22 : 2, 0, sx * .12), 'roof', 'metal'); }
@@ -393,13 +440,14 @@ void main(){
   }
   function buildBuildings(objs) {
     ground.material.uniforms.hallC.value.set(1e6, 1e6);
+    ground.material.uniforms.orderC.value.set(1e6, 1e6);
     for (const k in bInst) { scene.remove(bInst[k].mesh); if (bInst[k].mesh.userData.outline) scene.remove(bInst[k].mesh.userData.outline); delete bInst[k]; }
     bParts.length = 0; insideB = -1; glassPlan.length = 0; if (glassMesh) { scene.remove(glassMesh); glassMesh = null; } glassIdx.length = 0; for (const k in deco) { deco[k].forEach(m => scene.remove(m)); delete deco[k]; }
     const plan = {}, Y = new T.Vector3(0, 1, 0), ONE = new T.Vector3(1, 1, 1);
     for (const b of objs.blds || []) {
       const K = BKIND[b.kind], S = BSTY[K.style], base = new T.Matrix4().compose(new T.Vector3(b.p[0], 0, b.p[1]), new T.Quaternion().setFromAxisAngle(Y, -b.a), ONE);
       const wc = S.cols[b.id % S.cols.length], wm = S.tex, pcs = [], wallH = K.wallHeight || WALLH;
-      const sill = K.slit ? 36 : b.kind === 'house' || K.church === 0 ? 28 : 24, winTop = K.slit ? 44 : K.church === 0 ? 68 : b.kind === 'house' ? 60 : 50;
+      const sill = K.slit ? 36 : b.kind === 'house' || K.church === 0 ? 28 : 24, winTop = K.slit ? 44 : K.church === 0 ? 68 : K.church === 1 ? 78 : b.kind === 'house' ? 60 : 50;
       if (b.yard) {
         const [yw, yh] = b.yard;
         pcs.push([geo.box, 'dirt', 48, 0x829360, M(0, .15, 0, yw, .3, yh), 'floor']);
@@ -442,7 +490,7 @@ void main(){
       }
       // крыша
       const rc = ROOFC[b.id % ROOFC.length];
-      const GR = { gable: [.38, K.style === 'metal' ? 0x7a807a : rc], lowgable: [.2, K.church === 0 ? 0x315855 : 0x5a6068], steep: [.75, 0x2a2730] }[K.roof];
+      const GR = { gable: [.38, K.style === 'metal' ? 0x7a807a : rc], lowgable: [.2, K.church === 0 ? 0x315855 : 0x5a6068], steep: [K.church === 1 ? .55 : .75, 0x2a2730] }[K.roof];
       if (GR) { const along = b.w >= b.h; pcs.push([geo.roof, K.church === 0 ? 'slate' : 'rooftile', 24, GR[1], along ? M(0, wallH, 0, b.w * 1.04, Math.min(b.h, b.w) * GR[0], b.h * 1.08) : M(0, wallH, 0, b.h * 1.04, Math.min(b.h, b.w) * GR[0], b.w * 1.08, 1.5708), 'roof']); }
       else { pcs.push([geo.box, K.roof === 'foil' ? 'metal' : 'gravel', K.roof === 'foil' ? 9 : 32, K.roof === 'foil' ? 0xdfe4ea : 0x8a867e, M(0, wallH + 1.5, 0, b.w + 2, 3, b.h + 2), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, wallH + 4.5, b.h / 2 - 1, b.w + 3, 6, 3), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, wallH + 4.5, -b.h / 2 + 1, b.w + 3, 6, 3), 'roof']);
         pcs.push([geo.box, wm, 48, wc, M(b.w / 2 - 1, wallH + 4.5, 0, 3, 6, b.h), 'roof']); pcs.push([geo.box, wm, 48, wc, M(-b.w / 2 + 1, wallH + 4.5, 0, 3, 6, b.h), 'roof']);
