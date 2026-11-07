@@ -280,6 +280,7 @@ void main(){
     hallplaster: { tex: 'stucco', cols: [0xc8b795] },
     orderstone: { tex: 'ashlar', cols: [0x817987] },
     bunkercoat: { tex: 'concrete', cols: [0x889287] },
+    civic: { tex: 'stucco', cols: [0xc8c2b2] },
     plaster: { tex: 'plaster', cols: [0xe0d6c2, 0xd8cfbe, 0xcdbfa6, 0xd9c9b0] }, plaster2: { tex: 'plaster', cols: [0xc9c2b4, 0xbcb4a6, 0xd6cfc0, 0xb8a990] },
     brick: { tex: 'brick', cols: [0xb8705a, 0xa86450, 0xc08068] }, concrete: { tex: 'concrete', cols: [0xbdb8ae, 0xaaa69e, 0x9c988f] },
     wood: { tex: 'wood', cols: [0x8a5a3a, 0x7a3a2c, 0x6e5238] }, metal: { tex: 'metal', cols: [0x8a8f86, 0x7a8478, 0x9a9488] }, adobe: { tex: 'adobe', cols: [0xd9b88a, 0xcfa878, 0xe0c49a] },
@@ -463,12 +464,56 @@ void main(){
         for (const side of [-1, 1]) Q(geo.box, concrete, M(q[0] + (ax ? 0 : side * 24), 9, q[1] + (ax ? side * 24 : 0), 4, 18, 4), 'prop'); }
       sign(b.id, wpt(out(70.5, 100)), 29, 60, 25, [['ПРИЁМ СИГНАЛА', 6], ['шапку не снимать', 4.5]], '#b5bba7', '#394432', '#687357', n);
     } else { // «собор» Святого Плаката: белое здание, шпиль из билбордов
-      const cols = [0x3d8bff, 0xffd43b, 0xff5a5a, 0x3d8bff];
-      for (let t = 0; t < 4; t++) { const s = 1 - t * .2; for (let r = 0; r < 2; r++) P(geo.box, cols[(t + r) % 4], M(0, top + 22 + t * 30, 0, 90 * s, 28, 3, r * 1.5708 + t * .4), 'roof'); P(geo.box, 0x55595e, M(0, top + 8 + t * 30, 0, 4, 30, 4), 'roof'); }
-      P(geo.cone7, 0xffd43b, M(0, top + 150, 0, 8, 22, 8), 'roof');
-      for (let i = 0; i < 10; i++) { const x = (i / 9 - .5) * (W - 20); for (const sd of [-1, 1]) P(geo.box, cols[(i + (sd > 0 ? 1 : 0)) % 4], M(x, 34, sd * (H / 2 + 3.6), 16, 20, .8), 'wall'); }
-      for (const sd of [-1, 1]) { const q = out(20, sd * 30); P(geo.cyl10, 0xd8d4ca, M(q[0], 6, q[1], 5, 12, 5), 'prop'); P(geo.box, 0xf2efe6, M(q[0], 12.4, q[1], 7, .8, 7), 'prop'); }
-      sign(b.id, add(b.p, [0, 0]), top + 100 + 22, 80, 24, [['СЛАВА ПЛАКАТУ!', 10]], '#3d8bff', '#ffffff', '#ffd43b');
+      const Q = (g, c, m, role = 'roof', tx = 'stucco') => pcs.push([g, tx, 48, c, m, role]);
+      const ivory = 0xc9c1ac, blue = 0x396899, red = 0xb85e52, gold = 0xc3a85e, stone = 0x9a9689;
+      // Чистые горизонтали дворца культуры: карниз, цоколь и приподнятый фонарь крыши.
+      for (const side of [-1, 1]) {
+        Q(geo.box, ivory, M(0, top + 5, side * H / 2, W + 16, 7, 12));
+        Q(geo.box, blue, M(0, top + 10, side * H / 2, W + 20, 3, 14));
+        Q(geo.box, ivory, M(side * W / 2, top + 5, 0, 12, 7, H + 16));
+      }
+      Q(geo.box, blue, M(W * .12, top + 18, 0, W * .42, 30, H * .46));
+      Q(geo.box, 0x848a83, M(W * .12, top + 35, 0, W * .46, 5, H * .5));
+      for (let i = -2; i <= 2; i++) Q(geo.box, ivory, M(W * .12 + i * W * .075, top + 18, H * .232, 3, 28, 2));
+      // Передний и задний фасады оформлены одинаково; колонны не перекрывают реальный вход.
+      for (const side of [-1, 1]) {
+        Q(geo.box, blue, M(side * (W / 2 + 24), 84, 0, 62, 7, H + 28));
+        for (const z of [-H / 2 + 14, -H * .18, H * .18, H / 2 - 14]) {
+          const nearDoor = b.doors.some(d => { const r = sub(lerp(d.i, d.o, .5), b.p); return Math.abs(dot(r, b.u) - side * W / 2) < 12 && Math.abs(dot(r, b.v) - z) < K.door / 2 + 14; });
+          if (nearDoor) continue;
+          Q(geo.box, ivory, M(side * (W / 2 + 43), 39, z, 11, 78, 11), 'top');
+          Q(geo.box, stone, M(side * (W / 2 + 43), 3, z, 17, 6, 17), 'top');
+        }
+        const face = mul(b.u, side), wp = wpt([side * (W / 2 + 55.5), 0]);
+        sign(b.id, wp, 84, 172, 11, [['ДВОРЕЦ СВЯТОГО ПЛАКАТА', 8]], '#315678', '#f5e8ca', '#b49d69', face);
+      }
+      // Афиши в закреплённых витринах вдоль боковых стен, с собственной графической иерархией.
+      const posters = [
+        ['СОБРАНИЕ', 'согласных заранее', '#a94f48'],
+        ['СЛАВА ПЛАКАТУ!', 'прочитал — передай', '#355f8a'],
+        ['СКОРО ПРАЗДНИК', 'дата уточняется', '#8b783e']
+      ];
+      for (const side of [-1, 1]) for (let i = 0; i < posters.length; i++) {
+        const x = (i - 1) * 110, z = side * (H / 2 + 5), face = mul(b.v, side), p = posters[i];
+        Q(geo.box, blue, M(x, 47, z, 78, 51, 5), 'top');
+        sign(b.id, wpt([x, z + side * 3]), 47, 70, 44, [[p[0], 6], [p[1], 4]], '#e8ddbd', p[2], '#a9a496', face);
+      }
+      // Один крупный плакат-эмблема заменяет хаотичную башню из щитов.
+      Q(geo.box, blue, M(W * .36, top + 43, 0, 7, 70, 106));
+      Q(geo.box, ivory, M(W * .36 + 4, top + 43, 0, 2, 58, 92));
+      Q(geo.box, red, M(W * .36 + 5.5, top + 54, 0, 1, 9, 76));
+      Q(geo.box, gold, M(W * .36 + 5.5, top + 32, 0, 1, 22, 76));
+      for (const side of [-1, 1]) Q(geo.box, stone, M(W * .36, top + 5, side * 32, 12, 10, 12));
+      sign(b.id, wpt([W * .36 + 6.2, 0]), top + 43, 84, 54, [['СЛАВА', 14], ['ПЛАКАТУ!', 11]], '#dfc274', '#315678', '#b8ad91', b.u);
+      // Мощение только под галереей и проходом, а не цветной прямоугольник поверх газона.
+      for (const side of [-1, 1]) Q(geo.box, stone, M(side * (W / 2 + 28), .8, 0, 66, .5, H + 36), 'floor', 'paving');
+      for (let i = 0; i < 5; i++) { const q = out(78 + i * 28, (i % 2 ? 1 : -1) * 3);
+        Q(geo.box, 0xaaa28d, M(q[0], .7, q[1], ax ? 22 : 74 - i * 6, .4, ax ? 74 - i * 6 : 22), 'floor', 'paving'); }
+      for (const side of [-1, 1]) { const q = out(80, side * 105);
+        Q(geo.box, blue, M(q[0], 12, q[1], 28, 24, 28), 'prop');
+        for (let i = -1; i <= 1; i++) Q(geo.dod, 0x57794a, M(q[0] + i * 7, 27, q[1], 10, 8, 10), 'prop');
+        Q(geo.ico1, gold, M(q[0], 35, q[1], 5, 5, 5), 'prop');
+      }
     }
   }
   function buildBuildings(objs) {
@@ -480,7 +525,7 @@ void main(){
     for (const b of objs.blds || []) {
       const K = BKIND[b.kind], S = BSTY[K.style], base = new T.Matrix4().compose(new T.Vector3(b.p[0], 0, b.p[1]), new T.Quaternion().setFromAxisAngle(Y, -b.a), ONE);
       const wc = S.cols[b.id % S.cols.length], wm = S.tex, pcs = [], wallH = K.wallHeight || WALLH;
-      const sill = K.slit ? 36 : b.kind === 'house' || K.church === 0 ? 28 : 24, winTop = K.slit ? 44 : K.church === 0 ? 68 : K.church === 1 ? 78 : b.kind === 'house' ? 60 : 50;
+      const sill = K.slit ? 36 : b.kind === 'house' || K.church === 0 ? 28 : 24, winTop = K.slit ? 44 : K.church === 0 ? 68 : K.church === 1 || K.church === 3 ? 78 : b.kind === 'house' ? 60 : 50;
       if (b.yard) {
         const [yw, yh] = b.yard;
         pcs.push([geo.box, 'dirt', 48, 0x829360, M(0, .15, 0, yw, .3, yh), 'floor']);

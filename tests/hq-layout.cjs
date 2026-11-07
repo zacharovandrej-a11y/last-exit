@@ -9,9 +9,9 @@ assert.equal(w.churches.length,4);
 for(const [s,id] of w.churches.entries()) {
  const b=w.blds[id],d=b.doors[0],v=norm(sub(d.o,d.i)),side=perp(v);
  assert.deepEqual(b.p,positions[s]); assert.equal(b.sect,s); assert(b.altar!==undefined); assert(b.box!==undefined);
- // Художественный поворот трёх переработанных штабов: вход смотрит к центру с отклонением до 20° и открывает боковой фасад.
- assert(dot(v,norm(mul(b.p,-1))) > (s <= 2 ? Math.cos(Math.PI / 9) : .99));
- if (s <= 2) {
+ // Художественный поворот четырёх переработанных штабов: вход смотрит к центру с отклонением до 20° и открывает боковой фасад.
+ assert(dot(v,norm(mul(b.p,-1))) > Math.cos(Math.PI / 9));
+ if (s <= 3) {
   assert.equal(b.rooms.length, 1, 'The meeting hall must remain one room');
   const rel = sub(d.i, b.p), aisle = add(b.p, b.u, dot(rel, b.u));
   const altar = w[b.altar], end = add(altar.p, b.u, -(altar.w / 2 + PR + 3));
