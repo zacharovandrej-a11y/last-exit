@@ -317,33 +317,52 @@ void main(){
     const plan = {}, Y = new T.Vector3(0, 1, 0), ONE = new T.Vector3(1, 1, 1);
     for (const b of objs.blds || []) {
       const K = BKIND[b.kind], S = BSTY[K.style], base = new T.Matrix4().compose(new T.Vector3(b.p[0], 0, b.p[1]), new T.Quaternion().setFromAxisAngle(Y, -b.a), ONE);
-      const wc = S.cols[b.id % S.cols.length], wm = S.tex, pcs = [];
+      const wc = S.cols[b.id % S.cols.length], wm = S.tex, pcs = [], wallH = K.wallHeight || WALLH;
+      const sill = K.slit ? 36 : b.kind === 'house' ? 28 : 24, winTop = K.slit ? 44 : b.kind === 'house' ? 60 : 50;
       const [ft, fc] = FLOOR[K.floor]; pcs.push([geo.box, ft, 48, fc, M(0, .8, 0, b.w - 2, 1.6, b.h - 2), 'floor']);
       for (const id of b.walls) {
         const o = objs[id], L = o.len, sx = o.hor ? L : WALLT, sz = o.hor ? WALLT : L, X = o.lx, Z = o.ly;
+        if (b.kind === 'house' && (o.hor ? Math.abs(Z) > b.h / 2 - WALLT : Math.abs(X) > b.w / 2 - WALLT))
+          pcs.push([geo.box, 'concrete', 48, 0x837d72, M(X, 3.5, Z, sx + (o.hor ? 0 : 2), 7, sz + (o.hor ? 2 : 0)), 'wall', M(X, 3.5, Z, sx, 7, sz)]);
         if (o.win) { // окно: подоконник, перемычка, рама; посередине пусто — видно и стреляют
-          const sill = K.slit ? 36 : 24, top = K.slit ? 44 : 50;
+          const top = winTop;
           pcs.push([geo.box, wm, 48, wc, M(X, sill / 2, Z, sx, sill, sz), 'wall', M(X, 7, Z, sx, 14, sz)]);
-          pcs.push([geo.box, wm, 48, wc, M(X, (top + WALLH) / 2, Z, sx, WALLH - top, sz), 'top']);
+          pcs.push([geo.box, wm, 48, wc, M(X, (top + wallH) / 2, Z, sx, wallH - top, sz), 'top']);
           if (!K.slit) { const fx = o.hor ? sx : WALLT + 1, fz = o.hor ? WALLT + 1 : sz; pcs.push([geo.box, 'plaster', 48, 0xe8e4da, M(X, sill + 1, Z, fx + 2, 2, fz + 2), 'win']); pcs.push([geo.box, 'plaster', 48, 0xe8e4da, M(X, top - 1, Z, fx + 2, 2, fz + 2), 'win']);
             pcs.push([geo.box, 'plaster', 48, 0xd8d4ca, M(X, (sill + top) / 2, Z, o.hor ? 1.6 : WALLT * .4, top - sill, o.hor ? WALLT * .4 : 1.6), 'win']); }
-        } else pcs.push([geo.box, wm, 48, wc, M(X, WALLH / 2, Z, sx, WALLH, sz), 'wall', M(X, 7, Z, sx, 14, sz)]);
+        } else pcs.push([geo.box, wm, 48, wc, M(X, wallH / 2, Z, sx, wallH, sz), 'wall', M(X, 7, Z, sx, 14, sz)]);
       }
       // перемычки над дверями (наружными и внутренними)
       const dw = (K.door || DOOR) + 2;
       for (const d of b.doors) { const c = lerp(d.i, d.o, .5), r = sub(c, b.p), lx = dot(r, b.u), ly = dot(r, b.v), n = sub(d.o, d.i), hor = Math.abs(dot(n, b.v)) > Math.abs(dot(n, b.u));
-        pcs.push([geo.box, wm, 48, wc, M(hor ? lx : Math.sign(lx) * (b.w / 2 - WALLT / 2), WALLH - 8, hor ? Math.sign(ly) * (b.h / 2 - WALLT / 2) : ly, hor ? dw : WALLT, 16, hor ? WALLT : dw), 'top']); }
-      for (const [x, y] of b.idoors) { const onV = b.walls.some(i => { const o = objs[i]; return !o.hor && Math.abs(o.lx - x) < 1; }); pcs.push([geo.box, wm, 48, wc, M(x, WALLH - 8, y, onV ? WALLT : DOOR + 2, 16, onV ? DOOR + 2 : WALLT), 'top']); }
+        pcs.push([geo.box, wm, 48, wc, M(hor ? lx : Math.sign(lx) * (b.w / 2 - WALLT / 2), wallH - 8, hor ? Math.sign(ly) * (b.h / 2 - WALLT / 2) : ly, hor ? dw : WALLT, 16, hor ? WALLT : dw), 'top']); }
+      for (const [x, y] of b.idoors) { const onV = b.walls.some(i => { const o = objs[i]; return !o.hor && Math.abs(o.lx - x) < 1; }); pcs.push([geo.box, wm, 48, wc, M(x, wallH - 8, y, onV ? WALLT : DOOR + 2, 16, onV ? DOOR + 2 : WALLT), 'top']); }
+      if (b.kind === 'house') {
+        // Карниз, наличники и навесы входят в существующие инстанс-группы.
+        for (const side of [-1, 1]) {
+          pcs.push([geo.box, 'plaster', 48, 0xe8e4da, M(0, wallH - 2, side * b.h / 2, b.w + 8, 4, 8), 'roof']);
+          pcs.push([geo.box, 'plaster', 48, 0xe8e4da, M(side * b.w / 2, wallH - 2, 0, 8, 4, b.h + 8), 'roof']);
+        }
+        for (const d of b.doors) {
+          const r = sub(lerp(d.i, d.o, .5), b.p), x = dot(r, b.u), z = dot(r, b.v), n = norm(sub(d.o, d.i)), nx = dot(n, b.u), nz = dot(n, b.v), hor = Math.abs(nz) > .5;
+          for (const side of [-1, 1]) pcs.push([geo.box, 'plaster', 48, 0xe8e4da, M(x + (hor ? side * (dw / 2 + 2) : 0), 32, z + (hor ? 0 : side * (dw / 2 + 2)), hor ? 4 : WALLT + 2, 64, hor ? WALLT + 2 : 4), 'top']);
+          pcs.push([geo.box, 'metal', 24, 0x4a5358, M(x + nx * 10, 67, z + nz * 10, hor ? dw + 16 : 26, 3, hor ? 26 : dw + 16), 'roof']);
+          pcs.push([geo.box, 'concrete', 48, 0xa49c8e, M(x + nx * 12, 1, z + nz * 12, hor ? dw + 12 : 24, 2, hor ? 24 : dw + 12), 'floor']);
+        }
+        const chimneyY = wallH + b.h * .38 * .7;
+        pcs.push([geo.box, 'brick', 48, 0x98624c, M(b.w * .22, chimneyY, -b.h * .16, 12, 34, 12), 'roof']);
+        pcs.push([geo.box, 'concrete', 48, 0x625e57, M(b.w * .22, chimneyY + 18, -b.h * .16, 16, 3, 16), 'roof']);
+      }
       // крыша
       const rc = ROOFC[b.id % ROOFC.length];
       const GR = { gable: [.38, K.style === 'metal' ? 0x7a807a : rc], lowgable: [.2, 0x5a6068], steep: [.75, 0x2a2730] }[K.roof];
-      if (GR) { const along = b.w >= b.h; pcs.push([geo.roof, 'rooftile', 24, GR[1], along ? M(0, WALLH, 0, b.w * 1.04, Math.min(b.h, b.w) * GR[0], b.h * 1.08) : M(0, WALLH, 0, b.h * 1.04, Math.min(b.h, b.w) * GR[0], b.w * 1.08, 1.5708), 'roof']); }
-      else { pcs.push([geo.box, K.roof === 'foil' ? 'metal' : 'gravel', K.roof === 'foil' ? 9 : 32, K.roof === 'foil' ? 0xdfe4ea : 0x8a867e, M(0, WALLH + 1.5, 0, b.w + 2, 3, b.h + 2), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, WALLH + 4.5, b.h / 2 - 1, b.w + 3, 6, 3), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, WALLH + 4.5, -b.h / 2 + 1, b.w + 3, 6, 3), 'roof']);
-        pcs.push([geo.box, wm, 48, wc, M(b.w / 2 - 1, WALLH + 4.5, 0, 3, 6, b.h), 'roof']); pcs.push([geo.box, wm, 48, wc, M(-b.w / 2 + 1, WALLH + 4.5, 0, 3, 6, b.h), 'roof']);
-        if (!K.church) pcs.push([geo.box, 'metal', 24, 0x9a9a92, M(b.w * .22, WALLH + 7, -b.h * .15, 22, 10, 16), 'roof']); }
+      if (GR) { const along = b.w >= b.h; pcs.push([geo.roof, 'rooftile', 24, GR[1], along ? M(0, wallH, 0, b.w * 1.04, Math.min(b.h, b.w) * GR[0], b.h * 1.08) : M(0, wallH, 0, b.h * 1.04, Math.min(b.h, b.w) * GR[0], b.w * 1.08, 1.5708), 'roof']); }
+      else { pcs.push([geo.box, K.roof === 'foil' ? 'metal' : 'gravel', K.roof === 'foil' ? 9 : 32, K.roof === 'foil' ? 0xdfe4ea : 0x8a867e, M(0, wallH + 1.5, 0, b.w + 2, 3, b.h + 2), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, wallH + 4.5, b.h / 2 - 1, b.w + 3, 6, 3), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, wallH + 4.5, -b.h / 2 + 1, b.w + 3, 6, 3), 'roof']);
+        pcs.push([geo.box, wm, 48, wc, M(b.w / 2 - 1, wallH + 4.5, 0, 3, 6, b.h), 'roof']); pcs.push([geo.box, wm, 48, wc, M(-b.w / 2 + 1, wallH + 4.5, 0, 3, 6, b.h), 'roof']);
+        if (!K.church) pcs.push([geo.box, 'metal', 24, 0x9a9a92, M(b.w * .22, wallH + 7, -b.h * .15, 22, 10, 16), 'roof']); }
       if (K.church !== undefined) churchDeco(b, K, pcs);
       bParts[b.id] = [];
-      if (!K.slit) for (const id of b.walls) { const o = objs[id]; if (!o.win) continue; glassPlan.push([o.id, b.id, base.clone().multiply(M(o.lx, 37, o.ly, o.hor ? o.len : 1.2, 26, o.hor ? 1.2 : o.len))]); }
+      if (!K.slit) for (const id of b.walls) { const o = objs[id]; if (!o.win) continue; glassPlan.push([o.id, b.id, base.clone().multiply(M(o.lx, (sill + winTop) / 2, o.ly, o.hor ? o.len : 1.2, winTop - sill, o.hor ? 1.2 : o.len))]); }
       for (const [g, tx, sc, col, lm, role, low] of pcs) { const key = g.uuid + '|' + tx + '|' + sc + '|' + (role === 'floor' ? 'f' : 'w'); (plan[key] = plan[key] || { g, tx, sc, items: [] }).items.push([b.id, col, base.clone().multiply(lm), role, low ? base.clone().multiply(low) : null]); }
     }
     if (glassPlan.length) { glassMesh = new T.InstancedMesh(geo.box, new T.MeshLambertMaterial({ color: 0xbfe4ff, transparent: true, opacity: .32, depthWrite: false }), glassPlan.length); glassMesh.frustumCulled = false;

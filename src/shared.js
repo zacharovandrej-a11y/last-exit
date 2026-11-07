@@ -107,7 +107,7 @@ const OT = {
 // здания: план из комнат (BSP-деление), двери между комнатами, окна (пули и взгляд проходят, человек — нет)
 // style: стены/пол/крыша; hall — большой зал без деления; maxRoom — размер комнаты
 const BKIND = {
-  house: { w: 150, h: 112, maxRoom: 80, doors: 2, style: 'plaster', floor: 'wood', roof: 'gable', furn: 'home' },
+  house: { w: 210, h: 156, maxRoom: 100, doors: 2, door: 48, window: 36, wallHeight: 80, style: 'plaster', floor: 'wood', roof: 'gable', furn: 'home' },
   villa: { w: 220, h: 160, maxRoom: 90, doors: 3, style: 'brick', floor: 'wood', roof: 'gable', furn: 'home' },
   apart: { w: 320, h: 210, maxRoom: 95, doors: 4, style: 'plaster2', floor: 'tile', roof: 'flat', furn: 'home' },
   office: { w: 280, h: 200, maxRoom: 100, doors: 3, style: 'concrete', floor: 'tile', roof: 'flat', furn: 'office' },
@@ -187,7 +187,7 @@ function genWorld() {
       for (const _ of doorsAt[si]) { for (let k = 0; k < 30; k++) { const g = s0 + ED / 2 + 14 + rnd() * (s1 - s0 - ED - 28); if (clear(g)) { gaps.push([g, ED, 0]); const lp = hor ? [g, c] : [c, g], n = hor ? [0, sg] : [sg, 0]; b.doors.push({ i: L(lp[0] - n[0] * 28, lp[1] - n[1] * 28), o: L(lp[0] + n[0] * 30, lp[1] + n[1] * 30) }); break; } } }
       // окна через каждые ~70
       // окна: равномерно в свободных промежутках между дверями и перегородками
-      const ww = K.slit ? 22 : WIN, blk = [[s0 - 1, s0 + 14], [s1 - 14, s1 + 1], ...gaps.map(([g, w]) => [g - w / 2 - 12, g + w / 2 + 12]), ...joins.map(j => [j - 19, j + 19])].sort((m, n) => m[0] - n[0]);
+      const ww = K.slit ? 22 : K.window || WIN, blk = [[s0 - 1, s0 + 14], [s1 - 14, s1 + 1], ...gaps.map(([g, w]) => [g - w / 2 - 12, g + w / 2 + 12]), ...joins.map(j => [j - 19, j + 19])].sort((m, n) => m[0] - n[0]);
       let cur = blk[0][1]; for (const [x0, x1] of blk.slice(1)) { if (x0 > cur) { const lf = x0 - cur; if (lf >= ww + 6) { const n = Math.max(1, Math.floor(lf / 56)); for (let k = 0; k < n; k++) gaps.push([cur + (k + .5) * lf / n, ww, 1]); } } cur = Math.max(cur, x1); }
       wallLine(hor, c, s0, s1, gaps);
     });
