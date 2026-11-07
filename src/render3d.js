@@ -61,7 +61,7 @@ vec4 wp_=modelMatrix*p_;vec3 wn_=normalize(mat3(modelMatrix)*normalize(nm_*norma
   const crateTex = typeof ART === 'object' && ART.crate ? loader.load(ART.crate) : null;
   const gsize = HALF * 2 + 4000, gg = new T.PlaneGeometry(gsize, gsize, 1, 1); gg.rotateX(-Math.PI / 2);
   const ground = new T.Mesh(gg, new T.ShaderMaterial({
-    uniforms: Object.assign(T.UniformsUtils.clone(T.UniformsLib.lights), { grass: { value: grassTex }, hasGrass: { value: grassTex ? 1 : 0 }, bc: { value: BIOMES.map(b => new T.Vector2(b.c[0], b.c[1])) }, bcol: { value: BIOMES.map(b => new T.Color(b.col)) }, brad: { value: BIOMES.map(b => b.r) } }, U),
+    uniforms: Object.assign(T.UniformsUtils.clone(T.UniformsLib.lights), { grass: { value: grassTex }, hasGrass: { value: grassTex ? 1 : 0 }, bc: { value: BIOMES.map(b => new T.Vector2(b.c[0], b.c[1])) }, bcol: { value: BIOMES.map(b => new T.Color(b.col)) }, brad: { value: BIOMES.map(b => b.r) }, hallC: { value: new T.Vector2(1e6, 1e6) }, hallU: { value: new T.Vector2(1, 0) }, hallHalf: { value: new T.Vector2() } }, U),
     lights: true,
     vertexShader: '#include <common>\n#include <shadowmap_pars_vertex>\nvarying vec2 vP;void main(){vec3 transformedNormal=normalMatrix*vec3(0.,1.,0.);vec4 worldPosition=modelMatrix*vec4(position,1.);vP=worldPosition.xz;gl_Position=projectionMatrix*viewMatrix*worldPosition;\n#include <shadowmap_vertex>\n}',
     fragmentShader: `
@@ -70,11 +70,13 @@ vec4 wp_=modelMatrix*p_;vec3 wn_=normalize(mat3(modelMatrix)*normalize(nm_*norma
 #include <shadowmap_pars_fragment>
 uniform vec2 zc;uniform float zrho;uniform vec2 nc;uniform float nrho;uniform float t;
 uniform vec2 bc[6];uniform vec3 bcol[6];uniform float brad[6];uniform sampler2D grass;uniform float hasGrass;
+uniform vec2 hallC;uniform vec2 hallU;uniform vec2 hallHalf;
 varying vec2 vP;
 float hash(vec2 p){p=fract(p*vec2(.1031,.1030));p+=dot(p,p.yx+33.33);return fract((p.x+p.y)*p.x);}
 float noise(vec2 x){vec2 i=floor(x);vec2 f=fract(x);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),f.x),f.y);}
 void main(){
- vec3 col=hasGrass>.5?texture2D(grass,vP/170.).rgb:vec3(.42,.74,.29);
+ vec3 grassBase=hasGrass>.5?texture2D(grass,vP/170.).rgb:vec3(.42,.74,.29);
+ vec3 col=grassBase;
  col*=.88+.24*noise(vP*.012);
  ${STYLE === 'real' ? 'col=mix(vec3(dot(col,vec3(.3,.59,.11))),col,.72)*vec3(.93,.9,.7);' : 'col*=vec3(1.02,1.05,.95);'} // трава: оливковая (реализм) или сочная
  float nb=noise(vP*.04);
@@ -83,6 +85,15 @@ void main(){
  col=mix(col,vec3(.47,.38,.27)*(.8+.35*nb),smoothstep(.72,.86,dn)*.85);
  col=mix(col,col*vec3(.78,.74,.6),smoothstep(.45,.7,noise(vP*.009)));
  for(int i=0;i<6;i++){float e=smoothstep(brad[i]+12.,brad[i]-12.,length(vP-bc[i])+(nb-.5)*30.);col=mix(col,bcol[i]*(.9+.18*nb),e);}
+ // Газон — часть той же земли: скруглённый неровный край, без отдельной плоскости и шва.
+ vec2 hrel=vP-hallC;
+ vec2 hp=vec2(dot(hrel,hallU),dot(hrel,vec2(-hallU.y,hallU.x)));
+ vec2 he=abs(hp)-hallHalf+vec2(60.);
+ float hedge=length(max(he,vec2(0.)))+min(max(he.x,he.y),0.)-60.;
+ hedge+=(noise(vP*.035)-.5)*28.;
+ float lawn=1.-smoothstep(-16.,34.,hedge);
+ vec3 lawnCol=mix(vec3(.25,.36,.16),grassBase*.62,.25)*(.94+.12*nb);
+ col=mix(col,lawnCol,lawn*.94);
  // берег и вода по краю карты
  float e=max(abs(vP.x),abs(vP.y))-${HALF.toFixed(1)}+(noise(vP*.02)-.5)*40.;
  col=mix(col,vec3(.93,.84,.62)*(.92+.12*nb),smoothstep(-55.,-45.,e));
@@ -120,6 +131,8 @@ void main(){
   };
   // prism: после поворотов — треугольник в плоскости YZ? подгоняем отдельно ниже
   geo.roof = (() => { const s = new T.Shape(); s.moveTo(-.5, 0); s.lineTo(.5, 0); s.lineTo(0, 1); s.closePath(); const g = new T.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false }); g.translate(0, 0, -.5); g.rotateY(Math.PI / 2); return g; })(); // гребень вверх, длина по X, ширина по Z
+  geo.slipperSole = (() => { const s = new T.Shape(); s.moveTo(-42, -21); s.quadraticCurveTo(-65, -21, -65, 0); s.quadraticCurveTo(-65, 21, -42, 21); s.lineTo(38, 24); s.quadraticCurveTo(66, 24, 66, 0); s.quadraticCurveTo(66, -24, 38, -24); s.closePath(); const g = new T.ExtrudeGeometry(s, { depth: 5, bevelEnabled: false, curveSegments: 6 }); g.rotateX(-Math.PI / 2); return g; })();
+  geo.slipperStrap = (() => { const s = new T.Shape(); s.moveTo(-24, 0); s.quadraticCurveTo(0, 48, 24, 0); s.lineTo(18, 0); s.quadraticCurveTo(0, 34, -18, 0); s.closePath(); const g = new T.ExtrudeGeometry(s, { depth: 30, bevelEnabled: false, curveSegments: 6 }); g.translate(0, 0, -15); g.rotateY(Math.PI / 2); return g; })();
   const M = (x, y, z, sx, sy, sz, ry = 0, rz = 0) => new T.Matrix4().compose(new T.Vector3(x, y, z), new T.Quaternion().setFromEuler(new T.Euler(0, ry, rz)), new T.Vector3(sx, sy, sz));
   const MX = (x, y, z, sx, sy, sz) => new T.Matrix4().compose(new T.Vector3(x, y, z), new T.Quaternion().setFromEuler(new T.Euler(Math.PI / 2, 0, 0)), new T.Vector3(sx, sy, sz)); // цилиндр вдоль Z
   // приглушённые реальные цвета; у каждого экземпляра свой оттенок
@@ -224,6 +237,9 @@ void main(){
   function tex(f, n = 128) { const c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d'); f(g, n, mkRng(n * 7 + f.length)); const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.magFilter = T.NearestFilter; return t; }
   const noiseFill = (g, n, rnd, base, amp, k = 1800) => { g.fillStyle = `rgb(${base},${base},${base})`; g.fillRect(0, 0, n, n); for (let i = 0; i < k; i++) { const v = base + (rnd() - .5) * amp | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(rnd() * n | 0, rnd() * n | 0, 1 + (rnd() * 2 | 0), 1 + (rnd() * 2 | 0)); } };
   const TX = {
+    paving: tex((g, n, rnd) => { noiseFill(g, n, rnd, 237, 9, 1600); g.fillStyle = '#c5c1b8'; for (let i = 0; i < n; i += 64) { g.fillRect(i, 0, 1, n); g.fillRect(0, i, n, 1); } }),
+    stucco: tex((g, n, rnd) => { noiseFill(g, n, rnd, 245, 10, 1200); }),
+    slate: tex((g, n) => { g.fillStyle = '#eeeeee'; g.fillRect(0, 0, n, n); g.fillStyle = '#d4d4d4'; for (let x = 0; x < n; x += 32) g.fillRect(x, 0, 2, n); }),
     brick: tex((g, n, rnd) => { g.fillStyle = '#d8d4cc'; g.fillRect(0, 0, n, n); for (let y = 0; y < n; y += 8) for (let x = -16; x < n; x += 16) { const o = (y / 8) % 2 ? 8 : 0, v = 150 + rnd() * 50 | 0; g.fillStyle = `rgb(${v + 20},${v},${v - 10})`; g.fillRect(x + o + 1, y + 1, 14, 6); } }),
     plaster: tex((g, n, rnd) => { noiseFill(g, n, rnd, 225, 30); g.strokeStyle = 'rgba(90,80,70,.35)'; for (let i = 0; i < 4; i++) { g.beginPath(); let x = rnd() * n, y = rnd() * n; g.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (rnd() - .5) * 16; y += rnd() * 10; g.lineTo(x, y); } g.stroke(); } }),
     concrete: tex((g, n, rnd) => { noiseFill(g, n, rnd, 200, 40); g.fillStyle = 'rgba(70,70,70,.35)'; g.fillRect(0, 0, n, 1); g.fillRect(0, 63, n, 1); g.fillRect(0, 0, 1, n); g.fillRect(63, 0, 1, n); }),
@@ -252,6 +268,7 @@ void main(){
     return texMats[k] = m;
   }
   const BSTY = {
+    hallplaster: { tex: 'stucco', cols: [0xc8b795] },
     plaster: { tex: 'plaster', cols: [0xe0d6c2, 0xd8cfbe, 0xcdbfa6, 0xd9c9b0] }, plaster2: { tex: 'plaster', cols: [0xc9c2b4, 0xbcb4a6, 0xd6cfc0, 0xb8a990] },
     brick: { tex: 'brick', cols: [0xb8705a, 0xa86450, 0xc08068] }, concrete: { tex: 'concrete', cols: [0xbdb8ae, 0xaaa69e, 0x9c988f] },
     wood: { tex: 'wood', cols: [0x8a5a3a, 0x7a3a2c, 0x6e5238] }, metal: { tex: 'metal', cols: [0x8a8f86, 0x7a8478, 0x9a9488] }, adobe: { tex: 'adobe', cols: [0xd9b88a, 0xcfa878, 0xe0c49a] },
@@ -260,18 +277,18 @@ void main(){
   const FLOOR = { wood: ['fwood', 0x9a7350], tile: ['tile', 0xb8b4aa], concrete: ['floorc', 0x99968e], dirt: ['dirt', 0x8a7556] };
   const ROOFC = [0x7e3a2c, 0x4a4f57, 0x6b4a3a, 0x5b4636, 0x8a4a34];
   const bInst = {}, bParts = []; let insideB = -1; const deco = {}; const glassPlan = [], glassIdx = []; let glassMesh = null;
-  // вывеска с текстом: всегда повёрнута к камере, чтобы читалась
-  function sign(bid, wp, y, w, h, lines, bg, fg, frame) {
+  // Вывеска: по умолчанию к камере, с facing — закреплена в плоскости фасада.
+  function sign(bid, wp, y, w, h, lines, bg, fg, frame, facing = null) {
     const c = document.createElement('canvas'), k = 6; c.width = w * k; c.height = h * k; const g = c.getContext('2d');
     g.fillStyle = frame || bg; g.fillRect(0, 0, c.width, c.height); g.fillStyle = bg; g.fillRect(k * 1.2, k * 1.2, c.width - k * 2.4, c.height - k * 2.4);
     g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
     lines.forEach(([t, sz], i) => { g.font = '900 ' + (sz * k) + 'px system-ui,sans-serif'; const mw = g.measureText(t).width, lim = c.width - k * 5; if (mw > lim) g.font = '900 ' + Math.floor(sz * k * lim / mw) + 'px system-ui,sans-serif'; g.fillText(t, c.width / 2, c.height * (i + .5) / lines.length + (lines.length > 1 ? (i ? -k : k) : 0)); });
     const tx = new T.CanvasTexture(c); tx.anisotropy = 4;
     const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: tx, side: T.DoubleSide }));
-    m.position.set(wp[0], y, wp[1]); m.rotation.order = 'YXZ'; m.rotation.y = Math.atan2(CAM_OFF.x, CAM_OFF.z); m.rotation.x = -.25; scene.add(m); (deco[bid] = deco[bid] || []).push(m); return m;
+    m.position.set(wp[0], y, wp[1]); m.rotation.order = 'YXZ'; m.rotation.y = facing ? Math.atan2(facing[0], facing[1]) : Math.atan2(CAM_OFF.x, CAM_OFF.z); m.rotation.x = facing ? 0 : -.25; scene.add(m); (deco[bid] = deco[bid] || []).push(m); return m;
   }
   // уникальный вид церквей сект
-  function churchDeco(b, K, pcs) {
+  function churchDeco(b, K, pcs, objs) {
     const d = b.doors[0], dc = lerp(d.i, d.o, .5), rr_ = sub(dc, b.p), lx = dot(rr_, b.u), ly = dot(rr_, b.v), n = sub(d.o, d.i), nl = [dot(n, b.u), dot(n, b.v)], ax = Math.abs(nl[0]) > Math.abs(nl[1]);
     const fx = ax ? Math.sign(nl[0]) : 0, fz = ax ? 0 : Math.sign(nl[1]); // наружу от двери
     const out = (k, side = 0) => [lx + fx * k + (ax ? 0 : side), ly + fz * k + (ax ? side : 0)]; // точка перед дверью
@@ -281,15 +298,76 @@ void main(){
     const lawn = (y, w, h, lines, bg, fg, fr, side = 0) => { const cd = norm([CAM_OFF.x, CAM_OFF.z]), wp = add(add(b.p, cd, b.rad * .8 + 30), [-cd[1], cd[0]], side), q = sub(add(wp, cd, -3.5), b.p), lq = [dot(q, b.u), dot(q, b.v)];
       for (const sd of [-1, 1]) { const o = [Math.cos(Math.atan2(CAM_OFF.x, CAM_OFF.z)) * sd * w * .38, -Math.sin(Math.atan2(CAM_OFF.x, CAM_OFF.z)) * sd * w * .38], oq = [dot(o, b.u), dot(o, b.v)]; P(geo.box, 0x55595e, M(lq[0] + oq[0], y / 2, lq[1] + oq[1], 2.4, y, 2.4), 'prop'); }
       sign(b.id, wp, y + h / 2 - 2, w, h, lines, bg, fg, fr); };
-    const W = b.w, H = b.h, top = WALLH;
+    const W = b.w, H = b.h, top = K.wallHeight || WALLH;
     if (K.church === 0) { // «Зал Вечного Тапка»: аккуратный низкий зал, газон, кусты, стойка с литературой, гигантский тапок на крыше
+      const Q = (g, c, m, role = 'roof', tx = 'stucco') => pcs.push([g, tx, 48, c, m, role]);
+      const cream = 0xcabea7, stone = 0x9b9382, teal = 0x315855, pink = 0xdb8daa, gold = 0xb89044;
       const rh = Math.min(W, H) * .2;
-      const sa = .3, sx_ = Math.cos(sa), sz_ = -Math.sin(sa), at = (k, y) => [k * sx_, top + rh + y, k * sz_];
-      { const [x, y, z] = at(4, 3); P(geo.box, 0xff7eb0, M(x, y, z, 70, 4, 30, sa)); } { const [x, y, z] = at(-35, 3); P(geo.cyl10, 0xff7eb0, M(x, y, z, 15, 4, 15)); } { const [x, y, z] = at(39, 3); P(geo.cyl10, 0xff7eb0, M(x, y, z, 15, 4, 15)); }
-      { const [x, y, z] = at(-20, 9); P(geo.box, 0xd94a8a, M(x, y, z, 14, 9, 33, sa)); } { const [x, y, z] = at(-20, 15); P(geo.box, 0xffffff, M(x, y, z, 6, 3, 18, sa)); }
-      for (const sd of [-1, 1]) for (let k = 0; k < 4; k++) { const q = out(18, sd * (36 + k * 20)); P(geo.dod, 0x3f6a2a, M(q[0], 7, q[1], 9, 8, 9), 'prop', 'plaster'); }
-      const q = out(26, 34); P(geo.box, 0x4a4f57, M(q[0], 10, q[1], 10, 20, 10), 'prop'); P(geo.box, 0xff7eb0, M(q[0] + fx * 5.2, 13, q[1] + fz * 5.2, ax ? .6 : 8, 12, ax ? 8 : .6), 'prop'); P(geo.box, 0xffd43b, M(q[0] + fx * 5.3, 8, q[1] + fz * 5.3, ax ? .6 : 6, 3, ax ? 6 : .6), 'prop');
-      lawn(16, 80, 24, [['ЗАЛ ВЕЧНОГО ТАПКА', 8], ['собрания по средам и воскресеньям', 4.5]], '#fff8ee', '#c2185b', '#7a8a9a');
+      // Ухоженный двор и светлая терраса: тихий фон вместо пёстрой травы под входом.
+      const gu = ground.material.uniforms; gu.hallC.value.set(...b.p); gu.hallU.value.set(...b.u); gu.hallHalf.value.set(W / 2 + 90, H / 2 + 90);
+      Q(geo.box, 0xaaa18c, M(0, .6, 0, W + 76, .5, H + 64), 'floor', 'paving');
+      { const q = out(107); Q(geo.box, 0xb8aa8e, M(q[0], .9, q[1], ax ? 214 : 110, .4, ax ? 110 : 214), 'floor', 'paving'); }
+      // Разреженные плиты продолжают дорожку в город, без резкого обрыва у газона.
+      for (let i = 0; i < 4; i++) { const q = out(230 + i * 22, (i % 2 ? 1 : -1) * 4), width = 56 - i * 7;
+        Q(geo.box, 0xa99b80, M(q[0], .5, q[1], ax ? 15 : width, .4, ax ? width : 15), 'floor', 'paving'); }
+      // Каменный цоколь отдельными сегментами — проёмы не зашиваем.
+      for (const id of b.walls) { const o = objs[id];
+        if (!o || (o.hor ? Math.abs(o.ly) < H / 2 - WALLT : Math.abs(o.lx) < W / 2 - WALLT)) continue;
+        Q(geo.box, stone, M(o.lx, 5, o.ly, o.hor ? o.len : WALLT + 2, 10, o.hor ? WALLT + 2 : o.len), 'wall', 'concrete');
+        if (o.win) {
+          const nx = o.hor ? 0 : Math.sign(o.lx), nz = o.hor ? Math.sign(o.ly) : 0;
+          for (const sd of [-1, 1]) Q(geo.box, teal, M(o.lx + nx * 4 + (o.hor ? sd * (o.len / 2 + 4) : 0), 48, o.ly + nz * 4 + (o.hor ? 0 : sd * (o.len / 2 + 4)), o.hor ? 5 : 3, 43, o.hor ? 3 : 5), 'win');
+          Q(geo.box, cream, M(o.lx + nx * 4, 26, o.ly + nz * 4, o.hor ? o.len + 14 : 10, 4, o.hor ? 10 : o.len + 14), 'win');
+        }
+      }
+      // Угловые пилястры, пояс под крышей и глубокий свес задают архитектурный ритм.
+      for (const x of [-1, 1]) for (const z of [-1, 1]) {
+        Q(geo.box, cream, M(x * (W / 2 - 4), top / 2, z * (H / 2 - 4), 13, top, 13), 'top');
+        Q(geo.box, stone, M(x * (W / 2 - 4), 7, z * (H / 2 - 4), 17, 14, 17), 'wall');
+      }
+      for (const sd of [-1, 1]) {
+        Q(geo.box, cream, M(0, top - 3, sd * H / 2, W + 14, 8, 12));
+        Q(geo.box, teal, M(0, top + 2, sd * (H / 2 + 5), W + 24, 3, 12));
+        Q(geo.box, cream, M(sd * W / 2, top - 3, 0, 12, 8, H + 12));
+      }
+      // Вход-портик: тонкие колонны остаются за пределами свободного коридора 120.
+      for (const sd of [-1, 1]) { const q = out(54, sd * 74);
+        Q(geo.box, stone, M(q[0], 3, q[1], 15, 6, 15), 'top');
+        Q(geo.cyl10, cream, M(q[0], 39, q[1], 4.2, 72, 4.2), 'top');
+        Q(geo.box, gold, M(q[0], 77, q[1], 13, 5, 13), 'top');
+      }
+      { const q = out(28); Q(geo.box, cream, M(q[0], 82, q[1], ax ? 72 : 170, 16, ax ? 170 : 72));
+        Q(geo.roof, teal, M(q[0], 87, q[1], ax ? 82 : 178, 23, ax ? 178 : 82)); }
+      // Чёткий силуэт тапка: закруглённая подошва, стелька и настоящая дуга ремешка.
+      Q(geo.cyl10, gold, M(0, top + rh + 5, 0, 71, 10, 35));
+      Q(geo.slipperSole, 0xc56a8c, M(0, top + rh + 10, 0, 1, 1, 1, -.12));
+      Q(geo.slipperSole, 0xf5c6cd, M(0, top + rh + 15, 0, .92, .5, .85, -.12));
+      Q(geo.slipperStrap, pink, M(18, top + rh + 18, 0, 1, 1, 1, -.12));
+      Q(geo.box, gold, M(18, top + rh + 41, 0, 8, 4, 12, -.12));
+      // Клумбы низкие, не закрывают людей; повторяющиеся детали инстансятся.
+      for (const sd of [-1, 1]) { const q = out(115, sd * 110);
+        Q(geo.box, stone, M(q[0], 3, q[1], 60, 6, 42), 'prop');
+        Q(geo.box, 0x685a48, M(q[0], 6.3, q[1], 54, 1, 36), 'prop');
+        for (let j = -1; j <= 1; j++) {
+          Q(geo.dod, 0x50784a, M(q[0] + j * 17, 10, q[1], 12, 7, 13), 'prop');
+          Q(geo.ico1, j % 2 ? 0xf3d78a : pink, M(q[0] + j * 17, 16, q[1], 4, 3, 4), 'prop');
+        }
+      }
+      for (const sd of [-1, 1]) { const q = out(20, sd * 170);
+        Q(geo.box, teal, M(q[0], 13, q[1], ax ? 20 : 68, 4, ax ? 68 : 20), 'prop');
+        Q(geo.box, teal, M(q[0] - fx * 9, 23, q[1] - fz * 9, ax ? 3 : 68, 18, ax ? 68 : 3), 'prop');
+        for (const end of [-1, 1]) Q(geo.box, stone, M(q[0] + (ax ? 0 : end * 23), 6, q[1] + (ax ? end * 23 : 0), 14, 12, 14), 'prop');
+      }
+      { const q = out(32, -100); Q(geo.box, teal, M(q[0], 14, q[1], 22, 28, 14), 'prop');
+        Q(geo.box, cream, M(q[0], 29, q[1], 28, 3, 20), 'prop');
+        Q(geo.box, pink, M(q[0] + fx * 11.5, 17, q[1] + fz * 7.5, ax ? 1 : 16, 12, ax ? 16 : 1), 'prop'); }
+      // Лицевая доска закреплена под балкой и выступает за свес крыши: текст не перекрывается.
+      { const q = out(67); Q(geo.box, cream, M(q[0], 73, q[1], ax ? 6 : 144, 18, ax ? 144 : 6)); }
+      sign(b.id, wpt(out(70.5)), 73, 132, 13, [['ЗАЛ ВЕЧНОГО ТАПКА', 9]], '#e6d4b5', '#395d5b', '#b99d6d', n);
+      // Отдельный щит стоит на двух ножках, а не висит в воздухе.
+      { const q = out(120, -158); Q(geo.box, stone, M(q[0], 30, q[1], ax ? 3 : 62, 31, ax ? 62 : 3), 'prop');
+        for (const side of [-1, 1]) Q(geo.box, teal, M(q[0] + (ax ? 0 : side * 23), 10, q[1] + (ax ? side * 23 : 0), 3, 20, 3), 'prop'); }
+      sign(b.id, wpt(out(122, -158)), 30, 58, 27, [['ВАС УЖЕ ЛЮБЯТ', 6], ['осталось подписать', 4]], '#fff2df', '#a84d71', '#d4b474', n);
     } else if (K.church === 1) { // «Обитель» Тёмного Ордена: крутая чёрная крыша, шпиль со сферой, каменные голуби на углах, свечи у входа
       const rh = Math.min(W, H) * .75;
       P(geo.cone7, 0x1e1c24, M(0, top + rh + 26, 0, 9, 56, 9), 'roof'); P(geo.sph, 0xa259ff, M(0, top + rh + 58, 0, 6, 6, 6), 'roof');
@@ -314,13 +392,14 @@ void main(){
     }
   }
   function buildBuildings(objs) {
+    ground.material.uniforms.hallC.value.set(1e6, 1e6);
     for (const k in bInst) { scene.remove(bInst[k].mesh); if (bInst[k].mesh.userData.outline) scene.remove(bInst[k].mesh.userData.outline); delete bInst[k]; }
     bParts.length = 0; insideB = -1; glassPlan.length = 0; if (glassMesh) { scene.remove(glassMesh); glassMesh = null; } glassIdx.length = 0; for (const k in deco) { deco[k].forEach(m => scene.remove(m)); delete deco[k]; }
     const plan = {}, Y = new T.Vector3(0, 1, 0), ONE = new T.Vector3(1, 1, 1);
     for (const b of objs.blds || []) {
       const K = BKIND[b.kind], S = BSTY[K.style], base = new T.Matrix4().compose(new T.Vector3(b.p[0], 0, b.p[1]), new T.Quaternion().setFromAxisAngle(Y, -b.a), ONE);
       const wc = S.cols[b.id % S.cols.length], wm = S.tex, pcs = [], wallH = K.wallHeight || WALLH;
-      const sill = K.slit ? 36 : b.kind === 'house' ? 28 : 24, winTop = K.slit ? 44 : b.kind === 'house' ? 60 : 50;
+      const sill = K.slit ? 36 : b.kind === 'house' || K.church === 0 ? 28 : 24, winTop = K.slit ? 44 : K.church === 0 ? 68 : b.kind === 'house' ? 60 : 50;
       if (b.yard) {
         const [yw, yh] = b.yard;
         pcs.push([geo.box, 'dirt', 48, 0x829360, M(0, .15, 0, yw, .3, yh), 'floor']);
@@ -363,12 +442,12 @@ void main(){
       }
       // крыша
       const rc = ROOFC[b.id % ROOFC.length];
-      const GR = { gable: [.38, K.style === 'metal' ? 0x7a807a : rc], lowgable: [.2, 0x5a6068], steep: [.75, 0x2a2730] }[K.roof];
-      if (GR) { const along = b.w >= b.h; pcs.push([geo.roof, 'rooftile', 24, GR[1], along ? M(0, wallH, 0, b.w * 1.04, Math.min(b.h, b.w) * GR[0], b.h * 1.08) : M(0, wallH, 0, b.h * 1.04, Math.min(b.h, b.w) * GR[0], b.w * 1.08, 1.5708), 'roof']); }
+      const GR = { gable: [.38, K.style === 'metal' ? 0x7a807a : rc], lowgable: [.2, K.church === 0 ? 0x315855 : 0x5a6068], steep: [.75, 0x2a2730] }[K.roof];
+      if (GR) { const along = b.w >= b.h; pcs.push([geo.roof, K.church === 0 ? 'slate' : 'rooftile', 24, GR[1], along ? M(0, wallH, 0, b.w * 1.04, Math.min(b.h, b.w) * GR[0], b.h * 1.08) : M(0, wallH, 0, b.h * 1.04, Math.min(b.h, b.w) * GR[0], b.w * 1.08, 1.5708), 'roof']); }
       else { pcs.push([geo.box, K.roof === 'foil' ? 'metal' : 'gravel', K.roof === 'foil' ? 9 : 32, K.roof === 'foil' ? 0xdfe4ea : 0x8a867e, M(0, wallH + 1.5, 0, b.w + 2, 3, b.h + 2), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, wallH + 4.5, b.h / 2 - 1, b.w + 3, 6, 3), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, wallH + 4.5, -b.h / 2 + 1, b.w + 3, 6, 3), 'roof']);
         pcs.push([geo.box, wm, 48, wc, M(b.w / 2 - 1, wallH + 4.5, 0, 3, 6, b.h), 'roof']); pcs.push([geo.box, wm, 48, wc, M(-b.w / 2 + 1, wallH + 4.5, 0, 3, 6, b.h), 'roof']);
         if (!K.church) pcs.push([geo.box, 'metal', 24, 0x9a9a92, M(b.w * .22, wallH + 7, -b.h * .15, 22, 10, 16), 'roof']); }
-      if (K.church !== undefined) churchDeco(b, K, pcs);
+      if (K.church !== undefined) churchDeco(b, K, pcs, objs);
       bParts[b.id] = [];
       if (!K.slit) for (const id of b.walls) { const o = objs[id]; if (!o.win) continue; glassPlan.push([o.id, b.id, base.clone().multiply(M(o.lx, (sill + winTop) / 2, o.ly, o.hor ? o.len : 1.2, winTop - sill, o.hor ? 1.2 : o.len))]); }
       for (const [g, tx, sc, col, lm, role, low] of pcs) { const key = g.uuid + '|' + tx + '|' + sc + '|' + (role === 'floor' ? 'f' : 'w'); (plan[key] = plan[key] || { g, tx, sc, items: [] }).items.push([b.id, col, base.clone().multiply(lm), role, low ? base.clone().multiply(low) : null]); }
