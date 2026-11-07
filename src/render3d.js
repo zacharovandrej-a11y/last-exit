@@ -130,6 +130,8 @@ void main(){
   };
   // части каждого типа: [геометрия, цвет (или ключ VAR), матрица в единицах w/h объекта]
   const PARTS = {
+    shed: (w, h) => [[geo.box, 0x79614b, M(0, 30, 0, w, 60, h)], [geo.roof, 0x4c555a, M(0, 60, 0, w + 8, 24, h + 8)],
+      [geo.box, 0x40352a, M(0, 24, h / 2 + .6, 38, 48, 1.2)], [geo.box, 0xb8aea0, M(14, 24, h / 2 + 1.4, 2, 3, 1.5)]],
     tree: (w) => { const k = w / 44; return [[geo.cyl6, 0x4a3626, M(0, 15 * k, 0, 3.2 * k, 30 * k, 3.2 * k)], [geo.cyl6, 0x4a3626, M(5 * k, 28 * k, 0, 1.6 * k, 14 * k, 1.6 * k, 0, -.7)],
       [geo.dod, 'leaf2', M(0, 38 * k, 0, 21 * k, 15 * k, 21 * k)], [geo.dod, 'leaf', M(-8 * k, 48 * k, 5 * k, 15 * k, 13 * k, 15 * k, 1)], [geo.dod, 'leaf', M(9 * k, 50 * k, -4 * k, 14 * k, 12 * k, 14 * k, 2)], [geo.dod, 'leaf', M(1 * k, 60 * k, 1 * k, 12 * k, 11 * k, 12 * k, 3)]]; },
     pine: (w) => { const k = w / 40; return [[geo.cyl6, 0x4a3626, M(0, 8 * k, 0, 2.6 * k, 16 * k, 2.6 * k)], [geo.cone7, 'pine', M(0, 26 * k, 0, 21 * k, 30 * k, 21 * k)], [geo.cone7, 'pine', M(0, 44 * k, 0, 16 * k, 26 * k, 16 * k, .5)], [geo.cone7, 'pine', M(0, 60 * k, 0, 10 * k, 22 * k, 10 * k, 1)], [geo.cone7, 0xe4e9ec, M(0, 66 * k, 0, 5 * k, 10 * k, 5 * k)]]; },
@@ -319,6 +321,12 @@ void main(){
       const K = BKIND[b.kind], S = BSTY[K.style], base = new T.Matrix4().compose(new T.Vector3(b.p[0], 0, b.p[1]), new T.Quaternion().setFromAxisAngle(Y, -b.a), ONE);
       const wc = S.cols[b.id % S.cols.length], wm = S.tex, pcs = [], wallH = K.wallHeight || WALLH;
       const sill = K.slit ? 36 : b.kind === 'house' ? 28 : 24, winTop = K.slit ? 44 : b.kind === 'house' ? 60 : 50;
+      if (b.yard) {
+        const [yw, yh] = b.yard;
+        pcs.push([geo.box, 'dirt', 48, 0x829360, M(0, .15, 0, yw, .3, yh), 'floor']);
+        for (const side of [-1, 1]) { const length = (yh - b.h) / 2;
+          pcs.push([geo.box, 'gravel', 32, 0xb7aa8c, M(0, .4, side * (b.h / 2 + length / 2), 62, .3, length), 'floor']); }
+      }
       const [ft, fc] = FLOOR[K.floor]; pcs.push([geo.box, ft, 48, fc, M(0, .8, 0, b.w - 2, 1.6, b.h - 2), 'floor']);
       for (const id of b.walls) {
         const o = objs[id], L = o.len, sx = o.hor ? L : WALLT, sz = o.hor ? WALLT : L, X = o.lx, Z = o.ly;

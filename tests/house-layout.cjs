@@ -4,7 +4,15 @@ vm.runInNewContext(source + `
 const world = genWorld(), houses = world.blds.filter(b => b.kind === 'house');
 assert(houses.length > 0);
 for (const b of houses) {
-  assert(b.doors.length > 0);
+  assert.equal(b.doors.length, 2);
+  assert.equal(b.rooms.length, 3);
+  assert(b.rooms.every(r => r.x1 - r.x0 >= 75 && r.y1 - r.y0 >= 75), 'Cramped room');
+  assert(b.furn.some(i => world[i].fk === 'bed'), 'Bedroom has no bed');
+  // Реальные коллизии всего мира: дверь, дорожка и калитка с обеих сторон участка.
+  for (const side of [-1, 1]) for (let z = b.h / 2 - 25; z <= b.yard[1] / 2 + 35; z += 4) {
+    const p = add(b.p, b.v, side * z);
+    assert(dist(p, collide(world, p)) < .01, 'Blocked gate/path in house ' + b.id);
+  }
   const step = 6, margin = 42, x0 = -b.w / 2 - margin, y0 = -b.h / 2 - margin;
   const nx = Math.ceil((b.w + margin * 2) / step), ny = Math.ceil((b.h + margin * 2) / step);
   const obstacles = b.walls.concat(b.furn).map(i => world[i]);
