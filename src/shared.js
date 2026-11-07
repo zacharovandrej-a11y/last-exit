@@ -102,12 +102,12 @@ const OT = {
   tree: { s: 0 }, pine: { s: 0 }, rock: { s: 0 }, hay: { s: 0 }, cactus: { s: 0 }, snowman: { s: 0 },
   house: { s: 0 }, car: { s: 1, hp: 160 }, truck: { s: 1, hp: 240 }, crate: { s: 0, hp: 45 }, wall: { s: 1 }, igloo: { s: 0 }, tent: { s: 1 },
   bw: { s: 1 }, furn: { s: 1, pass: 1 }, barrel: { s: 0, hp: 30 }, fence: { s: 1, pass: 1 }, bush: { s: 0, nc: 1, pass: 1 },
-  grave: { s: 1, pass: 1 }, deadtree: { s: 0 }, ifence: { s: 1, pass: 1 }, antenna: { s: 0, pass: 1 }, billboard: { s: 1 }, dish: { s: 0, pass: 1 }, junk: { s: 0 },
+  grave: { s: 1, pass: 1 }, deadtree: { s: 0 }, ifence: { s: 1, pass: 1 }, antenna: { s: 0, pass: 1 }, billboard: { s: 1 }, dish: { s: 0, pass: 1 }, junk: { s: 0 }, shed: { s: 1 },
 };
 // здания: план из комнат (BSP-деление), двери между комнатами, окна (пули и взгляд проходят, человек — нет)
 // style: стены/пол/крыша; hall — большой зал без деления; maxRoom — размер комнаты
 const BKIND = {
-  house: { w: 150, h: 112, maxRoom: 80, doors: 2, style: 'plaster', floor: 'wood', roof: 'gable', furn: 'home' },
+  house: { w: 360, h: 280, maxRoom: 200, doors: 2, door: 48, window: 40, wallHeight: 88, yard: [640, 560], style: 'plaster', floor: 'wood', roof: 'gable', furn: 'home' },
   villa: { w: 220, h: 160, maxRoom: 90, doors: 3, style: 'brick', floor: 'wood', roof: 'gable', furn: 'home' },
   apart: { w: 320, h: 210, maxRoom: 95, doors: 4, style: 'plaster2', floor: 'tile', roof: 'flat', furn: 'home' },
   office: { w: 280, h: 200, maxRoom: 100, doors: 3, style: 'concrete', floor: 'tile', roof: 'flat', furn: 'office' },
@@ -127,13 +127,13 @@ const BKIND = {
 const WIN = 30; // ширина окна
 function genWorld() {
   const rnd = mkRng(424242), objs = [], blds = [];
-  const hqApproaches = [];
+  const hqApproaches = [], housePlots = [];
   // Коридор от входа: ширина 120, длина 260. Не занимаем его декором и случайными объектами.
   const blocksApproach = (p, m) => hqApproaches.some(([a, b]) => {
     const v = sub(b, a), t = Math.max(0, Math.min(1, dot(sub(p, a), v) / dot(v, v)));
     return dist(p, add(a, v, t)) < 60 + m;
   });
-  const free = (p, m) => { if (blocksApproach(p, m)) return false; for (const o of objs) if (o.bid === undefined && dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + b.rad) return false; return true; };
+  const free = (p, m) => { if (blocksApproach(p, m) || housePlots.some(b => { const r = sub(p, b.p); return Math.hypot(Math.max(0, Math.abs(dot(r, b.u)) - b.yard[0] / 2), Math.max(0, Math.abs(dot(r, b.v)) - b.yard[1] / 2)) < m; })) return false; for (const o of objs) if (o.bid === undefined && dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + b.rad) return false; return true; };
   function putA(type, p, w, h, a) {
     const u = [Math.cos(a), Math.sin(a)];
     const o = { id: objs.length, type, p, a, u, v: perp(u), w, h, rad: Math.hypot(w, h) / 2, sh: OT[type].s };
@@ -164,7 +164,13 @@ function genWorld() {
       if (along) { const x = r.x0 + w * f; splits.push({ hor: false, c: x, s0: r.y0, s1: r.y1 }); const A = { x0: r.x0, x1: x - t / 2, y0: r.y0, y1: r.y1 }, B = { x0: x + t / 2, x1: r.x1, y0: r.y0, y1: r.y1 }; if (hallOk && K.hall) A.hall = 1; split(A, depth + 1); split(B, depth + 1); }
       else { const y = r.y0 + h * f; splits.push({ hor: true, c: y, s0: r.x0, s1: r.x1 }); const A = { x0: r.x0, x1: r.x1, y0: r.y0, y1: y - t / 2 }, B = { x0: r.x0, x1: r.x1, y0: y + t / 2, y1: r.y1 }; if (hallOk && K.hall) A.hall = 1; split(A, depth + 1); split(B, depth + 1); }
     }
-    split(inner, 0, true);
+    if (kind === 'house') {
+      // Фиксированный план: прихожая спереди, общая комната и спальня сзади.
+      splits.push({ hor: true, c: 50, s0: inner.x0, s1: inner.x1 }, { hor: false, c: 30, s0: inner.y0, s1: 50 });
+      b.rooms.push({ x0: inner.x0, x1: inner.x1, y0: 53, y1: inner.y1, use: 'entry' },
+        { x0: inner.x0, x1: 27, y0: inner.y0, y1: 47, use: 'living' },
+        { x0: 33, x1: inner.x1, y0: inner.y0, y1: 47, use: 'bedroom' });
+    } else split(inner, 0, true);
     // внутренние стены с дверью (каждое деление — один проём → все комнаты связаны)
     for (const sp of splits) {
       // где к этой стене примыкают другие перегородки — дверь туда не ставим
@@ -180,14 +186,15 @@ function genWorld() {
     const doorsAt = sides.map(() => []);
     const sk = sides.map(sd => (sd[3] - sd[2]) + (rnd() - .5) * 40), order = [0, 1, 2, 3].sort((i, j) => sk[j] - sk[i] || i - j); // без рандома внутри sort — мир одинаковый везде
     if (K.church !== undefined) doorsAt[2].push(1); // церковь: вход в торце, напротив алтаря
+    else if (kind === 'house') { doorsAt[0].push(1); doorsAt[1].push(1); }
     else for (let k = 0; k < K.doors; k++) doorsAt[order[k % 4]].push(1);
     sides.forEach(([hor, c, s0, s1, sg], si) => {
       const joins = splits.filter(o => o.hor !== hor && (Math.abs(o.s0 - (hor ? c - sg * t / 2 : c - sg * t / 2)) < 10 || Math.abs(o.s1 - (c - sg * t / 2)) < 10)).map(o => o.c);
       const gaps = [], clear = g => joins.every(j => Math.abs(j - g) > 24) && gaps.every(([x, w]) => Math.abs(x - g) > w / 2 + 20) && g - 26 > s0 + 10 && g + 26 < s1 - 10;
-      for (const _ of doorsAt[si]) { for (let k = 0; k < 30; k++) { const g = s0 + ED / 2 + 14 + rnd() * (s1 - s0 - ED - 28); if (clear(g)) { gaps.push([g, ED, 0]); const lp = hor ? [g, c] : [c, g], n = hor ? [0, sg] : [sg, 0]; b.doors.push({ i: L(lp[0] - n[0] * 28, lp[1] - n[1] * 28), o: L(lp[0] + n[0] * 30, lp[1] + n[1] * 30) }); break; } } }
+      for (const _ of doorsAt[si]) { for (let k = 0; k < 30; k++) { const randomG = s0 + ED / 2 + 14 + rnd() * (s1 - s0 - ED - 28), g = kind === 'house' ? 0 : randomG; if (clear(g)) { gaps.push([g, ED, 0]); const lp = hor ? [g, c] : [c, g], n = hor ? [0, sg] : [sg, 0]; b.doors.push({ i: L(lp[0] - n[0] * 28, lp[1] - n[1] * 28), o: L(lp[0] + n[0] * 30, lp[1] + n[1] * 30) }); break; } } }
       // окна через каждые ~70
       // окна: равномерно в свободных промежутках между дверями и перегородками
-      const ww = K.slit ? 22 : WIN, blk = [[s0 - 1, s0 + 14], [s1 - 14, s1 + 1], ...gaps.map(([g, w]) => [g - w / 2 - 12, g + w / 2 + 12]), ...joins.map(j => [j - 19, j + 19])].sort((m, n) => m[0] - n[0]);
+      const ww = K.slit ? 22 : K.window || WIN, blk = [[s0 - 1, s0 + 14], [s1 - 14, s1 + 1], ...gaps.map(([g, w]) => [g - w / 2 - 12, g + w / 2 + 12]), ...joins.map(j => [j - 19, j + 19])].sort((m, n) => m[0] - n[0]);
       let cur = blk[0][1]; for (const [x0, x1] of blk.slice(1)) { if (x0 > cur) { const lf = x0 - cur; if (lf >= ww + 6) { const n = Math.max(1, Math.floor(lf / 56)); for (let k = 0; k < n; k++) gaps.push([cur + (k + .5) * lf / n, ww, 1]); } } cur = Math.max(cur, x1); }
       wallLine(hor, c, s0, s1, gaps);
     });
@@ -197,6 +204,12 @@ function genWorld() {
     const SETS = { home: [['bed', 24, 40], ['table', 30, 20], ['sofa', 40, 16], ['shelf', 34, 10], ['desk', 28, 14]], office: [['desk', 30, 16], ['desk', 30, 16], ['shelf', 40, 10], ['table', 40, 22]], barracks: [['bunk', 20, 40], ['bunk', 20, 40], ['shelf', 30, 10], ['crate', 30, 30]], store: [['shelf', 50, 12], ['crate', 30, 30], ['barrel', 18, 18]], barn: [['hay', 30, 30], ['crate', 30, 30], ['hay', 30, 30]] };
     for (const r of b.rooms) {
       const set = SETS[K.furn], rw = r.x1 - r.x0, rh = r.y1 - r.y0;
+      if (kind === 'house') {
+        if (r.use === 'entry') { fu('shelf', r.x0 + 36, r.y1 - 12, 54, 14); fu('bench', r.x1 - 38, r.y1 - 15, 56, 20); }
+        if (r.use === 'living') { fu('sofa', r.x0 + 52, r.y0 + 20, 80, 28); fu('table', r.x0 + 68, r.y0 + 90, 64, 40); fu('shelf', r.x0 + 10, r.y0 + 90, 14, 64); }
+        if (r.use === 'bedroom') { fu('bed', r.x1 - 40, r.y0 + 54, 46, 88); fu('shelf', r.x1 - 40, r.y1 - 12, 56, 14); }
+        continue;
+      }
       if (K.furn === 'church') { // церковь: алтарь у дальней стены, скамьи рядами, проход посередине
         const al = fu('altar' + K.church, r.x1 - 16, (r.y0 + r.y1) / 2, 20, 44); if (al) b.altar = al.id;
         const bx = fu('dbox', r.x1 - 14, r.y1 - 12, 14, 14) || fu('dbox', r.x1 - 14, r.y0 + 12, 14, 14); if (bx) b.box = bx.id; // ящик пожертвований у алтаря
@@ -221,9 +234,9 @@ function genWorld() {
       const Q = [0]; seen[0] = 1; while (Q.length) { const k = Q.pop(), i = k % nx, j = (k / nx) | 0; for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a2 = i + di, c = j + dj; if (a2 < 0 || c < 0 || a2 >= nx || c >= ny) continue; const q = c * nx + a2; if (!seen[q] && ok[q]) { seen[q] = 1; Q.push(q); } } }
       return b.rooms.every(r => { for (let j = Math.ceil((r.y0 + Y) / S); -Y + j * S < r.y1; j++) for (let i = Math.ceil((r.x0 + X) / S); -X + i * S < r.x1; i++) if (seen[j * nx + i]) return true; return false; }); };
     for (let k = b.furn.length - 1; k >= 0 && !allOk(); k--) { const o = objs[b.furn[k]]; o.gone = 1; }
-    blds.push(b); return b;
+    blds.push(b); if (K.yard) { b.yard = K.yard; housePlots.push(b); } return b;
   }
-  function manyB(kinds, cen, r, n, tries = 30) { for (let i = 0; i < n; i++) { const kind = kinds[Math.floor(rnd() * kinds.length)], K = BKIND[kind], m = Math.hypot(K.w, K.h) / 2 + 30;
+  function manyB(kinds, cen, r, n, tries = 30) { for (let i = 0; i < n; i++) { const kind = kinds[Math.floor(rnd() * kinds.length)], K = BKIND[kind], m = Math.hypot(...(K.yard || [K.w, K.h])) / 2 + 30;
     for (let k = 0; k < tries; k++) { const p = cen ? nearPt(rnd, cen, r) : rndMap(rnd, m); if (inMap(p, m) && free(p, m) && blds.every(b => BKIND[b.kind].church === undefined || dist(p, b.p) >= 250 + m)) { building(kind, p); break; } } } }
   const B = BIOMES;
   building('market', B[3].c);
@@ -254,6 +267,18 @@ function genWorld() {
   many('cactus', B[5].c, 420, 26, 26, 50); many('rock', B[5].c, 420, 40, 40, 26);
   many('crate', null, 0, 34, 34, 90, 40);
   many('tree', null, 0, 44, 44, 420); many('rock', null, 0, 36, 36, 110); many('bush', null, 0, 34, 34, 260, 10);
+  // У каждого участка два выхода и свободные дорожки от дверей к калиткам.
+  for (const b of housePlots) {
+    const local = (x, y) => add(add(b.p, b.u, x), b.v, y), [w, h] = b.yard;
+    const rail = (x0, y0, x1, y1) => { const length = Math.hypot(x1 - x0, y1 - y0), n = Math.ceil(length / 80);
+      for (let i = 0; i < n; i++) { const f = (i + .5) / n; putA('fence', local(x0 + (x1 - x0) * f, y0 + (y1 - y0) * f), length / n, 6, b.a + Math.atan2(y1 - y0, x1 - x0)); } };
+    for (const side of [-1, 1]) {
+      rail(side * w / 2, -h / 2, side * w / 2, h / 2);
+      rail(-w / 2, side * h / 2, -50, side * h / 2); rail(50, side * h / 2, w / 2, side * h / 2);
+    }
+    putA('tree', local(240, 175), 64, 64, b.a);
+    putA('shed', local(-240, -210), 100, 80, b.a);
+  }
   // убираем «лишнюю» мебель и перенумеровываем
   const keep = objs.filter(o => !o.gone), idm = new Map(); objs.length = 0; keep.forEach((o, i) => { idm.set(o.id, i); o.id = i; objs.push(o); });
   for (const b of blds) { b.walls = b.walls.map(i => idm.get(i)); b.furn = b.furn.filter(i => idm.has(i)).map(i => idm.get(i)); if (b.altar !== undefined) b.altar = idm.get(b.altar); if (b.box !== undefined) b.box = idm.get(b.box); }
