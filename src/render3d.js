@@ -4,25 +4,28 @@ const G3 = (() => {
   const glc = document.getElementById('g');
   const lowEnd = Math.min(screen.width, screen.height) < 500;
   // стиль «как в 90-х»: рендер в низком разрешении + растягивание по пикселям (#hd — чёткая картинка)
-  // стиль: по умолчанию мультяшный (контуры только у людей); #toonall — контуры у всего; #bright — яркий без контуров; #real — старый реализм с пикселями
+  // По умолчанию естественный свет окружения и toon-персонажи; #toonall — старый toon, #bright и #real — сравнение.
   const STYLE = /real/.test(location.hash) ? 'real' : /bright/.test(location.hash) ? 'bright' : 'toon', OUTLINE_ALL = /toonall/.test(location.hash);
+  const GROUNDED = STYLE === 'toon' && !OUTLINE_ALL;
   const HD = /hd/.test(location.hash) || STYLE !== 'real', PIXH = 360;
   const renderer = new T.WebGLRenderer({ canvas: glc, antialias: HD, powerPreference: 'high-performance' });
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFShadowMap;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = GROUNDED ? T.PCFSoftShadowMap : T.PCFShadowMap;
   if (!HD) glc.style.imageRendering = 'pixelated';
   const scene = new T.Scene(); scene.background = new T.Color(0x2a4b58);
   // ортогональная камера под постоянным углом (изометрия): карта не вращается, «вверх» на экране — всегда одно направление
   const camera = new T.OrthographicCamera(-1, 1, 1, -1, -3000, 8000);
   const CAM_OFF = new T.Vector3(1, 1, 1).normalize().multiplyScalar(2500);
   const at = (p, h = 0) => new T.Vector3(p[0], h, p[1]);
-  scene.add(new T.AmbientLight(0xdfe6ff, STYLE === 'real' ? .5 : .62));
+  if (GROUNDED) scene.add(new T.HemisphereLight(0xd6e1e5, 0x9a8c71, .9));
+  else scene.add(new T.AmbientLight(0xdfe6ff, STYLE === 'real' ? .5 : .62));
   // солнце с настоящими тенями; область теней ездит за камерой
   const SUN_DIR = new T.Vector3(-.55, 1, .25).normalize();
-  const sun = new T.DirectionalLight(STYLE === 'real' ? 0xffe6c4 : 0xfff3e0, STYLE === 'real' ? .95 : .85); scene.add(sun); scene.add(sun.target);
+  const sun = new T.DirectionalLight(STYLE === 'real' ? 0xffe6c4 : 0xfff3e0, STYLE === 'real' ? .95 : GROUNDED ? .8 : .85); scene.add(sun); scene.add(sun.target);
   sun.castShadow = true; sun.shadow.mapSize.set(lowEnd ? 1024 : 2048, lowEnd ? 1024 : 2048);
   Object.assign(sun.shadow.camera, { left: -800, right: 800, top: 800, bottom: -800, near: 10, far: 4000 }); sun.shadow.bias = -.0006;
   // общий «цветокор»: приглушённые цвета, чуть тёплый оттенок
   const GRADE = STYLE === 'real' ? 'float lum_=dot(gl_FragColor.rgb,vec3(.299,.587,.114));gl_FragColor.rgb=mix(vec3(lum_),gl_FragColor.rgb,.62)*vec3(1.03,1.,.88);'
+    : GROUNDED ? 'float lum_=dot(gl_FragColor.rgb,vec3(.299,.587,.114));gl_FragColor.rgb=mix(vec3(lum_),gl_FragColor.rgb,.9)*vec3(1.02,1.,.97);'
     : 'float lum_=dot(gl_FragColor.rgb,vec3(.299,.587,.114));gl_FragColor.rgb=mix(vec3(lum_),gl_FragColor.rgb,1.18)*vec3(1.03,1.02,.98);';
   // мультяшный свет: 3 ступени вместо плавного
   const toonGrad = (() => { const d = new Uint8Array([90, 170, 255]), t = new T.DataTexture(d, 3, 1, T.LuminanceFormat); t.minFilter = t.magFilter = T.NearestFilter; t.needsUpdate = true; return t; })();
@@ -54,6 +57,10 @@ vec4 wp_=modelMatrix*p_;vec3 wn_=normalize(mat3(modelMatrix)*normalize(nm_*norma
   const matCache = {};
   const lam = (col, opt = {}) => { const k = col + JSON.stringify(opt); return matCache[k] || (matCache[k] = charrable(MAT(Object.assign({ color: col, map: grunge }, opt)))); };
 
+  // Материалы окружения имеют плавное освещение; персонажи сохраняют читаемый toon-силуэт.
+  const worldMats = {};
+  const worldMat = (opt = {}) => { const k = JSON.stringify(opt); return worldMats[k] || (worldMats[k] = charrable((GROUNDED ? o => new T.MeshLambertMaterial(o) : MAT)(Object.assign({ color: 0xffffff, map: grunge }, opt)))); };
+
   // ===== земля =====
   const loader = new T.TextureLoader();
   const grassTex = typeof ART === 'object' && ART.grass ? loader.load(ART.grass) : null;
@@ -77,14 +84,16 @@ float noise(vec2 x){vec2 i=floor(x);vec2 f=fract(x);f=f*f*(3.-2.*f);return mix(m
 void main(){
  vec3 grassBase=hasGrass>.5?texture2D(grass,vP/170.).rgb:vec3(.42,.74,.29);
  vec3 col=grassBase;
- col*=.88+.24*noise(vP*.012);
+ float terrain=noise(vP*.012);
+ col*=.88+.24*terrain;
+ ${GROUNDED ? 'col=mix(vec3(.3,.39,.2),vec3(.44,.49,.28),terrain);col=mix(col,grassBase*vec3(.65,.72,.58),.08);' : ''}
  ${STYLE === 'real' ? 'col=mix(vec3(dot(col,vec3(.3,.59,.11))),col,.72)*vec3(.93,.9,.7);' : 'col*=vec3(1.02,1.05,.95);'} // трава: оливковая (реализм) или сочная
  float nb=noise(vP*.04);
  // вытоптанная земля и грязь пятнами
  float dn=noise(vP*.005)*.7+noise(vP*.021)*.45;
  col=mix(col,vec3(.47,.38,.27)*(.8+.35*nb),smoothstep(.72,.86,dn)*.85);
  col=mix(col,col*vec3(.78,.74,.6),smoothstep(.45,.7,noise(vP*.009)));
- for(int i=0;i<6;i++){float e=smoothstep(brad[i]+12.,brad[i]-12.,length(vP-bc[i])+(nb-.5)*30.);col=mix(col,bcol[i]*(.9+.18*nb),e);}
+ for(int i=0;i<6;i++){float e=smoothstep(brad[i]+12.,brad[i]-12.,length(vP-bc[i])+(nb-.5)*30.);vec3 biome=bcol[i];${GROUNDED ? 'biome=mix(vec3(dot(biome,vec3(.3,.59,.11))),biome,.55)*vec3(.9,.92,.87);' : ''}col=mix(col,biome*(.9+.18*nb),e);}
  // Газон — часть той же земли: скруглённый неровный край, без отдельной плоскости и шва.
  vec2 hrel=vP-hallC;
  vec2 hp=vec2(dot(hrel,hallU),dot(hrel,vec2(-hallU.y,hallU.x)));
@@ -225,7 +234,7 @@ void main(){
     }
     for (const key in plan) {
       const { g, col, items } = plan[key];
-      const mat = col === 'crate' ? lam(0xfffffe, crateTex ? { map: crateTex } : {}) : lam(0xffffff); // цвет — у каждого экземпляра
+      const mat = col === 'crate' ? worldMat(crateTex ? { map: crateTex } : {}) : worldMat(); // цвет — у каждого экземпляра
       const mesh = new T.InstancedMesh(g, mat, items.length); mesh.frustumCulled = false; mesh.castShadow = true;
       items.forEach(([o, lm], i) => {
         const m = basisAt(o).multiply(lm); mesh.setMatrixAt(i, m);
@@ -242,7 +251,7 @@ void main(){
   }
   // ===== здания =====
   // процедурные текстуры (серые — цвет задаёт оттенок экземпляра)
-  function tex(f, n = 128) { const c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d'); f(g, n, mkRng(n * 7 + f.length)); const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.magFilter = T.NearestFilter; return t; }
+  function tex(f, n = 128) { const c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d'); f(g, n, mkRng(n * 7 + f.length)); const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.magFilter = GROUNDED ? T.LinearFilter : T.NearestFilter; t.anisotropy = GROUNDED ? Math.max(1, Math.min(lowEnd ? 2 : 4, renderer.capabilities.getMaxAnisotropy())) : 1; return t; }
   const noiseFill = (g, n, rnd, base, amp, k = 1800) => { g.fillStyle = `rgb(${base},${base},${base})`; g.fillRect(0, 0, n, n); for (let i = 0; i < k; i++) { const v = base + (rnd() - .5) * amp | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(rnd() * n | 0, rnd() * n | 0, 1 + (rnd() * 2 | 0), 1 + (rnd() * 2 | 0)); } };
   const TX = {
     ashlar: tex((g, n, rnd) => { noiseFill(g, n, rnd, 230, 14, 1400); g.fillStyle = '#b8b4bc'; for (let y = 0; y < n; y += 32) { g.fillRect(0, y, n, 2); for (let x = (y / 32) % 2 ? 32 : 0; x < n; x += 64) g.fillRect(x, y, 2, 32); } }),
@@ -266,7 +275,7 @@ void main(){
   const texMats = {};
   function texMat(name, scale) {
     const k = name + scale; if (texMats[k]) return texMats[k];
-    const m = MAT({ color: 0xffffff, map: TX[name] });
+    const m = GROUNDED ? new T.MeshLambertMaterial({ color: 0xffffff, map: TX[name] }) : MAT({ color: 0xffffff, map: TX[name] });
     m.onBeforeCompile = sh => {
       sh.uniforms.zc = U.zc; sh.uniforms.zrho = U.zrho;
       sh.vertexShader = 'varying vec3 vWP;varying vec3 vWN;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n#ifdef USE_INSTANCING\nmat4 mw_=modelMatrix*instanceMatrix;\n#else\nmat4 mw_=modelMatrix;\n#endif\nvWP=(mw_*vec4(transformed,1.)).xyz;vWN=normalize(mat3(mw_)*objectNormal);');
@@ -527,8 +536,8 @@ void main(){
       const wc = S.cols[b.id % S.cols.length], wm = S.tex, pcs = [], wallH = K.wallHeight || WALLH;
       const sill = K.slit ? 36 : b.kind === 'house' || K.church === 0 ? 28 : 24, winTop = K.slit ? 44 : K.church === 0 ? 68 : K.church === 1 || K.church === 3 ? 78 : b.kind === 'house' ? 60 : 50;
       if (b.yard) {
-        const [yw, yh] = b.yard;
-        pcs.push([geo.box, 'dirt', 48, 0x829360, M(0, .15, 0, yw, .3, yh), 'floor']);
+        const yh = b.yard[1];
+        // В огороженном дворе остаётся общая земля, без зелёной прямоугольной подложки.
         for (const side of [-1, 1]) { const length = (yh - b.h) / 2;
           pcs.push([geo.box, 'gravel', 32, 0xb7aa8c, M(0, .4, side * (b.h / 2 + length / 2), 62, .3, length), 'floor']); }
       }
@@ -578,7 +587,7 @@ void main(){
       if (!K.slit) for (const id of b.walls) { const o = objs[id]; if (!o.win) continue; glassPlan.push([o.id, b.id, base.clone().multiply(M(o.lx, (sill + winTop) / 2, o.ly, o.hor ? o.len : 1.2, winTop - sill, o.hor ? 1.2 : o.len))]); }
       for (const [g, tx, sc, col, lm, role, low] of pcs) { const key = g.uuid + '|' + tx + '|' + sc + '|' + (role === 'floor' ? 'f' : 'w'); (plan[key] = plan[key] || { g, tx, sc, items: [] }).items.push([b.id, col, base.clone().multiply(lm), role, low ? base.clone().multiply(low) : null]); }
     }
-    if (glassPlan.length) { glassMesh = new T.InstancedMesh(geo.box, new T.MeshLambertMaterial({ color: 0xbfe4ff, transparent: true, opacity: .32, depthWrite: false }), glassPlan.length); glassMesh.frustumCulled = false;
+    if (glassPlan.length) { glassMesh = new T.InstancedMesh(geo.box, GROUNDED ? new T.MeshPhongMaterial({ color: 0x9cb2bd, specular: 0x9cabb0, shininess: 55, transparent: true, opacity: .28, depthWrite: false }) : new T.MeshLambertMaterial({ color: 0xbfe4ff, transparent: true, opacity: .32, depthWrite: false }), glassPlan.length); glassMesh.frustumCulled = false;
       glassPlan.forEach(([oid, bid, m], i) => { glassIdx[oid] = [i, m, bid]; glassMesh.setMatrixAt(i, objs[oid].broken ? zero : m); }); scene.add(glassMesh); }
     for (const key in plan) {
       const { g, tx, sc, items } = plan[key];
