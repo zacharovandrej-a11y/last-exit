@@ -153,13 +153,13 @@ const G3 = (() => {
     for (let i = 0; i < 14; i++) { g.fillStyle = `rgba(60,50,40,${.05 + rnd() * .1})`; g.beginPath(); g.arc(rnd() * 128, rnd() * 128, 6 + rnd() * 22, 0, 6.2832); g.fill(); }
     g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, 124, 128, 4); g.fillRect(0, 0, 128, 2);
     const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; })();
-  const outlineMat = w => { const m = new T.MeshBasicMaterial({ color: 0x1b1612, side: T.BackSide });
+  const outlineMat = w => { const m = new T.MeshBasicMaterial({ color: 0x1b1612, side: T.BackSide }); m.customProgramCacheKey = () => 'outline-' + w;
     m.onBeforeCompile = sh => { sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', `vec4 p_=vec4(transformed,1.);mat3 nm_=mat3(1.);
 #ifdef USE_INSTANCING
 p_=instanceMatrix*p_;nm_=mat3(instanceMatrix);
 #endif
 vec4 wp_=modelMatrix*p_;vec3 wn_=normalize(mat3(modelMatrix)*normalize(nm_*normal));wp_.xyz+=wn_*${w.toFixed(2)};vec4 mvPosition=viewMatrix*wp_;gl_Position=projectionMatrix*mvPosition;`); }; return m; };
-  const OUT_B = outlineMat(2.2), OUT_C = outlineMat(1.2);
+  const OUT_B = outlineMat(2.2), OUT_C = outlineMat(1.2), OUT_P = outlineMat(.25);
   function addOutline(mesh, mat) { if (STYLE !== 'toon') return; const o = mesh.isInstancedMesh ? new T.InstancedMesh(mesh.geometry, mat, mesh.count) : new T.Mesh(mesh.geometry, mat); if (mesh.isInstancedMesh) { o.instanceMatrix = mesh.instanceMatrix; o.frustumCulled = false; scene.add(o); mesh.userData.outline = o; } else mesh.add(o); }
   const matCache = {};
   const lam = (col, opt = {}) => { const k = col + JSON.stringify(opt); return matCache[k] || (matCache[k] = charrable(MAT(Object.assign({ color: col, map: grunge }, opt)))); };
@@ -255,6 +255,11 @@ void main(){
   geo.pointedArch = (() => { const s = new T.Shape(); s.moveTo(-.5, 0); s.lineTo(-.5, .6); s.quadraticCurveTo(-.5, .8, 0, 1); s.quadraticCurveTo(.5, .8, .5, .6); s.lineTo(.5, 0); s.closePath(); return new T.ShapeGeometry(s, 6); })();
   geo.receiverRim = new T.TorusGeometry(1, .025, 4, 24); geo.receiverRim.rotateX(Math.PI / 2);
   geo.receiverDish = new T.LatheGeometry([new T.Vector2(1, .42), new T.Vector2(.7, .18), new T.Vector2(.3, .03), new T.Vector2(0, 0)], 16);
+  geo.faceDetail = new T.IcosahedronGeometry(1, 0);
+  geo.facePlane = new T.PlaneGeometry(1, 1);
+  geo.tailoredTorso = new T.CylinderGeometry(.5, .42, 1, 8);
+  geo.humanLimb = new T.CylinderGeometry(.5, .43, 1, 6);
+  geo.slipperShoe = new T.CylinderGeometry(.5, .5, 1, 10);
   geo.slipperSole = (() => { const s = new T.Shape(); s.moveTo(-42, -21); s.quadraticCurveTo(-65, -21, -65, 0); s.quadraticCurveTo(-65, 21, -42, 21); s.lineTo(38, 24); s.quadraticCurveTo(66, 24, 66, 0); s.quadraticCurveTo(66, -24, 38, -24); s.closePath(); const g = new T.ExtrudeGeometry(s, { depth: 5, bevelEnabled: false, curveSegments: 6 }); g.rotateX(-Math.PI / 2); return g; })();
   geo.slipperStrap = (() => { const s = new T.Shape(); s.moveTo(-24, 0); s.quadraticCurveTo(0, 48, 24, 0); s.lineTo(18, 0); s.quadraticCurveTo(0, 34, -18, 0); s.closePath(); const g = new T.ExtrudeGeometry(s, { depth: 30, bevelEnabled: false, curveSegments: 6 }); g.translate(0, 0, -15); g.rotateY(Math.PI / 2); return g; })();
   const M = (x, y, z, sx, sy, sz, ry = 0, rz = 0) => new T.Matrix4().compose(new T.Vector3(x, y, z), new T.Quaternion().setFromEuler(new T.Euler(0, ry, rz)), new T.Vector3(sx, sy, sz));
@@ -855,23 +860,62 @@ void main(){
     { n: 'Заговор', shirt: 0x8a7a5a, pants: 0x4a4038, skin: 0xd4a07a, skirt: 0x8a7a5a, hat: 'fedora', item: 'folder' },
     { n: 'Плакат', shirt: 0x2a6ad8, pants: 0x2a6ad8, skin: 0x9c6a48, hat: 'capyel', item: 'roll' },
   ];
+  const rigidCharCache = new Map();
+  function mergeRigidChar(node, skin, cloth) {
+    for (const child of [...node.children]) if (child.isGroup) mergeRigidChar(child, skin, cloth);
+    for (const isSkin of [false, true]) {
+      const parts = node.children.filter(o => o.isMesh && !o.userData.noMerge && (o.material === skin) === isSkin);
+      if ((parts.length < 2 && isSkin) || !parts.length) continue;
+      parts.forEach(o => o.updateMatrix());
+      const key = isSkin + '|' + parts.map(o => o.geometry.uuid + ':' + o.matrix.elements.join(',') + ':' + o.material.color.getHex()).join('|');
+      let geometry = rigidCharCache.get(key);
+      if (!geometry) {
+        const positions = [], normals = [], colors = [];
+        for (const mesh of parts) {
+          const g = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone(); g.applyMatrix4(mesh.matrix);
+          positions.push(...g.attributes.position.array); normals.push(...g.attributes.normal.array);
+          const color = isSkin ? new T.Color(0xffffff) : mesh.material.color;
+          for (let i = 0; i < g.attributes.position.count; i++) colors.push(color.r, color.g, color.b);
+          g.dispose();
+        }
+        geometry = new T.BufferGeometry(); geometry.setAttribute('position', new T.Float32BufferAttribute(positions, 3)); geometry.setAttribute('normal', new T.Float32BufferAttribute(normals, 3)); geometry.setAttribute('color', new T.Float32BufferAttribute(colors, 3));
+        geometry.computeBoundingSphere(); rigidCharCache.set(key, geometry);
+      }
+      parts.forEach(o => node.remove(o)); node.add(new T.Mesh(geometry, isSkin ? skin : cloth));
+    }
+  }
+  const faceTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+    x.fillStyle = '#604b3d'; x.fillRect(13, 14, 12, 3); x.fillRect(39, 14, 12, 3);
+    x.fillStyle = '#f0e3cd'; x.fillRect(14, 21, 11, 5); x.fillRect(39, 21, 11, 5);
+    x.fillStyle = '#3e4745'; x.fillRect(19, 21, 4, 5); x.fillRect(41, 21, 4, 5);
+    x.strokeStyle = '#956958'; x.lineWidth = 2; x.beginPath(); x.moveTo(23, 46); x.quadraticCurveTo(32, 49, 41, 46); x.stroke(); return new T.CanvasTexture(c); })();
   function makeChar(ch) {
     const g = new T.Group(), body = new T.Group(); g.add(body);
     const cv = ch >= CH_SECT ? CIV_S[(ch - CH_SECT) % 4] : ch >= 100 ? CIV[(ch - 100) % CIV.length] : null;
+    const refined = ch === CH_SECT;
     if (STYLE !== 'real') g.scale.setScalar(1.15); // в ярких стилях люди крупнее
     const cm = camo(ch), mats = cv ? { shirt: charrable(MAT({ color: cv.shirt })), skin: charrable(MAT({ color: cv.skin })), pants: charrable(MAT({ color: cv.pants })) } : { shirt: charrable(MAT({ color: 0xffffff, map: cm })), skin: charrable(MAT({ color: SKIN[ch % 10] })), pants: charrable(MAT({ color: 0xe8e8e8, map: cm })) };
+    if (refined) {
+      Object.values(mats).forEach(m => m.dispose());
+      mats.shirt = charrable(new T.MeshLambertMaterial({ color: 0xc9c3ae })); mats.skin = charrable(new T.MeshLambertMaterial({ color: 0xd4aa88 })); mats.pants = charrable(new T.MeshLambertMaterial({ color: 0x3d4655 }));
+    }
     const part = (gg, mat, x, y, z, sx, sy, sz, par = body) => { const o = new T.Mesh(gg, mat); o.position.set(x, y, z); o.scale.set(sx, sy, sz); par.add(o); return o; };
-    const boot = lam(cv && cv.boots || 0x2e241b), gear = lam(0x3b3d30), belt = lam(cv ? 0x2a2420 : 0x26261f);
+    const boot = lam(refined ? 0xc78e9d : cv && cv.boots || 0x2e241b), gear = lam(0x3b3d30), belt = lam(cv ? 0x2a2420 : 0x26261f);
     // ноги: бедро + голень (колено гнётся)
-    const leg = s => { const hip = new T.Group(); hip.position.set(s * 3.1, 24, 0); body.add(hip); part(geo.box, mats.pants, 0, -6, 0, 5, 12, 5.6, hip);
-      const knee = new T.Group(); knee.position.y = -12; hip.add(knee); part(geo.box, mats.pants, 0, -5.5, 0, 4.6, 11, 5.2, knee); part(geo.box, boot, 0, -11, 1.2, 5, 3.4, 8, knee); return [hip, knee]; };
+    const leg = s => { const hip = new T.Group(); hip.position.set(s * 3.1, 24, 0); body.add(hip); part(refined ? geo.humanLimb : geo.box, mats.pants, 0, -6, 0, 5, 12, 5.6, hip);
+      const knee = new T.Group(); knee.position.y = -12; hip.add(knee); part(refined ? geo.humanLimb : geo.box, mats.pants, 0, -5.5, 0, 4.6, 11, 5.2, knee); part(refined ? geo.slipperShoe : geo.box, boot, 0, -11, 1.2, 5, 3.4, 8, knee); return [hip, knee]; };
     const [legL, kneeL] = leg(-1), [legR, kneeR] = leg(1);
     part(geo.box, belt, 0, 25, 0, 13.6, 2.4, 7.6);
-    const torso = part(geo.box, mats.shirt, 0, 33, 0, cv && cv.wide ? 16 : 13, 15, cv && cv.wide ? 8.5 : 7);
+    const torso = part(refined ? geo.tailoredTorso : geo.box, mats.shirt, 0, 33, 0, cv && cv.wide ? 16 : 13, 15, cv && cv.wide ? 8.5 : 7);
     if (!cv) { part(geo.box, gear, 0, 33.5, 3.8, 9, 7, 1); for (const s of [-1, 1]) part(geo.box, gear, s * 3.8, 33.5, 0, 1.4, 15.2, 7.4); } // разгрузка — только у бойцов
     else {
       if (cv.skirt) part(geo.box, lam(cv.skirt), 0, cv.long ? 14 : 20, 0, 14, cv.long ? 24 : 12, 9); // юбка / плащ / ряса
-      if (cv.tie) { part(geo.box, lam(0xf4f4f0), 0, 36, 3.6, 4, 9, .6); part(geo.box, lam(cv.n === 'Тапок' ? 0x2a50a0 : 0xc02020), 0, 34.5, 3.9, 1.4, 8, .6); }
+      if (cv.tie && !refined) { part(geo.box, lam(0xf4f4f0), 0, 36, 3.6, 4, 9, .6); part(geo.box, lam(cv.n === 'Тапок' ? 0x2a50a0 : 0xc02020), 0, 34.5, 3.9, 1.4, 8, .6); }
+      if (refined) {
+        for (const side of [-1, 1]) part(geo.box, lam(0xe3ddcc), side * 1.9, 39.2, 3.6, 3.2, 2.8, .5).rotation.z = side * .45;
+        part(geo.box, lam(0x334b66), 0, 35, 3.9, 1.3, 7, .4); part(geo.box, lam(0x334b66), 0, 39, 4, 1.8, 1.6, .5);
+        part(geo.box, boot, 3.8, 35, 3.4, 2.2, 2.8, .5);
+      }
       if (cv.trim) part(geo.box, lam(cv.trim), 0, 33, 3.6, 2, 15, .6);
       if (cv.back) part(geo.box, lam(cv.back), 0, 33, -5.6, 10, 12, 4);
     }
@@ -881,15 +925,20 @@ void main(){
     part(geo.box, mats.skin, 0, 41.5, 0, 3.4, 2.4, 3.4); // шея
     const head = new T.Group(); head.position.set(0, 46.5, 0); body.add(head);
     part(geo.sph, mats.skin, 0, 0, .3, 4.1, 4.9, 4.5, head);
-    part(geo.box, lam(0x1a1a1a), 0, .7, 4.1, 4.8, .9, .6, head); // брови/глаза — тёмная полоска
-    if (STYLE !== 'real') head.scale.setScalar(1.25);
+    if (!refined) part(geo.box, lam(0x1a1a1a), 0, .7, 4.1, 4.8, .9, .6, head);
+    else {
+      const face = part(geo.facePlane, new T.MeshLambertMaterial({ map: faceTex, transparent: true, depthWrite: false, alphaTest: .1 }), 0, .1, 4.83, 5.2, 5.2, 1, head); face.userData.noMerge = face.userData.noOutline = face.userData.noShadow = true;
+      part(geo.faceDetail, mats.skin, 0, -.2, 4.7, .75, 1.1, 1, head);
+      for (const side of [-1, 1]) part(geo.faceDetail, mats.skin, side * 4, -.3, .1, .7, 1.2, .7, head);
+    }
+    if (STYLE !== 'real') head.scale.setScalar(refined ? 1.06 : 1.25);
     if (!cv) head.add(hat(ch));
     else { const hm = (gg, c, x, y, z, sx, sy, sz, rx = 0) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.x = rx; head.add(o); };
       ({ scarf: () => { hm(geo.dome, 0xd8a23a, 0, .6, -.2, 4.8, 4.6, 5); hm(geo.box, 0xd8a23a, 0, -4.4, 2.6, 2.4, 2, 1.6); },
         capback: () => { hm(geo.dome, 0xd23a3a, 0, 1.6, 0, 4.9, 3.8, 4.9); hm(geo.box, 0xd23a3a, 0, 1.8, -5, 5, .6, 4); },
         foil: () => hm(geo.cone7, 0xdfe3e8, 0, 6, 0, 4.4, 9, 4.4),
         slick: () => hm(geo.dome, 0x1e1a16, 0, 1.4, -.4, 4.6, 3.2, 4.8),
-        neat: () => hm(geo.dome, 0x6a4a2a, 0, 1.4, -.3, 4.6, 3.2, 4.7),
+        neat: () => hm(geo.dome, refined ? 0x5e4935 : 0x6a4a2a, 0, refined ? 1.9 : 1.4, refined ? -.45 : -.3, refined ? 4.35 : 4.6, refined ? 3.3 : 3.2, refined ? 4.6 : 4.7),
         hood: () => { hm(geo.dome, 0x1c1820, 0, .4, -.6, 5.4, 5.8, 5.6); hm(geo.box, 0x1c1820, 0, -2, -3.5, 9, 6, 4); },
         fedora: () => { hm(geo.cyl10, 0x3a3228, 0, 3, 0, 7, .6, 7); hm(geo.cyl10, 0x3a3228, 0, 5, 0, 4.4, 4, 4.4); hm(geo.box, 0x1a1a1a, 0, 3.6, 0, 9, 1, 9); },
         capyel: () => { hm(geo.dome, 0xffd43b, 0, 1.6, 0, 4.9, 3.8, 4.9); hm(geo.box, 0xffd43b, 0, 1.8, 5, 5, .6, 4); },
@@ -898,8 +947,8 @@ void main(){
         hardhat: () => { hm(geo.dome, 0xffc61a, 0, 1.6, 0, 5.2, 4.4, 5.4); hm(geo.cyl10, 0xffc61a, 0, 1.4, .4, 6.4, .6, 6.6); },
         buzz: () => hm(geo.dome, 0x2a2018, 0, 1.6, -.2, 4.4, 2.4, 4.6) })[cv.hat](); }
     // руки: плечо + предплечье, держат оружие двумя руками
-    const arm = s => { const sh = new T.Group(); sh.position.set(s * 8.2, 39, 0); body.add(sh); part(geo.box, mats.shirt, 0, -4.8, 0, 3.8, 9.6, 3.8, sh);
-      const el = new T.Group(); el.position.y = -9.4; sh.add(el); part(geo.box, mats.shirt, 0, -4.2, 0, 3.4, 8.4, 3.4, el); part(geo.box, lam(0x2a2a24), 0, -9.2, 0, 3, 2.6, 3, el); return [sh, el]; };
+    const arm = s => { const sh = new T.Group(); sh.position.set(s * 8.2, 39, 0); body.add(sh); part(refined ? geo.humanLimb : geo.box, mats.shirt, 0, -4.8, 0, 3.8, 9.6, 3.8, sh);
+      const el = new T.Group(); el.position.y = -9.4; sh.add(el); part(refined ? geo.humanLimb : geo.box, mats.shirt, 0, -4.2, 0, 3.4, 8.4, 3.4, el); part(refined ? geo.faceDetail : geo.box, refined ? mats.skin : lam(0x2a2a24), 0, -9.2, 0, refined ? 1.5 : 3, refined ? 2 : 2.6, refined ? 1.4 : 3, el); return [sh, el]; };
     const [armL, elL] = arm(-1), [armR, elR] = arm(1);
     armR.rotation.set(-.35, 0, .12); elR.rotation.x = -1.25;
     armL.rotation.set(-1.0, 0, -.45); elL.rotation.set(-.5, 0, .35);
@@ -912,7 +961,12 @@ void main(){
       const items = { bag: () => it(geo.box, 0x4a2e1e, 0, -12, 0, 3, 7, 7), case: () => it(geo.box, 0x2a1e14, 0, -13, 0, 2.6, 8, 10), leaflets: () => it(geo.box, 0xfafafa, 0, -10, 2.5, 5, 1.6, 6.5), candle: () => { it(geo.cyl6, 0xf2e6c0, 0, -8, 3, 1, 6, 1); it(geo.sph, 0xffb020, 0, -4.4, 3, 1, 1.6, 1); }, folder: () => it(geo.box, 0xc9a85a, 0, -10, 2.5, 1.4, 8, 6), roll: () => it(geo.cyl10, 0xf6f6f2, 0, -9, 3, 1.6, 14, 1.6, 1.4), cane: () => it(geo.cyl6, 0x4a3020, 0, -14, 1.5, .8, 22, .8), phone: () => it(geo.box, 0x1a1a1a, 0, -10, 2, 2.6, 1, 4.6), wrench: () => it(geo.box, 0x8a9096, 0, -12, 1, 1.4, 10, 1.6) };
       if (cv.item) items[cv.item](); }
     const shadow = new T.Mesh(new T.CircleGeometry(11, 16), new T.MeshBasicMaterial({ color: 0, transparent: true, opacity: .22, depthWrite: false })); shadow.rotation.x = -Math.PI / 2; shadow.position.y = .6; g.add(shadow);
-    body.traverse(o => { if (o.isMesh) o.castShadow = true; }); if (STYLE === 'toon') { const ms = []; body.traverse(o => { if (o.isMesh) ms.push(o); }); ms.forEach(o => addOutline(o, OUT_C)); }
+    if (refined) {
+      const cloth = charrable(new T.MeshLambertMaterial({ vertexColors: true })), shirt = mats.shirt, pants = mats.pants;
+      mergeRigidChar(body, mats.skin, cloth); mats.shirt = mats.pants = cloth; shirt.dispose(); pants.dispose();
+      head.traverse(o => { if (o.isMesh) o.userData.noOutline = true; });
+    }
+    body.traverse(o => { if (o.isMesh) o.castShadow = !o.userData.noShadow; }); if (STYLE === 'toon') { const ms = []; body.traverse(o => { if (o.isMesh && !o.userData.noOutline) ms.push(o); }); ms.forEach(o => addOutline(o, refined ? OUT_P : OUT_C)); }
     g.userData = { body, legL, legR, kneeL, kneeR, armL, armR, elL, elR, itemG, civ: !!cv, sectLook: ch >= CH_SECT, head, torso, vest, gunHold, handHold, gunNode: gunHold, muz: 18, gunKey: '', mats, shadow, ready: 0, fireT: 9 };
     return g;
   }
