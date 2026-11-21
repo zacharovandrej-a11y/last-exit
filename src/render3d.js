@@ -361,9 +361,8 @@ void main(){
   // крона: раскладка облаков на вариант (центр, размер, оттенок)
   // варианты: 0 — круглая крона, 1 — высокая узкая, 2 — широкая раскидистая; низ кроны тёмный, верх — светлый
   const CROWN = [[13, 16, 60, 1], [10, 24, 70, .9], [18, 11, 54, 1.15]].map(([R, Y, top, s], v) => { const r = mkRng(911 + v * 7), out = [[0, 44, 0, 21 * s, 'leaf2']];
-    for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28 + r() * .5, rr = R + r() * 5, y = 38 + r() * Y; out.push([Math.cos(a) * rr, y, Math.sin(a) * rr, (10.5 + r() * 4.5) * s, y < 44 ? 'leaf2' : r() < .35 ? 'leafTip' : 'leaf']); }
-    for (let i = 0; i < 2; i++) { const a = r() * 6.28; out.push([Math.cos(a) * (R + 4), 31 + r() * 4, Math.sin(a) * (R + 4), 8.5 * s, 'leaf2']); } // нижние ветви свисают — крона не «леденец на палке»
-    out.push([(r() - .5) * 6, top + r() * 3, (r() - .5) * 6, 11.5 * s, 'leafTip']); return out; });
+    for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28 + r() * .5, rr = R + r() * 5, y = 38 + r() * Y; out.push([Math.cos(a) * rr, y, Math.sin(a) * rr, (10.5 + r() * 4.5) * s, y < 50 ? 'leaf2' : 'leaf']); }
+    out.push([(r() - .5) * 6, top - 2 + r() * 3, (r() - .5) * 6, 11.5 * s, 'leaf']); return out; });
   // листовые карточки: плоскости с рисунком листьев (вырез по альфе) по поверхности кроны — даёт «лиственный» край вместо гладких комков
   const leafCardTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), r = mkRng(77);
     for (let i = 0; i < 70; i++) { const x = 14 + r() * 100, y = 14 + r() * 100, d = Math.hypot(x - 64, y - 64); if (d > 56) continue; const a = r() * 6.28, l = 9 + r() * 7, sh = .55 + r() * .45;
@@ -372,10 +371,12 @@ void main(){
     const t = new T.CanvasTexture(c); t.anisotropy = 2; return t; })();
   geo.leafCards = [0, 1, 2].map(v => { const r = mkRng(1201 + v * 17), L = [], quad = new T.PlaneGeometry(1, 1);
     const cr = [[13, 16, 60], [10, 24, 70], [18, 11, 54]][v];
-    for (let i = 0; i < 30; i++) { const a = r() * 6.28, up = r(), rad = cr[0] + 9 + r() * 6 - Math.abs(up - .45) * 10, y = 33 + up * (cr[1] + 22), sz = 15 + r() * 9;
-      const n = new T.Vector3(Math.cos(a) * .8, 1.1 + r() * .5, Math.sin(a) * .8).normalize() /* смотрят наружу и вверх: сверху видны листья, а не рёбра */, q = new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 0, 1), n).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 0, 1), r() * 6.28));
-      L.push([quad, new T.Matrix4().compose(new T.Vector3(Math.cos(a) * rad, y, Math.sin(a) * rad), q, new T.Vector3(sz, sz, 1)), y < 42 ? 0x9aa88a : 0xffffff]); }
-    for (let i = 0; i < 4; i++) { const a = r() * 6.28; L.push([quad, RX(Math.cos(a) * 6, cr[2] + 4 + r() * 4, Math.sin(a) * 6, 16 + r() * 6, 16 + r() * 6, 1, -Math.PI / 2 + (r() - .5) * .6, 0, r() * 6.28), 0xffffff]); } // макушка
+    // карточки лежат на поверхности эллипсоида кроны (бока и верх), повёрнуты наружу и чуть вверх — без «листьев в воздухе»
+    const cy = (32 + cr[2]) / 2, ry = (cr[2] - 32) / 2 + 4, rxz = cr[0] + 7;
+    for (let i = 0; i < 44; i++) { const a = r() * 6.28, el = -.35 + Math.acos(1 - r() * 1.6) / Math.PI * 1.9, d = new T.Vector3(Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el)), sz = 15 + r() * 8;
+      const pos = new T.Vector3(d.x * rxz * .92, cy + d.y * ry * .95, d.z * rxz * .92), n = new T.Vector3(d.x, d.y + .9, d.z).normalize();
+      const q = new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 0, 1), n).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 0, 1), r() * 6.28));
+      L.push([quad, new T.Matrix4().compose(pos, q, new T.Vector3(sz, sz, 1)), pos.y < 42 ? 0x9aa88a : 0xffffff]); }
     const g = mergeG(L); g.userData.cards = 1; return g; });
   // приглушённые реальные цвета; у каждого экземпляра свой оттенок
   const VAR = {
@@ -392,7 +393,7 @@ void main(){
     tree: (w, h, o) => {
       const k = w / 44 * 1.15, v = o.id % 3, tall = [1, 1.12, .9][v];
       return [[geo.treeWood[v], 0x5a4432, M(0, 0, 0, k, k * tall, k, o.id * .7)], [geo.leafCards[v], 'leaf', M(0, 0, 0, k, k * tall, k, o.id * .7)],
-        ...CROWN[v].map(([x, y, z, sz, c], i) => [geo.clump[(o.id + i) % 3], c, M(x * k, y * k * tall, z * k, sz * k * .85, sz * k * .85, sz * k * .85, i * 1.3 + o.id)])];
+        ...CROWN[v].map(([x, y, z, sz, c], i) => [geo.clump[(o.id + i) % 3], c, M(x * k, y * k * tall, z * k, sz * k * .7, sz * k * .7, sz * k * .7, i * 1.3 + o.id)])]; // комки — тёмная масса внутри, край кроны дают листовые карточки
     },
     pine: (w) => { const k = w / 40; return [[geo.cyl6, 0x4a3626, M(0, 8 * k, 0, 2.6 * k, 16 * k, 2.6 * k)], [geo.cone7, 'pine', M(0, 26 * k, 0, 21 * k, 30 * k, 21 * k)], [geo.cone7, 'pine', M(0, 44 * k, 0, 16 * k, 26 * k, 16 * k, .5)], [geo.cone7, 'pine', M(0, 60 * k, 0, 10 * k, 22 * k, 10 * k, 1)], [geo.cone7, 'pine', M(0, 66 * k, 0, 5 * k, 10 * k, 5 * k)]]; },
     rock: (w) => { const k = w / 36; return [[geo.dod, 'rock', M(0, 5 * k, 0, 18 * k, 12 * k, 15 * k, 0, .2)], [geo.dod, 'rock', M(9 * k, 3 * k, 6 * k, 9 * k, 7 * k, 8 * k, 1)]]; },
@@ -1595,7 +1596,7 @@ void main(){
     const f = m(geo.cyl10, 0xdee2e6, 0, 0, 0, 14, 110, 14); f.rotation.x = Math.PI / 2; m(geo.box, 0xadb5bd, 0, 0, 5, 130, 3, 24); m(geo.box, 0xadb5bd, 0, 8, -48, 40, 3, 12); m(geo.box, 0xe03131, 0, 16, -50, 3, 22, 14); const n = m(geo.cone7, 0x4dabf7, 0, 0, 61, 13, 14, 13); n.rotation.x = Math.PI / 2;
     for (const s of [-1, 1]) { const e = m(geo.cyl10, 0x495057, s * 34, -6, 8, 6, 22, 6); e.rotation.x = Math.PI / 2; } return g; }
   // метка под своим солдатом — тонкое кольцо на земле, видно и за стеной
-  const meRing = new T.Mesh(new T.RingGeometry(15, 17.5, 32), new T.MeshBasicMaterial({ color: 0xe9f5dc, transparent: true, opacity: .45, depthTest: false, depthWrite: false })); meRing.rotation.x = -Math.PI / 2; meRing.renderOrder = 5; meRing.visible = false; scene.add(meRing);
+  const meRing = new T.Mesh(new T.RingGeometry(15, 17.5, 32), new T.MeshBasicMaterial({ color: 0xe9f5dc, transparent: true, opacity: .45, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 })); meRing.rotation.x = -Math.PI / 2; meRing.renderOrder = 3 /* кольцо на земле под ногами: ноги его перекрывают */; meRing.visible = false; scene.add(meRing);
   // пыль/искры там, куда попала пуля
   const puffs = []; for (let i = 0; i < 30; i++) { const s = new T.Sprite(new T.SpriteMaterial({ map: smokeTex, depthWrite: false, transparent: true, color: 0xd8ccb0 })); s.visible = false; s.userData = { t: 9 }; scene.add(s); puffs.push(s); }
   let puffI = 0; function puffAt(v) { const s = puffs[puffI++ % puffs.length]; s.position.copy(v); s.userData.t = 0; s.visible = true; }
@@ -1653,7 +1654,7 @@ void main(){
     const { now, dt, objs, zone, plan, matchT, phase, loot, list, tracers, shipS, shipD, camP, inB, me, zoom } = st;
     { const z = zoom || 1; if (Math.abs(z - zoomCur) > .002) { zoomCur += (z - zoomCur) * Math.min(1, dt * 4); applyFrustum(); } }
     curDT = dt || .016; curNow = now;
-    meRing.visible = !!me; if (me) meRing.position.set(me[0], 1, me[1]);
+    meRing.visible = !!me; if (me) meRing.position.set(me[0], 2.3, me[1]);
     if (worldBuilt !== objs) { buildWorld(objs); worldBuilt = objs; }
     setInside(inB ?? -1);
     setCam(camP);
