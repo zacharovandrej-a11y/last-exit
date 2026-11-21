@@ -315,7 +315,7 @@ function loop(now) {
   hurtFlash = Math.max(0, hurtFlash - dt * 2.5);
     shake = Math.max(0, shake - dt * (8 + shake * 2)); if (Math.random() < .6) shakeV = [(Math.random() - .5) * 2, (Math.random() - .5) * 2];
   const camP = playing || inRoom ? add(meP, shakeV, shake) : [ZSPAWN[0] + Math.sin(now / 9000) * 300, ZSPAWN[1] + Math.cos(now / 9000) * 300];
-  G3.frame({ now, dt, objs, zone: NOZONE, plan: null, matchT: 0, phase: 0, loot, list, tracers, trails, shots: frameShots, shipS: [0, 0], shipD: [1, 0], camP, inB: playing ? bldAt(objs.blds, meP) : -1, me: playing && meSt !== 2 ? meP : null, zoom, extra: (d, n) => ZFX.update(d, n, zl) });
+  G3.frame({ now, dt, objs, zone: NOZONE, plan: null, matchT: 0, phase: 0, loot, list, tracers, trails, shots: frameShots, benders: list.map(e => [e.p[0], e.p[1], 24]).concat(zl.filter(z => Math.abs(z.p[0] - meP[0]) < 500 && Math.abs(z.p[1] - meP[1]) < 500).slice(0, 8).map(z => [z.p[0], z.p[1], 18 + 8 * ZT[z.ty].sc])), shipS: [0, 0], shipD: [1, 0], camP, inB: playing ? bldAt(objs.blds, meP) : -1, me: playing && meSt !== 2 ? meP : null, zoom, extra: (d, n) => ZFX.update(d, n, zl) });
   frameShots = [];
   hud(now, dt, cur, meS, plist, zl);
 }
