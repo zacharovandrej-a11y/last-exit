@@ -288,8 +288,8 @@ function hud(now, dt, cur, meS, plist, zl) {
       ctx.fillStyle = f.e ? 'rgba(255,150,60,' + (.5 + .4 * Math.sin(now / 120 + f.ph)) + ')' : 'rgba(200,190,180,.55)'; ctx.fillRect(f.x, f.y, f.s, f.s); } }
   if (now < buf.frz) { ctx.fillStyle = 'rgba(120,190,255,' + (.08 + .04 * Math.sin(now / 200)) + ')'; ctx.fillRect(0, 0, W_, H_); }
   // лазерный прицел и перекрестие (как в Crimsonland)
-  if (meS && meS.st === 0) { const W = ZW[myW], [px, py] = G3.project(meP, 24), far = G3.project(add(meP, meAim, Math.min(W.range, 460)), 24);
-    const g = ctx.createLinearGradient(px, py, far[0], far[1]); g.addColorStop(0, 'rgba(255,60,60,.45)'); g.addColorStop(1, 'rgba(255,60,60,0)'); ctx.strokeStyle = g; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(far[0], far[1]); ctx.stroke();
+  if (meS && meS.st === 0) { const W = ZW[myW], [px, py] = G3.project(meP, 24);
+    if (touchUI && sticks.R) { const q = G3.project(add(meP, meAim, 170), 24), r = 9; ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(q[0], q[1], r, 0, 7); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fillRect(q[0] - 1.5, q[1] - 1.5, 3, 3); } // телефон: маленький прицел впереди, пока держишь правый стик
     if (!touchUI && mouse.has) { const dpx = Math.hypot(mouse.x - px, mouse.y - py), r = Math.max(7, dpx * Math.tan((W.spread + bloom) / 2) + 5); ctx.strokeStyle = relT > 0 ? '#ffd43b' : '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mouse.x, mouse.y, r, 0, 7); ctx.stroke();
       for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.beginPath(); ctx.moveTo(mouse.x + a * (r + 2), mouse.y + b * (r + 2)); ctx.lineTo(mouse.x + a * (r + 8), mouse.y + b * (r + 8)); ctx.stroke(); }
       if (relT > 0) { ctx.strokeStyle = '#ffd43b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(mouse.x, mouse.y, r + 12, -1.57, -1.57 + 6.283 * (1 - relT / (ZW[myW].rel / (1 + (pk.rel || 0) * .25)))); ctx.stroke(); } }
