@@ -288,6 +288,73 @@ const ZFX = (() => {
   scene.add(prints);
   let printCount = 0;
 
+  function fabricMesh(finish, capacity) {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 64;
+    const ctx = canvas.getContext('2d'), pixels = ctx.createImageData(64, 64);
+    for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
+      const i = (y * 64 + x) * 4;
+      const weave = ((x + y * 3) % 5) * 4 + ((x * 19 + y * 29 + x * y * 7) % 23);
+      pixels.data[i] = pixels.data[i + 1] = pixels.data[i + 2] = 218 + weave;
+      pixels.data[i + 3] = 255;
+    }
+    ctx.putImageData(pixels, 0, 0);
+    finish(ctx);
+    const tex = new T.CanvasTexture(canvas);
+    tex.wrapS = T.RepeatWrapping;
+    const mesh = new T.InstancedMesh(raiderGeo, new T.MeshPhongMaterial({
+      map: tex, color: 0xffffff, emissive: 0x16181b, specular: 0x26252b, shininess: 12
+    }), capacity);
+    mesh.setColorAt(0, WHITE);
+    mesh.count = 0;
+    mesh.frustumCulled = false;
+    scene.add(mesh);
+    return mesh;
+  }
+  function denimSeams(ctx) {
+    ctx.fillStyle = '#777c85';
+    for (const x of [0, 31, 61]) ctx.fillRect(x, 0, 3, 64);
+    ctx.fillStyle = '#d4c5a5';
+    for (const x of [2, 33, 63]) for (let y = 0; y < 64; y += 5) ctx.fillRect(x, y, 1, 2);
+  }
+  const denimLeg = fabricMesh(ctx => {
+    // Вытертая ткань спереди и сзади, складки в зоне колена.
+    for (const x of [16, 48]) {
+      const fade = ctx.createRadialGradient(x, 29, 2, x, 29, 16);
+      fade.addColorStop(0, '#fff9');
+      fade.addColorStop(1, '#fff0');
+      ctx.fillStyle = fade; ctx.fillRect(x - 16, 10, 32, 38);
+      ctx.strokeStyle = '#5c6173aa'; ctx.lineWidth = 2;
+      for (const y of [30, 37, 44]) {
+        ctx.beginPath(); ctx.moveTo(x - 10, y);
+        ctx.quadraticCurveTo(x + 1, y + 5, x + 9, y - 2); ctx.stroke();
+      }
+    }
+    denimSeams(ctx);
+  }, ZN * 4);
+  const denimWaist = fabricMesh(ctx => {
+    denimSeams(ctx);
+    ctx.fillStyle = '#737887';
+    ctx.fillRect(0, 16, 64, 5);
+    ctx.fillRect(46, 21, 3, 37);
+    ctx.lineWidth = 2;
+    for (const x of [39, 56]) {
+      ctx.fillStyle = '#a3a9b5'; ctx.strokeStyle = '#e7d2ab';
+      ctx.beginPath(); ctx.moveTo(x - 6, 29); ctx.lineTo(x + 6, 29);
+      ctx.lineTo(x + 5, 42); ctx.lineTo(x, 47); ctx.lineTo(x - 5, 42);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+  }, ZN);
+  const streetCotton = fabricMesh(ctx => {
+    ctx.fillStyle = '#4b3e452e';
+    for (let x = 4; x < 64; x += 12) ctx.fillRect(x, 0, 2, 64);
+    ctx.fillRect(0, 42, 64, 2);
+    ctx.fillStyle = '#ffe4d06b';
+    ctx.fillRect(0, 46, 64, 1);
+    ctx.fillRect(0, 49, 64, 2);
+  }, ZN * 4);
+  let denimCount = 0, waistCount = 0, cottonCount = 0;
+
   function drawStreetRaider(z, sc, t, fall) {
     const crawl = z.lost & 4, turn = fall ? 0 : (z.backTurn || 0);
     const stride = Math.sin(z.walk * .85) * (1 - turn * 2);
@@ -302,17 +369,17 @@ const ZFX = (() => {
     if (z.open || z.crop) enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), 0, 26 + bob, 1, 5.8, 7, 4.4, lean);
     if (z.open) {
       for (const side of [-1, 1]) {
-        enemyPart(suit, suitCount++, enemyColor(z.shirt, z, t), side * 3.7, 29 + bob, .3, 3.6, 8, 4.7, lean, side * .08);
+        enemyPart(streetCotton, cottonCount++, enemyColor(z.shirt, z, t), side * 3.7, 29 + bob, .3, 3.6, 8, 4.7, lean, side * .08);
         enemyPart(suit, suitCount++, enemyColor(0xf4d9c2, z, t), side * 2.4, 34.3 + bob, 4.35, 1.05, 2.6, .85, lean + .24, -side * .52);
       }
     } else {
-      enemyPart(suit, suitCount++, enemyColor(z.shirt, z, t), 0, 29.5 + bob, 1.3, 6.8, z.crop ? 5.2 : 8.4, 4.55, lean);
+      enemyPart(streetCotton, cottonCount++, enemyColor(z.shirt, z, t), 0, 29.5 + bob, 1.3, 6.8, z.crop ? 5.2 : 8.4, 4.55, lean);
       if (z.unicorn) {
         enemyPart(prints, printCount++, enemyColor(0xffffff, z, t), 0, 30 + bob, 5.85, 6, 6, 1, lean);
         enemyPart(prints, printCount++, enemyColor(0xffffff, z, t), 0, 31 + bob, -3.4, 6, 6, 1, -lean, 0, Math.PI);
       }
     }
-    enemyPart(suit, suitCount++, enemyColor(z.pants, z, t), 0, 20, 0, 6.4, 3.9, 4.6);
+    enemyPart(denimWaist, waistCount++, enemyColor(z.pants, z, t), 0, 20, 0, 6.4, 3.9, 4.6);
     if (!(z.lost & 16)) {
       enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), turn, 38 + bob, 2.4, 4.15, 4.75, 4.25, lean, 0, turn * 1.65);
       enemyPart(suit, suitCount++, enemyColor(z.hair, z, t), turn - .65, 40.7 + bob, 2.15, 4.55, 3.1, 4.5, lean, .29, turn * 1.65);
@@ -323,17 +390,17 @@ const ZFX = (() => {
     for (const side of [-1, 1]) {
       const step = stride * side, lift = Math.max(0, step) * 2.5;
       if (!crawl) {
-        enemyPart(suit, suitCount++, enemyColor(z.pants, z, t), side * 3.4, 15.5 + lift, step * 4, 3.3, z.shorts ? 5 : 7, 3.4, step * .4);
+        enemyPart(denimLeg, denimCount++, enemyColor(z.pants, z, t), side * 3.4, 15.5 + lift, step * 4, 3.3, z.shorts ? 5 : 7, 3.4, step * .4);
         if (z.shorts) enemyPart(suit, suitCount++, enemyColor(0x9ab4c9, z, t),
           side * 3.45, 12.35 + lift, step * 4.5, 3.07, 1.55, 3.15, step * .4);
-        const shin = z.shorts ? enforcerSkin : suit;
-        const shinIndex = z.shorts ? enforcerSkinCount++ : suitCount++;
+        const shin = z.shorts ? enforcerSkin : denimLeg;
+        const shinIndex = z.shorts ? enforcerSkinCount++ : denimCount++;
         enemyPart(shin, shinIndex, enemyColor(z.shorts ? z.skin : z.pants, z, t), side * 3.85, 7.6 + lift, step * 5.4, 2.4, 5.7, 2.5, -step * .13);
         enemyPart(suit, suitCount++, enemyColor(z.shorts ? 0xe1e7f2 : 0x322936, z, t), side * 4, 2.8 + lift, 1.6 + step * 6, 2.8, 2.6, 4.1);
       }
       if (z.lost & (side < 0 ? 1 : 2)) continue;
       const reach = attack * (side === 1 ? 1 : .45);
-      enemyPart(suit, suitCount++, enemyColor(z.shirt, z, t), side * 7, 31 + bob, 1, 2.75, 3.55, 2.75, .2 * step, side * .2);
+      enemyPart(streetCotton, cottonCount++, enemyColor(z.shirt, z, t), side * 7, 31 + bob, 1, 2.75, 3.55, 2.75, .2 * step, side * .2);
       enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), side * 8.2, 26 + bob + reach * 3, 2 - step * 2.3 + reach * 2.5, 2.05, 5.4, 2.3, -.19 + step * .5 - reach);
       enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), side * 8.35, 21.7 + bob + reach * 6, 3 - step * 4.8 + reach * 6, 1.85, 4.1, 2.1, -.38 + step * .45 - reach);
     }
@@ -341,7 +408,7 @@ const ZFX = (() => {
   function draw(list, now) {
     let shadowCount = 0;
     const t = now / 1000;
-    suitCount = markCount = bannerCount = enforcerSkinCount = printCount = supportCount = 0;
+    suitCount = markCount = bannerCount = enforcerSkinCount = printCount = supportCount = denimCount = waistCount = cottonCount = 0;
     for (const z of list) {
       if (shadowCount >= ZN) break;
       const Tz = ZT[z.ty], sc = Tz.sc, fall = z.fall || 0;
@@ -365,12 +432,15 @@ const ZFX = (() => {
     banners.count = bannerCount;
     enforcerSkin.count = enforcerSkinCount;
     prints.count = printCount;
+    denimLeg.count = denimCount;
+    denimWaist.count = waistCount;
+    streetCotton.count = cottonCount;
     supportRings.count = supportCount;
     if (supportCount) {
       supportRings.instanceMatrix.updateRange.count = supportCount * 16;
       supportRings.instanceMatrix.needsUpdate = true;
     }
-    for (const mesh of [suit, raiderMarks, banners, enforcerSkin, prints]) {
+    for (const mesh of [suit, raiderMarks, banners, enforcerSkin, prints, denimLeg, denimWaist, streetCotton]) {
       if (!mesh.count) continue;
       mesh.instanceMatrix.updateRange.count = mesh.count * 16;
       mesh.instanceColor.updateRange.count = mesh.count * 3;
