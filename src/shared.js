@@ -461,9 +461,10 @@ const zXpNeed = lv => Math.round(12 * Math.pow(lv, 1.45));
 const zWaveCount = (w, n, cyc = 0) => Math.round((6 + w * 4 + w * w * .22) * (1 + .6 * (n - 1)) * (1 + cyc * .5));
 const zHpMul = (w, n, cyc = 0) => (1 + (w - 1) * .06 + .15 * (n - 1)) * (1 + cyc * .8);
 const raiderBackKick = id => id % 2 === 0;
+const FIRST_WAVE_TYPES = [0, 1, 2, 4, 0, 0];
 function zPickType(w, rnd, index) {
   const r = rnd();
-  if (w === 1 && index < 6) return [0, 1, 2, 4, 0, 0][index];
+  if (w === 1 && index < FIRST_WAVE_TYPES.length) return FIRST_WAVE_TYPES[index];
   if (r < (w < 5 ? .045 : .08)) return 4;
   if (r < .19) return 2;
   if (r < .43) return 1;

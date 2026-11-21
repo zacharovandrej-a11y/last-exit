@@ -256,7 +256,7 @@ let lastT = performance.now(), sendAcc = 0, hurtFlash = 0, lastHp = 1, fps = 60,
 function loop(now) {
   requestAnimationFrame(loop);
   if ($('start').classList.contains('on')) G3.preview($('skin'), mySkin);
-  const dt = Math.min(.05, (now - lastT) / 1000); lastT = now; fps = fps * .95 + (1 / Math.max(dt, .001)) * .05;
+  const elapsed = (now - lastT) / 1000, dt = Math.min(.05, elapsed); lastT = now; fps = fps * .95 + (1 / Math.max(dt, .001)) * .05;
   const S = sampled(now), cur = lastSnap, playing = inRoom && cur && cur.st >= 1 && !$('lobby').classList.contains('on');
   // мой ввод
   let mv = [0, 0], aimV = null; fireHeld = false;
@@ -279,7 +279,7 @@ function loop(now) {
       const d = dist(p, z.lp); z.walk += d * .12 / ZT[zb.ty].sc; if (d > .2) { const ty = Math.atan2(p[0] - z.lp[0], p[1] - z.lp[1]); let dy = ty - z.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); z.yaw += dy * .2; }
       z.lp = p; z.p = p; z.ty = zb.ty; z.lost = zb.lost; z.fl = zb.fl;
       const facingBack = zb.ty === 1 && raiderBackKick(id) && !(zb.lost & 4) && (zb.fl & 1);
-      z.backTurn = Math.max(0, Math.min(1, (z.backTurn || 0) + (facingBack ? 5 : -5) * dt));
+      z.backTurn = Math.max(0, Math.min(1, (z.backTurn || 0) + (facingBack ? 5 : -5) * elapsed));
       z.hp = zb.hp; z.flash = Math.max(0, z.flash - dt * 6); z.kick = Math.max(0, (z.kick || 0) - dt * 7);
       if (zb.hp < .5 && Math.random() < dt * 2) ZFX.decal(p, 5 + Math.random() * 5, 'drop', 0x6e0000, .8); // раненый оставляет кровавый след
       if (zb.lost & 4 && Math.random() < dt * 8) ZFX.decal(p, 9, 'drop', 0x5e0000, .5);
