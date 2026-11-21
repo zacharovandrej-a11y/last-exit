@@ -54,9 +54,9 @@ const ZFX = (() => {
   function boom(c, r = 100) { G3.boom(c, r); decal(c, r * 1.2, 'scorch', 0x16100c, .85); spray(c, 10, [1, 0], 30, 160, 2.4); }
   // ===== зомби =====
   const ZN = 400, PART = ['legL', 'legR', 'torso', 'head', 'armL', 'armR', 'eyes', 'jaw', 'stain', 'hair', 'brow', 'nose', 'ears', 'wound'], PG = {
-    legL: [new T.BoxGeometry(5.2, 16, 5.4).translate(0, -8, 0), [-3.3, 16, 0]], legR: [new T.BoxGeometry(5.2, 16, 5.4).translate(0, -8, 0), [3.3, 16, 0]],
-    torso: [new T.BoxGeometry(13.5, 16, 8.5).translate(0, 8, 0), [0, 15, 0]], head: [new T.BoxGeometry(8.6, 9, 8.6).translate(0, 4.5, 0), [0, 30, 2]],
-    armL: [new T.BoxGeometry(4.2, 15, 4.2).translate(0, -7, 0), [-8.8, 29, 0]], armR: [new T.BoxGeometry(4.2, 15, 4.2).translate(0, -7, 0), [8.8, 29, 0]],
+    legL: [new T.CylinderGeometry(.5, .43, 1, 6).scale(5.2, 16, 5.4).translate(0, -8, 0), [-3.3, 16, 0]], legR: [new T.CylinderGeometry(.5, .43, 1, 6).scale(5.2, 16, 5.4).translate(0, -8, 0), [3.3, 16, 0]],
+    torso: [new T.CylinderGeometry(.5, .43, 1, 6).scale(13.5, 16, 8.5).translate(0, 8, 0), [0, 15, 0]], head: [new T.SphereGeometry(1, 8, 6).scale(4.5, 4.8, 4.5).translate(0, 4.5, 0), [0, 30, 2]],
+    armL: [new T.CylinderGeometry(.5, .43, 1, 6).scale(4.2, 15, 4.2).translate(0, -7, 0), [-8.8, 29, 0]], armR: [new T.CylinderGeometry(.5, .43, 1, 6).scale(4.2, 15, 4.2).translate(0, -7, 0), [8.8, 29, 0]],
     eyes: [new T.BoxGeometry(7.4, 2.2, .8).translate(0, 5.4, 4.8), [0, 30, 2]], stain: [new T.BoxGeometry(9, 8, .8).translate(1, 7, 4.4), [0, 15, 0]], jaw: [new T.BoxGeometry(7, 2.6, 2).translate(0, 1.2, 4.4), [0, 30, 2]],
     hair: [new T.BoxGeometry(9.2, 2.4, 9.4).translate(0, 9.4, -.5), [0, 30, 2]], brow: [new T.BoxGeometry(8.2, 1.5, 1.6).translate(0, 7.1, 4.5), [0, 30, 2]], nose: [new T.BoxGeometry(1.6, 2.4, 1.6).translate(0, 4, 5), [0, 30, 2]],
     ears: [new T.BoxGeometry(10.4, 3, 1.8).translate(0, 4.8, 0), [0, 30, 2]], wound: [new T.BoxGeometry(.7, 3.6, 3.8).translate(4.4, 5.4, 1), [0, 30, 2]] }; // голова: волосы клочьями, надбровья, нос, уши, рана
