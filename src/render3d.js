@@ -172,7 +172,7 @@ vec4 wp_=modelMatrix*p_;vec3 wn_=normalize(mat3(modelMatrix)*normalize(nm_*norma
     m.onBeforeCompile = sh => { prev(sh); sh.uniforms.uT = U.t; sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       #ifdef USE_INSTANCING
       { vec3 ip_ = instanceMatrix[3].xyz; vec4 wp_ = instanceMatrix * vec4(transformed, 1.0); float sc_ = max(.001, length(instanceMatrix[0].xyz)); float h_ = clamp(wp_.y / 55.0, 0.0, 1.4); float ph_ = uT * 1.25 + ip_.x * .011 + ip_.z * .013;
-        transformed.x += (sin(ph_) * 1.3 + sin(uT * 3.7 + wp_.y * .3 + wp_.x * .2) * .3) * h_ / sc_; transformed.z += (cos(ph_ * .83) * .95 + cos(uT * 3.1 + wp_.x * .25) * .25) * h_ / sc_; }
+        transformed.x += (sin(ph_) * 1.1 + sin(uT * 3.7 + wp_.y * .3 + wp_.x * .2) * .12) * h_ / sc_; transformed.z += (cos(ph_ * .83) * .8 + cos(uT * 3.1 + wp_.x * .25) * .1) * h_ / sc_; }
       #endif`); };
     m.customProgramCacheKey = () => (pk ? pk.call(m) : '') + '|wind'; return windMats[k] = m; };
   const worldMat = (opt = {}) => { const k = JSON.stringify(opt); return worldMats[k] || (worldMats[k] = charrable((GROUNDED ? o => new T.MeshLambertMaterial(o) : MAT)(Object.assign({ color: 0xffffff, map: grunge }, opt)))); };
@@ -342,7 +342,7 @@ void main(){
   const limb = (from, to, r0, r1) => { const d = new T.Vector3(to[0] - from[0], to[1] - from[1], to[2] - from[2]), l = d.length(), q = new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), d.normalize());
     const g = new T.LatheGeometry([[r0, 0], [(r0 + r1) / 2, .5], [r1, 1]].map(([x, y]) => new T.Vector2(x, y)), 6); return [g, new T.Matrix4().compose(new T.Vector3(...from), q, new T.Vector3(1, l, 1))]; };
   geo.treeWood = [0, 1, 2].map(v => { const r = mkRng(71 + v * 13), L = [[trunkGeo, RX(0, 0, 0, 3.6, 40, 3.6, 0, r() * 6)]];
-    for (let i = 0; i < 4; i++) { const a = i / 4 * 6.28 + r() * .8, h0 = 24 + r() * 12, len = 14 + r() * 8, tip = [Math.cos(a) * len, h0 + 8 + r() * 10, Math.sin(a) * len]; L.push(limb([0, h0, 0], tip, 1.6, .7)); L.push(limb(tip, [tip[0] * 1.4 + (r() - .5) * 6, tip[1] + 6 + r() * 6, tip[2] * 1.4 + (r() - .5) * 6], .7, .3)); }
+    for (let i = 0; i < 4; i++) { const a = i / 4 * 6.28 + r() * .8, h0 = 24 + r() * 12, len = 8 + r() * 5, tip = [Math.cos(a) * len, h0 + 10 + r() * 8, Math.sin(a) * len]; L.push(limb([0, h0, 0], tip, 1.6, .8)); L.push(limb(tip, [tip[0] * 1.25, tip[1] + 7 + r() * 5, tip[2] * 1.25], .8, .4)); /* ветки уходят в крону, не торчат */ }
     const g = mergeG(L.map(([g, m]) => [g, m, 0xffffff])); g.userData.bark = 1; return g; });
   geo.deadWood = [0, 1, 2].map(v => { const r = mkRng(301 + v * 29), L = [[trunkGeo, RX(0, 0, 0, 3, 44, 3, 0, r() * 6)]], top = [(r() - .5) * 4, 44, (r() - .5) * 4];
     L.push(limb([0, 40, 0], top, 1.8, .9));
@@ -383,6 +383,21 @@ void main(){
     g.userData.cards = 1; return g; }
   geo.leafCards = [[13, 16, 60], [10, 24, 70], [18, 11, 54]].map((cr, v) => leafShell(1201 + v * 17, (32 + cr[2]) / 2, (cr[2] - 32) / 2 + 4, cr[0] + 7, 52, 14, 8));
   geo.bushCards = [0, 1, 2].map(v => leafShell(1601 + v * 11, 9, 8, 15, 20, 9, 5));
+  // сплошная крона (без висящих плоскостей): ядро + много мелких «шапок» листвы, слитых в одну геометрию;
+  // нормали смешаны с направлением от центра кроны — мягкий объёмный свет; низ и середина темнее (цвет вершин)
+  function solidCrown(seed, cy, ry, rxz, lobes, lr) { const r = mkRng(seed), L = [], src = new T.IcosahedronGeometry(1, 1);
+    const lobe = (cx, y, cz, rad, v) => { const g = src.clone(), P = g.attributes.position;
+      for (let i = 0; i < P.count; i++) { const x = P.getX(i), yy = P.getY(i), z = P.getZ(i), k = .82 + .3 * hash3(Math.round(x * 90), Math.round(yy * 90), Math.round(z * 90), v); P.setXYZ(i, x * k, yy * k * .85, z * k); }
+      return [g, RX(cx, y, cz, rad, rad, rad, 0, r() * 6.28)]; };
+    L.push(lobe(0, cy, 0, Math.min(rxz, ry) * .9, seed));
+    for (let i = 0; i < lobes; i++) { const a = r() * 6.28, el = -.25 + Math.acos(1 - r() * 1.7) / Math.PI * 1.85, d = [Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el)], rad = lr * (.75 + r() * .5);
+      L.push(lobe(d[0] * (rxz - rad * .55), cy + d[1] * (ry - rad * .5), d[2] * (rxz - rad * .55), rad, seed + i)); }
+    const g = mergeG(L.map(([g, m]) => [g, m, 0xffffff])), P = g.attributes.position, N = g.attributes.normal, C = g.attributes.color;
+    for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), rv = new T.Vector3(x / rxz, (y - cy) / ry + .2, z / rxz).normalize(), n = new T.Vector3(N.getX(i), N.getY(i), N.getZ(i)).multiplyScalar(.4).add(rv.multiplyScalar(.6)).normalize(); N.setXYZ(i, n.x, n.y, n.z);
+      const h = Math.min(1, Math.max(0, (y - (cy - ry)) / (2 * ry))), out = Math.min(1, Math.hypot(x / rxz, (y - cy) / ry)), ao = .42 + .3 * h + .3 * out * out; C.setXYZ(i, ao, ao * 1.01, ao * .95); }
+    g.userData.foliage = 1; return g; }
+  geo.crownSolid = [[13, 16, 60], [10, 24, 70], [18, 11, 54]].map((cr, v) => solidCrown(501 + v * 7, (34 + cr[2]) / 2 + 2, (cr[2] - 34) / 2 + 6, cr[0] + 8, 16, 7));
+  geo.bushSolid = [0, 1, 2].map(v => solidCrown(701 + v * 5, 9, 8, 15, 8, 5));
   // у каждого дерева свой оттенок: в основном зелёные, часть желтеет, редкие — рыжие (конец лета)
   const LEAFC = [0x8c9c5c, 0x80965a, 0x98a462, 0x7e8e50, 0x8a9a56, 0xb0a24e, 0xa89846, 0xb8763c];
   const leafOf = id => { const r = rh(id, 41); return LEAFC[r < .72 ? Math.floor(rh(id, 42) * 5) : r < .92 ? 5 + Math.floor(rh(id, 43) * 2) : 7]; };
@@ -400,8 +415,7 @@ void main(){
       [geo.box, 0x40352a, M(0, 24, h / 2 + .6, 38, 48, 1.2)], [geo.box, 0xb8aea0, M(14, 24, h / 2 + 1.4, 2, 3, 1.5)]],
     tree: (w, h, o) => {
       const k = w / 44 * 1.15, v = o.id % 3, tall = [1, 1.12, .9][v];
-      return [[geo.treeWood[v], 0x5a4432, M(0, 0, 0, k, k * tall, k, o.id * .7)], [geo.leafCards[v], leafOf(o.id), M(0, 0, 0, k, k * tall, k, o.id * .7)],
-        ...CROWN[v].map(([x, y, z, sz, c], i) => [geo.clump[(o.id + i) % 3], c, M(x * k * .55, Math.min(54, Math.max(42, y)) * k * tall, z * k * .55, sz * k * .6, sz * k * .6, sz * k * .6, i * 1.3 + o.id)])]; // комки — тёмная масса внутри, край кроны дают листовые карточки
+      return [[geo.treeWood[v], 0x5a4432, M(0, 0, 0, k, k * tall, k, o.id * .7)], [geo.crownSolid[v], leafOf(o.id), M(0, 0, 0, k, k * tall, k, o.id * .7)]];
     },
     pine: (w) => { const k = w / 40; return [[geo.cyl6, 0x4a3626, M(0, 8 * k, 0, 2.6 * k, 16 * k, 2.6 * k)], [geo.cone7, 'pine', M(0, 26 * k, 0, 21 * k, 30 * k, 21 * k)], [geo.cone7, 'pine', M(0, 44 * k, 0, 16 * k, 26 * k, 16 * k, .5)], [geo.cone7, 'pine', M(0, 60 * k, 0, 10 * k, 22 * k, 10 * k, 1)], [geo.cone7, 'pine', M(0, 66 * k, 0, 5 * k, 10 * k, 5 * k)]]; },
     rock: (w) => { const k = w / 36; return [[geo.dod, 'rock', M(0, 5 * k, 0, 18 * k, 12 * k, 15 * k, 0, .2)], [geo.dod, 'rock', M(9 * k, 3 * k, 6 * k, 9 * k, 7 * k, 8 * k, 1)]]; },
@@ -444,9 +458,7 @@ void main(){
     fence: (w) => [[geo.box, 0x6b5238, M(0, 10, 0, w, 2, 2)], [geo.box, 0x6b5238, M(0, 18, 0, w, 2, 2)], ...[-.5, -.25, 0, .25, .5].map(k => [geo.box, 0x5a4430, M(w * k * .96, 11, 0, 3, 22, 3)])],
     bush: (w, h, o) => {
       const k = w / 34, spread = o.id % 2 ? 1 : .84;
-      const c = i => geo.clump[(o.id + i) % 3];
-      return [[c(0), 'leaf2', M(0, 6 * k, 0, 11 * k, 7 * k, 10 * k)], [c(1), 'leaf2', M(6 * k, 7 * k, 3 * k, 7 * k * spread, 6 * k, 6 * k, 1)], // тёмная середина куста
-        [geo.bushCards[o.id % 3], leafOf(o.id + 7), M(0, 0, 0, k * spread, k, k, o.id * .9)]];
+      return [[geo.bushSolid[o.id % 3], leafOf(o.id + 7), M(0, 0, 0, k * spread, k, k, o.id * .9)]];
     },
     wall: (w, h) => [[geo.box, 0x8d8d86, M(0, 11, 0, w, 22, h)], [geo.box, 0x76766f, M(0, 22.5, 0, w * 1.02, 2, h * 1.3)]],
     tent: (w, h) => [[geo.roof, 0x5a5a3a, M(0, 0, 0, w, 30, h)], [geo.box, 0x2e2e20, M(w / 2 + .3, 8, 0, .8, 14, 8)]],
@@ -496,7 +508,7 @@ void main(){
       const ty = o.type === 'tree' && rh(o.id, 1) < .38 ? 'deadtree' : o.type, f = PARTS[ty]; if (!f) continue; const parts = f(o.w, o.h, o);
       for (const [g, col, lm] of parts) {
         const bark = g.userData.bark || g === geo.cyl6 && (ty === 'tree' || ty === 'pine' || ty === 'deadtree');
-        const surface = col === 'crate' ? 'crate' : col === 'leaf' || col === 'leaf2' || col === 'leafTip' || col === 'pine' ? 'foliage' : bark ? 'bark' : 'plain';
+        const surface = col === 'crate' ? 'crate' : col === 'leaf' || col === 'leaf2' || col === 'leafTip' || col === 'pine' || g.userData.foliage ? 'foliage' : bark ? 'bark' : 'plain';
         const key = g.uuid + '|' + surface;
         (plan[key] = plan[key] || { g, surface, items: [] }).items.push([o, lm, col]);
       }
@@ -998,7 +1010,7 @@ void main(){
     for (let b = 0; b < 9; b++) { const a = r() * 6.28, d = r() * 2.6, x = Math.cos(a) * d, z = Math.sin(a) * d, h = 5 + r() * 6, wd = .55 + r() * .35, lean = .25 + r() * .45, ta = a + (r() - .5) * 1.2;
       const ux = -Math.sin(ta) * wd, uz = Math.cos(ta) * wd, ox = Math.cos(ta) * lean * h, oz = Math.sin(ta) * lean * h;
       const P = [[x - ux, 0, z - uz], [x + ux, 0, z + uz], [x + ox * .35 - ux * .6, h * .55, z + oz * .35 - uz * .6], [x + ox * .35 + ux * .6, h * .55, z + oz * .35 + uz * .6], [x + ox, h, z + oz]];
-      const C = [.42, .42, .72, .72, 1.05].map(t => t * (.9 + r() * .2));
+      const C = [.62, .62, .82, .82, 1.05].map(t => t * (.9 + r() * .2));
       for (const [i0, i1, i2] of [[0, 1, 2], [1, 3, 2], [2, 3, 4]]) for (const k of [i0, i1, i2]) { pos.push(...P[k]); col.push(C[k], C[k], C[k]); } }
     const geometry = new T.BufferGeometry();
     geometry.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geometry.setAttribute('color', new T.Float32BufferAttribute(col, 3));
