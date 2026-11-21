@@ -123,7 +123,7 @@ const G3 = (() => {
   const camera = new T.OrthographicCamera(-1, 1, 1, -1, -3000, 8000);
   const CAM_OFF = new T.Vector3(1, 1, 1).normalize().multiplyScalar(2500);
   const at = (p, h = 0) => new T.Vector3(p[0], h, p[1]);
-  if (GROUNDED) scene.add(new T.HemisphereLight(0xe6cdb4, 0x5e4c3c, .85)); // закат: тёплое небо, бурая земля
+  if (GROUNDED) scene.add(new T.HemisphereLight(0xe2d4bd, 0x656052, .85)); // закат: тёплое небо, бурая земля
   else scene.add(new T.AmbientLight(0xdfe6ff, STYLE === 'real' ? .5 : .62));
   // солнце с настоящими тенями; область теней ездит за камерой
   const SUN_DIR = new T.Vector3(-.8, .62, .42).normalize(); // низкое солнце — длинные тени
@@ -256,6 +256,14 @@ void main(){
   geo.receiverRim = new T.TorusGeometry(1, .025, 4, 24); geo.receiverRim.rotateX(Math.PI / 2);
   geo.receiverDish = new T.LatheGeometry([new T.Vector2(1, .42), new T.Vector2(.7, .18), new T.Vector2(.3, .03), new T.Vector2(0, 0)], 16);
   // Низкополигональная кабина со скосами стоек, масштабируется под габариты авто.
+  geo.foliage = geo.ico1.clone();
+  const crown = geo.foliage.attributes.position, crownTones = [];
+  for (let i = 0; i < crown.count; i++) {
+    // Внутренняя и нижняя часть кроны темнее, чем наружный молодой прирост.
+    const y = crown.getY(i), top = .68 + (y + 1) * .16;
+    crownTones.push(top * .99, top, top * (y > .35 ? .94 : 1.01));
+  }
+  geo.foliage.setAttribute('color', new T.Float32BufferAttribute(crownTones, 3));
   geo.carCabin = new T.BoxGeometry(1, 1, 1);
   const cabinVertices = geo.carCabin.attributes.position;
   for (let i = 0; i < cabinVertices.count; i++) {
@@ -277,7 +285,7 @@ void main(){
     house: [0xd8cfbe, 0xc9b79c, 0xb9b3a6, 0xe0d5c0, 0xc4a98a], roof: [0x7e3a2c, 0x4a4f57, 0x6b4a3a, 0x5b4636, 0x8a4a34],
     car: [0x2f4a63, 0x6e2626, 0x8a7d5e, 0xaeb0ab, 0x3a4a3a, 0x232323, 0x5e6266], house2: [0xbdb5a6, 0xa9a39a, 0xc8bfae, 0x9c958a],
     leaf: [0x778850, 0x85874a, 0x717c42, 0x9a874e, 0x577346],
-    leaf2: [0x4e6038, 0x646539, 0x485d37], pine: [0x435e42, 0x4c6849, 0x566744],
+    leaf2: [0x4e6038, 0x646539, 0x485d37], leafTip: [0x9ba066, 0xb1a063, 0x839356], pine: [0x435e42, 0x4c6849, 0x566744],
     rock: [0x7d7b74, 0x8a857a, 0x6e6c66],
   };
   // части каждого типа: [геометрия, цвет (или ключ VAR), матрица в единицах w/h объекта]
@@ -288,11 +296,11 @@ void main(){
       const k = w / 44, variant = o.id % 3, tall = [1, 1.14, .87][variant];
       const branch = [geo.cyl6, 0x5c452f, M(-4 * k, 33 * k * tall, 1 * k, 1.65 * k, 22 * k, 1.6 * k, .6, .55)];
       return [[geo.cyl6, 0x49362a, M(0, 18 * k * tall, 0, 3.4 * k, 36 * k * tall, 3.4 * k)], branch,
-        [geo.ico1, 'leaf2', M(0, 39 * k * tall, 0, 20 * k, 13 * k, 18 * k)],
-        [geo.ico1, 'leaf', M(-12 * k, 45 * k * tall, 4 * k, 14 * k, 11 * k, 12 * k, 1)],
-        [geo.ico1, 'leaf', M(12 * k, 49 * k * tall, -6 * k, 13 * k, 12 * k, 12 * k, 2)],
-        [geo.ico1, 'leaf', M(-2 * k, 55 * k * tall, -9 * k, 14 * k, 10 * k, 10 * k, 3)],
-        [geo.ico1, 'leaf', M(3 * k, 57 * k * tall, 7 * k, 11 * k, 10 * k, 12 * k, 2)]];
+        [geo.foliage, 'leaf2', M(0, 39 * k * tall, 0, 20 * k, 13 * k, 18 * k)],
+        [geo.foliage, 'leaf', M(-12 * k, 45 * k * tall, 4 * k, 14 * k, 11 * k, 12 * k, 1)],
+        [geo.foliage, 'leaf', M(12 * k, 49 * k * tall, -6 * k, 13 * k, 12 * k, 12 * k, 2)],
+        [geo.foliage, 'leaf', M(-2 * k, 55 * k * tall, -9 * k, 14 * k, 10 * k, 10 * k, 3)],
+        [geo.foliage, 'leafTip', M(3 * k, 57 * k * tall, 7 * k, 11 * k, 10 * k, 12 * k, 2)]];
     },
     pine: (w) => { const k = w / 40; return [[geo.cyl6, 0x4a3626, M(0, 8 * k, 0, 2.6 * k, 16 * k, 2.6 * k)], [geo.cone7, 'pine', M(0, 26 * k, 0, 21 * k, 30 * k, 21 * k)], [geo.cone7, 'pine', M(0, 44 * k, 0, 16 * k, 26 * k, 16 * k, .5)], [geo.cone7, 'pine', M(0, 60 * k, 0, 10 * k, 22 * k, 10 * k, 1)], [geo.cone7, 0xe4e9ec, M(0, 66 * k, 0, 5 * k, 10 * k, 5 * k)]]; },
     rock: (w) => { const k = w / 36; return [[geo.dod, 'rock', M(0, 5 * k, 0, 18 * k, 12 * k, 15 * k, 0, .2)], [geo.dod, 'rock', M(9 * k, 3 * k, 6 * k, 9 * k, 7 * k, 8 * k, 1)]]; },
@@ -351,11 +359,11 @@ void main(){
     fence: (w) => [[geo.box, 0x6b5238, M(0, 10, 0, w, 2, 2)], [geo.box, 0x6b5238, M(0, 18, 0, w, 2, 2)], ...[-.5, -.25, 0, .25, .5].map(k => [geo.box, 0x5a4430, M(w * k * .96, 11, 0, 3, 22, 3)])],
     bush: (w, h, o) => {
       const k = w / 34, spread = o.id % 2 ? 1 : .84;
-      return [[geo.ico1, 'leaf2', M(0, 7 * k, 0, 14 * k, 9 * k, 13 * k)],
-        [geo.ico1, 'leaf', M(8 * k, 9 * k, 5 * k, 9 * k * spread, 8 * k, 8 * k, 1)],
-        [geo.ico1, 'leaf', M(-8 * k, 10 * k, -4 * k, 9 * k, 9 * k, 8 * k, 2)],
-        [geo.ico1, 'leaf', M(1 * k, 15 * k, 1 * k, 8 * k, 7 * k, 7 * k, 3)],
-        [geo.ico1, 'leaf2', M(-3 * k, 6 * k, 9 * k, 8 * k, 6 * k, 7 * k, 2)]];
+      return [[geo.foliage, 'leaf2', M(0, 7 * k, 0, 14 * k, 9 * k, 13 * k)],
+        [geo.foliage, 'leaf', M(8 * k, 9 * k, 5 * k, 9 * k * spread, 8 * k, 8 * k, 1)],
+        [geo.foliage, 'leaf', M(-8 * k, 10 * k, -4 * k, 9 * k, 9 * k, 8 * k, 2)],
+        [geo.foliage, 'leafTip', M(1 * k, 15 * k, 1 * k, 8 * k, 7 * k, 7 * k, 3)],
+        [geo.foliage, 'leaf2', M(-3 * k, 6 * k, 9 * k, 8 * k, 6 * k, 7 * k, 2)]];
     },
     wall: (w, h) => [[geo.box, 0x8d8d86, M(0, 11, 0, w, 22, h)], [geo.box, 0x76766f, M(0, 22.5, 0, w * 1.02, 2, h * 1.3)]],
     tent: (w, h) => [[geo.roof, 0x5a5a3a, M(0, 0, 0, w, 30, h)], [geo.box, 0x2e2e20, M(w / 2 + .3, 8, 0, .8, 14, 8)]],
@@ -383,6 +391,19 @@ void main(){
   const RUST = new T.Color(0x6e4228), RUST2 = new T.Color(0x4a2e20), SOOT = new T.Color(0x221e1b), FLIP = new T.Matrix4().makeTranslation(0, 40, 0).multiply(new T.Matrix4().makeRotationX(Math.PI));
   const wreckOf = o => { if (o.type !== 'car' && o.type !== 'truck') return 0; const r = rh(o.id, 5); return r < .28 ? 0 : r < .6 ? 1 : o.type === 'car' && r > .9 ? 3 : 2; };
   const basisAt = o => { const k = sizeVar(o); return new T.Matrix4().compose(new T.Vector3(o.p[0], 0, o.p[1]), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -o.a), new T.Vector3(k, k, k)); };
+  function buildPlantContacts(objs) {
+    const plants = objs.filter(o => o.type === 'tree' || o.type === 'pine' || o.type === 'bush' || o.type === 'deadtree');
+    if (!plants.length) return;
+    const mesh = new T.InstancedMesh(plantContactGeometry, plantContactMaterial, plants.length);
+    mesh.frustumCulled = false;
+    plants.forEach((o, i) => {
+      const w = o.w * (o.type === 'bush' ? 1.52 : 1.07);
+      const m = M(o.p[0], .026, o.p[1], w, 1, w * .82, -o.a);
+      mesh.setMatrixAt(i, m);
+    });
+    scene.add(mesh);
+    inst.plantContacts = { mesh };
+  }
   function buildWorld(objs) {
     for (const k in inst) { scene.remove(inst[k].mesh); if (inst[k].mesh.userData.outline) scene.remove(inst[k].mesh.userData.outline); delete inst[k]; }
     objIdx.length = 0;
@@ -391,15 +412,21 @@ void main(){
     for (const o of objs) {
       const ty = o.type === 'tree' && rh(o.id, 1) < .38 ? 'deadtree' : o.type, f = PARTS[ty]; if (!f) continue; const parts = f(o.w, o.h, o);
       for (const [g, col, lm] of parts) {
-        const isCrate = col === 'crate';
-        const key = g.uuid + '|' + isCrate;
-        (plan[key] = plan[key] || { g, isCrate, items: [] }).items.push([o, lm, col]);
+        const bark = g === geo.cyl6 && (ty === 'tree' || ty === 'pine' || ty === 'deadtree');
+        const surface = col === 'crate' ? 'crate' : col === 'leaf' || col === 'leaf2' || col === 'leafTip' || col === 'pine' ? 'foliage' : bark ? 'bark' : 'plain';
+        const key = g.uuid + '|' + surface;
+        (plan[key] = plan[key] || { g, surface, items: [] }).items.push([o, lm, col]);
       }
     }
     for (const key in plan) {
-      const { g, isCrate, items } = plan[key];
-      const mat = isCrate ? worldMat(crateTex ? { map: crateTex } : {}) : worldMat(); // цвет — у каждого экземпляра
-      const mesh = new T.InstancedMesh(g, mat, items.length); mesh.frustumCulled = false; mesh.castShadow = true;
+      const { g, surface, items } = plan[key];
+      const options = surface === 'crate' && crateTex ? { map: crateTex }
+        : surface === 'foliage' ? { map: leafPattern, vertexColors: g === geo.foliage }
+        : surface === 'bark' ? { map: barkPattern } : {};
+      const mesh = new T.InstancedMesh(g, worldMat(options), items.length);
+      mesh.frustumCulled = false;
+      mesh.castShadow = true;
+      mesh.receiveShadow = GROUNDED && surface === 'foliage';
       items.forEach(([o, lm, col], i) => {
         const wk = wreckOf(o), m = basisAt(o); if (wk === 3) m.multiply(FLIP); m.multiply(lm); mesh.setMatrixAt(i, m);
         const c = new T.Color(typeof col === 'string' ? (VAR[col] ? VAR[col][o.id % VAR[col].length] : 0xffffff) : col);
@@ -410,6 +437,7 @@ void main(){
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       scene.add(mesh); inst[key] = { mesh }; if (OUTLINE_ALL) addOutline(mesh, OUT_B);
     }
+    if (GROUNDED) buildPlantContacts(objs);
     buildBuildings(objs);
     buildStreets(objs);
     buildRuin(objs);
@@ -420,6 +448,38 @@ void main(){
   // процедурные текстуры (серые — цвет задаёт оттенок экземпляра)
   function tex(f, n = 128) { const c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d'); f(g, n, mkRng(n * 7 + f.length)); const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.magFilter = GROUNDED ? T.LinearFilter : T.NearestFilter; t.anisotropy = GROUNDED ? Math.max(1, Math.min(lowEnd ? 2 : 4, renderer.capabilities.getMaxAnisotropy())) : 1; return t; }
   const noiseFill = (g, n, rnd, base, amp, k = 1800) => { g.fillStyle = `rgb(${base},${base},${base})`; g.fillRect(0, 0, n, n); for (let i = 0; i < k; i++) { const v = base + (rnd() - .5) * amp | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(rnd() * n | 0, rnd() * n | 0, 1 + (rnd() * 2 | 0), 1 + (rnd() * 2 | 0)); } };
+  const leafPattern = tex((g, n, rnd) => {
+    noiseFill(g, n, rnd, 213, 46, 1900);
+    for (let i = 0; i < 120; i++) {
+      const x = rnd() * n, y = rnd() * n, r = 1 + rnd() * 3.8;
+      g.fillStyle = i % 3 ? '#f4f0cd72' : '#72654a58';
+      g.beginPath();
+      g.ellipse(x, y, r, .75 + rnd() * 1.6, rnd() * 3.14, 0, Math.PI * 2);
+      g.fill();
+    }
+  }, 64);
+  const barkPattern = tex((g, n, rnd) => {
+    noiseFill(g, n, rnd, 205, 37, 1100);
+    for (let i = 0; i < 24; i++) {
+      const x = rnd() * n, y = rnd() * n, h = 7 + rnd() * 24;
+      g.strokeStyle = i % 3 ? '#5c473a74' : '#ffebc93c';
+      g.lineWidth = .7 + rnd() * .8;
+      g.beginPath(); g.moveTo(x, y);
+      g.lineTo(x + (rnd() - .5) * 3, y + h * .55);
+      g.lineTo(x + (rnd() - .5) * 4, y + h); g.stroke();
+    }
+  }, 64);
+  const plantContactGeometry = new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  const plantContactMaterial = new T.MeshBasicMaterial({
+    color: 0x242217, transparent: true, depthWrite: false, opacity: .64,
+    map: tex((g, n) => {
+      const c = n / 2, fade = g.createRadialGradient(c, c, 0, c, c, c);
+      fade.addColorStop(0, '#ffffffb5');
+      fade.addColorStop(.32, '#ffffff72');
+      fade.addColorStop(1, '#ffffff00');
+      g.fillStyle = fade; g.fillRect(0, 0, n, n);
+    }, 32)
+  });
   const TX = {
     asphalt: tex((g, n, rnd) => {
       noiseFill(g, n, rnd, 179, 33, 4800);
