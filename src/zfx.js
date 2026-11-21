@@ -15,6 +15,11 @@ const ZFX = (() => {
     drop: cvTex(32, 32, x => { const g = x.createRadialGradient(16, 16, 2, 16, 16, 16); g.addColorStop(0, '#fff'); g.addColorStop(.7, 'rgba(255,255,255,.85)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 32, 32); }),
     foot: cvTex(32, 64, x => { x.fillStyle = '#fff'; x.beginPath(); x.ellipse(16, 22, 9, 15, 0, 0, 7); x.fill(); x.beginPath(); x.ellipse(16, 49, 7, 9, 0, 0, 7); x.fill(); }),
     body: cvTex(64, 128, x => { x.fillStyle = '#fff'; x.fillRect(16, 30, 32, 54); x.beginPath(); x.arc(32, 18, 13, 0, 7); x.fill(); x.save(); x.translate(12, 34); x.rotate(.35); x.fillRect(-5, 0, 10, 38); x.restore(); x.save(); x.translate(52, 34); x.rotate(-.5); x.fillRect(-5, 0, 10, 38); x.restore(); x.fillRect(18, 82, 11, 42); x.save(); x.translate(41, 84); x.rotate(-.25); x.fillRect(-5, 0, 11, 40); x.restore(); }),
+    crack: cvTex(128, 128, x => { x.strokeStyle = '#fff'; x.lineCap = 'round'; const br = (px, py, a, l, w, d) => { x.lineWidth = w; x.beginPath(); x.moveTo(px, py); let qx = px, qy = py; const n = 5 + Math.random() * 4 | 0; for (let i = 0; i < n; i++) { a += (Math.random() - .5) * .9; qx += Math.cos(a) * l / n; qy += Math.sin(a) * l / n; x.lineTo(qx, qy); if (d > 0 && Math.random() < .35) { x.stroke(); br(qx, qy, a + (Math.random() < .5 ? 1 : -1) * (.6 + Math.random() * .6), l * .45, w * .6, d - 1); x.lineWidth = w; x.beginPath(); x.moveTo(qx, qy); } } x.stroke(); };
+      const a0 = Math.random() * 6.28; br(64, 64, a0, 60, 3.2, 2); br(64, 64, a0 + Math.PI + (Math.random() - .5) * .6, 54, 3, 2); }),
+    hole: cvTex(64, 64, x => { const g = x.createRadialGradient(32, 32, 4, 32, 32, 30); g.addColorStop(0, 'rgba(50,50,50,1)'); g.addColorStop(.55, 'rgba(70,70,70,1)'); g.addColorStop(.7, 'rgba(255,255,255,.9)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.beginPath(); for (let i = 0; i < 12; i++) { const a = i / 12 * 6.28, r = 24 + Math.random() * 7; x.lineTo(32 + Math.cos(a) * r, 32 + Math.sin(a) * r); } x.fill();
+      x.fillStyle = 'rgba(255,255,255,.8)'; for (let i = 0; i < 10; i++) { const a = Math.random() * 6.28, r = 26 + Math.random() * 4; x.fillRect(32 + Math.cos(a) * r, 32 + Math.sin(a) * r, 2, 2); } }),
+    patch: cvTex(64, 64, x => { x.fillStyle = 'rgba(255,255,255,.95)'; x.beginPath(); x.moveTo(6 + Math.random() * 6, 6); for (const [px, py] of [[58, 4], [60, 58], [4, 60]]) x.lineTo(px + (Math.random() - .5) * 6, py + (Math.random() - .5) * 6); x.fill(); x.fillStyle = 'rgba(0,0,0,.25)'; for (let i = 0; i < 40; i++) x.fillRect(Math.random() * 64, Math.random() * 64, 2, 2); }),
     scorch: cvTex(64, 64, x => { const g = x.createRadialGradient(32, 32, 2, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.6, 'rgba(255,255,255,.6)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); }) };
   const pool = [], dq = []; for (let i = 0; i < 80; i++) { const m = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false })); m.rotation.x = -Math.PI / 2; m.visible = false; dScene.add(m); pool.push(m); }
   let needClear = true;
@@ -23,8 +28,10 @@ const ZFX = (() => {
   const BLOOD = [0x7d0000, 0x6e0303, 0x5e0000, 0x8c0808], bcol = () => BLOOD[Math.floor(Math.random() * 4)];
   function wet(p, r, a) { const c = BS / GN; for (let dx = -r; dx <= r; dx += c) for (let dy = -r; dy <= r; dy += c) { const i = gi([p[0] + dx, p[1] + dy]); if (i >= 0) grid[i] = Math.min(3, grid[i] + a); } }
   function bloodAt(p, size, a = .9) { decal(p, size, 'b' + Math.floor(Math.random() * 3), bcol(), a); wet(p, size * .4, a); }
+  let ruinV = -1;
   function flush() {
-    if (needClear) { const cc = renderer.getClearColor(new T.Color()), ca = renderer.getClearAlpha(); renderer.setRenderTarget(RT); renderer.setClearColor(0, 0); renderer.clear(); renderer.setRenderTarget(null); renderer.setClearColor(cc, ca); needClear = false; grid.fill(0); }
+    { const R = G3.ruin(); if (R.v !== ruinV) { ruinV = R.v; needClear = true; } }
+    if (needClear) { const cc = renderer.getClearColor(new T.Color()), ca = renderer.getClearAlpha(); renderer.setRenderTarget(RT); renderer.setClearColor(0, 0); renderer.clear(); renderer.setRenderTarget(null); renderer.setClearColor(cc, ca); needClear = false; grid.fill(0); dq.unshift(...G3.ruin().decals); } // разбитый асфальт, ямы, пятна мазута — под кровью
     while (dq.length) {
       const batch = dq.splice(0, pool.length);
       batch.forEach((d, i) => { const m = pool[i]; m.position.set(d[0], 0, d[1]); m.scale.set(d[2], d[2] * d[7], 1); m.rotation.z = d[6]; m.material.map = TEX[d[3]]; m.material.color.setHex(d[4]); m.material.opacity = d[5]; m.material.needsUpdate = true; m.visible = true; });

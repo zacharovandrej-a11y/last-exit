@@ -118,21 +118,21 @@ const G3 = (() => {
   const renderer = new T.WebGLRenderer({ canvas: glc, antialias: HD, powerPreference: 'high-performance' });
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = GROUNDED ? T.PCFSoftShadowMap : T.PCFShadowMap;
   if (!HD) glc.style.imageRendering = 'pixelated';
-  const scene = new T.Scene(); scene.background = new T.Color(0x2a4b58);
+  const scene = new T.Scene(); scene.background = new T.Color(0x2a1a16);
   // ортогональная камера под постоянным углом (изометрия): карта не вращается, «вверх» на экране — всегда одно направление
   const camera = new T.OrthographicCamera(-1, 1, 1, -1, -3000, 8000);
   const CAM_OFF = new T.Vector3(1, 1, 1).normalize().multiplyScalar(2500);
   const at = (p, h = 0) => new T.Vector3(p[0], h, p[1]);
-  if (GROUNDED) scene.add(new T.HemisphereLight(0xd6e1e5, 0x9a8c71, .9));
+  if (GROUNDED) scene.add(new T.HemisphereLight(0xe6cdb4, 0x5e4c3c, .85)); // закат: тёплое небо, бурая земля
   else scene.add(new T.AmbientLight(0xdfe6ff, STYLE === 'real' ? .5 : .62));
   // солнце с настоящими тенями; область теней ездит за камерой
-  const SUN_DIR = new T.Vector3(-.55, 1, .25).normalize();
-  const sun = new T.DirectionalLight(STYLE === 'real' ? 0xffe6c4 : 0xfff3e0, STYLE === 'real' ? .95 : GROUNDED ? .8 : .85); scene.add(sun); scene.add(sun.target);
+  const SUN_DIR = new T.Vector3(-.8, .62, .42).normalize(); // низкое солнце — длинные тени
+  const sun = new T.DirectionalLight(STYLE === 'real' ? 0xffe6c4 : GROUNDED ? 0xffbc84 : 0xfff3e0, STYLE === 'real' ? .95 : GROUNDED ? .9 : .85); scene.add(sun); scene.add(sun.target);
   sun.castShadow = true; sun.shadow.mapSize.set(lowEnd ? 1024 : 2048, lowEnd ? 1024 : 2048);
   Object.assign(sun.shadow.camera, { left: -800, right: 800, top: 800, bottom: -800, near: 10, far: 4000 }); sun.shadow.bias = -.0006;
   // общий «цветокор»: приглушённые цвета, чуть тёплый оттенок
   const GRADE = STYLE === 'real' ? 'float lum_=dot(gl_FragColor.rgb,vec3(.299,.587,.114));gl_FragColor.rgb=mix(vec3(lum_),gl_FragColor.rgb,.62)*vec3(1.03,1.,.88);'
-    : GROUNDED ? 'float lum_=dot(gl_FragColor.rgb,vec3(.299,.587,.114));gl_FragColor.rgb=mix(vec3(lum_),gl_FragColor.rgb,.9)*vec3(1.02,1.,.97);'
+    : GROUNDED ? 'float lum_=dot(gl_FragColor.rgb,vec3(.299,.587,.114));gl_FragColor.rgb=mix(vec3(lum_),gl_FragColor.rgb,.84)*vec3(1.06,.97,.88);' // постапокалипсис на закате: блёкло и тепло
     : 'float lum_=dot(gl_FragColor.rgb,vec3(.299,.587,.114));gl_FragColor.rgb=mix(vec3(lum_),gl_FragColor.rgb,1.18)*vec3(1.03,1.02,.98);';
   // мультяшный свет: 3 ступени вместо плавного
   const toonGrad = (() => { const d = new Uint8Array([90, 170, 255]), t = new T.DataTexture(d, 3, 1, T.LuminanceFormat); t.minFilter = t.magFilter = T.NearestFilter; t.needsUpdate = true; return t; })();
@@ -193,7 +193,7 @@ void main(){
  vec3 col=grassBase;
  float terrain=noise(vP*.012);
  col*=.88+.24*terrain;
- ${GROUNDED ? 'col=mix(vec3(.3,.39,.2),vec3(.44,.49,.28),terrain);col=mix(col,grassBase*vec3(.65,.72,.58),.08);' : ''}
+ ${GROUNDED ? 'col=mix(vec3(.36,.35,.2),vec3(.5,.44,.27),terrain);col=mix(col,vec3(.3,.34,.19),smoothstep(.55,.8,noise(vP*.015))*.7);col=mix(col,grassBase*vec3(.6,.6,.45),.06);' : ''}
  ${STYLE === 'real' ? 'col=mix(vec3(dot(col,vec3(.3,.59,.11))),col,.72)*vec3(.93,.9,.7);' : 'col*=vec3(1.02,1.05,.95);'} // трава: оливковая (реализм) или сочная
  float nb=noise(vP*.04);
  // вытоптанная земля и грязь пятнами
@@ -208,7 +208,7 @@ void main(){
  float hedge=length(max(he,vec2(0.)))+min(max(he.x,he.y),0.)-60.;
  hedge+=(noise(vP*.035)-.5)*28.;
  float lawn=1.-smoothstep(-16.,34.,hedge);
- vec3 lawnCol=mix(vec3(.25,.36,.16),grassBase*.62,.25)*(.94+.12*nb);
+ vec3 lawnCol=mix(vec3(.34,.33,.18),grassBase*.5,.2)*(.94+.12*nb);
  col=mix(col,lawnCol,lawn*.94);
  // Приглушённая земля кладбища, также на общей поверхности и с мягким краем.
  vec2 oe=abs(vP-orderC)-vec2(235.);
@@ -268,7 +268,7 @@ void main(){
   const VAR = {
     house: [0xd8cfbe, 0xc9b79c, 0xb9b3a6, 0xe0d5c0, 0xc4a98a], roof: [0x7e3a2c, 0x4a4f57, 0x6b4a3a, 0x5b4636, 0x8a4a34],
     car: [0x2f4a63, 0x6e2626, 0x8a7d5e, 0xaeb0ab, 0x3a4a3a, 0x232323, 0x5e6266], house2: [0xbdb5a6, 0xa9a39a, 0xc8bfae, 0x9c958a],
-    leaf: [0x3b5323, 0x4a6b2a, 0x55702f, 0x3f5a26, 0x5c6b2e], leaf2: [0x2f4a1f, 0x3d5a24, 0x47622a], pine: [0x2c4a2a, 0x2f5233, 0x34502c], rock: [0x7d7b74, 0x8a857a, 0x6e6c66],
+    leaf: [0x6b6530, 0x7a6232, 0x5a5a2c, 0x8a6a36, 0x55582a], leaf2: [0x4e4a26, 0x5a4e2a, 0x47482a], // сухая листва pine: [0x2c4a2a, 0x2f5233, 0x34502c], rock: [0x7d7b74, 0x8a857a, 0x6e6c66],
   };
   // части каждого типа: [геометрия, цвет (или ключ VAR), матрица в единицах w/h объекта]
   const PARTS = {
@@ -325,6 +325,8 @@ void main(){
     antenna: () => [[geo.box, 0x6a6e72, M(0, 2, 0, 12, 4, 12)], [geo.cyl6, 0x9aa0a6, M(0, 24, 0, 1.6, 44, 1.6, 0, .35)], [geo.box, 0x9aa0a6, M(-5, 30, 0, 22, 1.2, 1.2, 0, .55)], [geo.box, 0x9aa0a6, M(-9, 40, 0, 16, 1.2, 1.2, 0, .1)], [geo.cyl6, 0x9aa0a6, M(14, 1.5, 6, 1.4, 30, 1.4, 0, 1.5)]],
     dish: () => [[geo.cyl6, 0x777b80, M(0, 9, 0, 2, 18, 2)], [geo.dome, 0xd8dde2, M(2, 22, 0, 13, 4, 13, 0, 1.9)], [geo.cyl6, 0x555a60, M(-4, 21, 0, 1, 12, 1, 0, 1.2)]],
     junk: () => [[geo.box, 0x7a6a4a, M(0, 6, 0, 18, 12, 14, .4)], [geo.box, 0x8a8e92, M(8, 4, -6, 12, 8, 10, 1.1)], [geo.lay, 0x1c1c1c, M(-8, 4, 8, 4, 4, 10)], [geo.box, 0xd8dde2, M(-2, 13, 0, 12, 3, 10, .2, .3)]],
+    sandbag: (w, h) => { const n = Math.max(3, Math.round(w / 13)), bw = w / n, r = []; for (let row = 0; row < 3; row++) { const m = row === 2 ? n - 1 : n; for (let i = 0; i < m; i++) r.push([geo.sph, row === 1 ? 0x8a7a58 : 0x7d6e4e, M(-w / 2 + bw * (i + .5 + (row === 2 ? .5 : 0)), 4.5 + row * 6, (row % 2 ? .8 : -.8), bw * .56, 3.6, h * .5, (i * 1.7 + row) % .3)]); } return r; },
+    jersey: (w, h) => [[geo.box, 0x9a958a, M(0, 3, 0, w, 6, h)], [geo.box, 0x8e897e, M(0, 12, 0, w * .99, 12, h * .55)], [geo.box, 0x9a958a, M(0, 19.5, 0, w * .98, 3, h * .42)], [geo.box, 0xb03a2a, M(-w * .25, 12, h * .28, w * .2, 4, .4)], [geo.box, 0xe8e4da, M(w * .1, 12, h * .28, w * .2, 4, .4)]],
     billboard: (w) => [[geo.box, 0x55595e, M(-w * .3, 22, 0, 3, 44, 3)], [geo.box, 0x55595e, M(w * .3, 22, 0, 3, 44, 3)], [geo.box, 0xf2f0ea, M(0, 56, 0, w, 32, 3)], [geo.box, 0x3d8bff, M(0, 56, 1.8, w * .9, 26, .6)], [geo.box, 0xffd43b, M(-w * .1, 62, 2.3, w * .55, 4, .4)], [geo.box, 0xffffff, M(0, 54, 2.3, w * .7, 3, .4)], [geo.box, 0xffffff, M(-w * .08, 48, 2.3, w * .5, 3, .4)], [geo.box, 0xff5a5a, M(0, 56, -1.8, w * .9, 26, .6)], [geo.box, 0xffffff, M(w * .05, 60, -2.3, w * .6, 4, .4)], [geo.box, 0xffd43b, M(0, 50, -2.3, w * .4, 3, .4)]],
   };
   // лёгкая разница в размерах деревьев и камней
@@ -332,15 +334,20 @@ void main(){
   const inst = {}; // key -> {mesh}
   const objIdx = []; // id -> [[mesh, index]]
   const zero = new T.Matrix4().makeScale(0, 0, 0);
+  // постапокалипсис: брошенные машины (ржавые, сгоревшие, перевёрнутые), всё детерминировано по id
+  const rh = (id, n) => ((id * 9301 + n * 49297 + 7) % 233280) / 233280;
+  const RUST = new T.Color(0x6e4228), RUST2 = new T.Color(0x4a2e20), SOOT = new T.Color(0x221e1b), FLIP = new T.Matrix4().makeTranslation(0, 40, 0).multiply(new T.Matrix4().makeRotationX(Math.PI));
+  const wreckOf = o => { if (o.type !== 'car' && o.type !== 'truck') return 0; const r = rh(o.id, 5); return r < .28 ? 0 : r < .6 ? 1 : o.type === 'car' && r > .9 ? 3 : 2; };
   const basisAt = o => { const k = sizeVar(o); return new T.Matrix4().compose(new T.Vector3(o.p[0], 0, o.p[1]), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -o.a), new T.Vector3(k, k, k)); };
   function buildWorld(objs) {
     for (const k in inst) { scene.remove(inst[k].mesh); if (inst[k].mesh.userData.outline) scene.remove(inst[k].mesh.userData.outline); delete inst[k]; }
     objIdx.length = 0;
     const plan = {};
+    for (const o of objs) if (o.win && rh(o.id, 3) < .45) { o.broken = true; glassBroken.add(o.id); } // выбитые стёкла с самого начала
     for (const o of objs) {
-      const f = PARTS[o.type]; if (!f) continue; const parts = f(o.w, o.h, o);
+      const ty = o.type === 'tree' && rh(o.id, 1) < .38 ? 'deadtree' : o.type, f = PARTS[ty]; if (!f) continue; const parts = f(o.w, o.h, o);
       parts.forEach(([g, col, lm], pi) => {
-        const key = o.type + '|' + (o.fk || '') + '|' + pi + '|' + g.uuid + '|' + col;
+        const key = ty + '|' + (o.fk || '') + '|' + pi + '|' + g.uuid + '|' + col;
         (plan[key] = plan[key] || { g, col, items: [] }).items.push([o, lm]);
       });
     }
@@ -349,8 +356,9 @@ void main(){
       const mat = col === 'crate' ? worldMat(crateTex ? { map: crateTex } : {}) : worldMat(); // цвет — у каждого экземпляра
       const mesh = new T.InstancedMesh(g, mat, items.length); mesh.frustumCulled = false; mesh.castShadow = true;
       items.forEach(([o, lm], i) => {
-        const m = basisAt(o).multiply(lm); mesh.setMatrixAt(i, m);
-        mesh.setColorAt(i, new T.Color(typeof col === 'string' ? (VAR[col] ? VAR[col][o.id % VAR[col].length] : 0xffffff) : col));
+        const wk = wreckOf(o), m = basisAt(o); if (wk === 3) m.multiply(FLIP); m.multiply(lm); mesh.setMatrixAt(i, m);
+        const c = new T.Color(typeof col === 'string' ? (VAR[col] ? VAR[col][o.id % VAR[col].length] : 0xffffff) : col);
+        if (wk === 1) c.lerp(RUST, .6).multiplyScalar(.8); else if (wk >= 2) c.lerp(rh(o.id, 9) < .5 ? SOOT : RUST2, .82); mesh.setColorAt(i, c);
         (objIdx[o.id] = objIdx[o.id] || []).push([mesh, i, m]);
         if (o.dead) mesh.setMatrixAt(i, zero);
       });
@@ -359,6 +367,7 @@ void main(){
     }
     buildBuildings(objs);
     buildStreets(objs);
+    buildRuin(objs);
     for (const [id, ob] of brokenOn) if (ob) altarBroken(id, true, ob);
     for (const k in objCol) delete objCol[k]; for (const [id, b] of burning) if (b.s === 2) darken(id);
   }
@@ -412,7 +421,8 @@ void main(){
   const FLOOR = { wood: ['fwood', 0x9a7350], tile: ['tile', 0xb8b4aa], concrete: ['floorc', 0x99968e], dirt: ['dirt', 0x8a7556] };
   const ROOFC = [0x7e3a2c, 0x4a4f57, 0x6b4a3a, 0x5b4636, 0x8a4a34];
   const wallParts = {}, wallGone = new Set(); // проломленные стены
-  function smashWall(id, objs) { wallGone.add(id); for (const [mesh, i] of wallParts[id] || []) { mesh.setMatrixAt(i, zero); mesh.instanceMatrix.needsUpdate = true; } killObj(id); const o = objs && objs[id]; if (o) { debrisAt(at(o.p, 20), 18, o.type === 'bw' ? 0x8a7a6a : 0x6b4a2e, 120, 4); debrisAt(at(o.p, 30), 8, 0x5a5048, 90, 2.5); if (glassIdx[id]) breakGlass(id, objs); } }
+  function smashWall(id, objs) { wallGone.add(id); if (boardMesh && boardIdx[id]) { for (const [i] of boardIdx[id]) boardMesh.setMatrixAt(i, zero); boardMesh.instanceMatrix.needsUpdate = true; } for (const [mesh, i] of wallParts[id] || []) { mesh.setMatrixAt(i, zero); mesh.instanceMatrix.needsUpdate = true; } killObj(id); const o = objs && objs[id]; if (o) { debrisAt(at(o.p, 20), 18, o.type === 'bw' ? 0x8a7a6a : 0x6b4a2e, 120, 4); debrisAt(at(o.p, 30), 8, 0x5a5048, 90, 2.5); if (glassIdx[id]) breakGlass(id, objs); } }
+  const boardPlan = [], boardIdx = {}, I4 = new T.Matrix4(); let boardMesh = null;
   const bInst = {}, bParts = []; let insideB = -1; const deco = {}; const glassPlan = [], glassIdx = []; let glassMesh = null;
   // Вывеска: по умолчанию к камере, с facing — закреплена в плоскости фасада.
   function sign(bid, wp, y, w, h, lines, bg, fg, frame, facing = null) {
@@ -631,7 +641,7 @@ void main(){
     ground.material.uniforms.orderC.value.set(1e6, 1e6);
     for (const k in wallParts) delete wallParts[k];
     for (const k in bInst) { scene.remove(bInst[k].mesh); if (bInst[k].mesh.userData.outline) scene.remove(bInst[k].mesh.userData.outline); delete bInst[k]; }
-    bParts.length = 0; insideB = -1; glassPlan.length = 0; if (glassMesh) { scene.remove(glassMesh); glassMesh = null; } glassIdx.length = 0; for (const k in deco) { deco[k].forEach(m => scene.remove(m)); delete deco[k]; }
+    bParts.length = 0; insideB = -1; glassPlan.length = 0; boardPlan.length = 0; if (boardMesh) { scene.remove(boardMesh); boardMesh = null; } for (const k in boardIdx) delete boardIdx[k]; if (glassMesh) { scene.remove(glassMesh); glassMesh = null; } glassIdx.length = 0; for (const k in deco) { deco[k].forEach(m => scene.remove(m)); delete deco[k]; }
     const plan = {}, Y = new T.Vector3(0, 1, 0), ONE = new T.Vector3(1, 1, 1);
     for (const b of objs.blds || []) {
       const K = BKIND[b.kind], S = BSTY[K.style], base = new T.Matrix4().compose(new T.Vector3(b.p[0], 0, b.p[1]), new T.Quaternion().setFromAxisAngle(Y, -b.a), ONE);
@@ -682,9 +692,13 @@ void main(){
         if (!K.church) pcs.push([geo.box, 'metal', 24, 0x9a9a92, M(b.w * .22, wallH + 7, -b.h * .15, 22, 10, 16), 'roof']); }
       if (K.church !== undefined) churchDeco(b, K, pcs, objs);
       bParts[b.id] = [];
-      if (!K.slit) for (const id of b.walls) { const o = objs[id]; if (!o.win) continue; glassPlan.push([o.id, b.id, base.clone().multiply(M(o.lx, (sill + winTop) / 2, o.ly, o.hor ? o.len : 1.2, winTop - sill, o.hor ? 1.2 : o.len))]); }
+      if (!K.slit) for (const id of b.walls) { const o = objs[id]; if (!o.win) continue; glassPlan.push([o.id, b.id, base.clone().multiply(M(o.lx, (sill + winTop) / 2, o.ly, o.hor ? o.len : 1.2, winTop - sill, o.hor ? 1.2 : o.len))]);
+        if (rh(o.id, 4) < .3) for (let k = 0; k < 3; k++) { const y = sill + (winTop - sill) * (.2 + k * .3), tl = (rh(o.id, 6 + k) - .5) * .35; boardPlan.push([o.id, b.id, base.clone().multiply(M(o.lx, y, o.ly, o.len * 1.18, 4.5, WALLT + 3, o.hor ? 0 : Math.PI / 2, tl))]); } }
+      const burnt = K.church === undefined && rh(b.id, 11) < .14; if (burnt) { b.burnt = 1; for (const pc of pcs) if (typeof pc[3] === 'number' && (pc[5] === 'roof' || pc[5] === 'top' || pc[5] === 'wall')) pc[3] = new T.Color(pc[3]).lerp(SOOT, pc[5] === 'wall' ? .45 : .8).getHex(); } // сгоревший дом
       for (const [g, tx, sc, col, lm, role, low, wid] of pcs) { const key = g.uuid + '|' + tx + '|' + sc + '|' + (role === 'floor' ? 'f' : 'w'); (plan[key] = plan[key] || { g, tx, sc, items: [] }).items.push([b.id, col, base.clone().multiply(lm), role, low ? base.clone().multiply(low) : null, wid]); }
     }
+    if (boardPlan.length) { boardMesh = new T.InstancedMesh(geo.box, worldMat(), boardPlan.length); boardMesh.frustumCulled = false; boardMesh.castShadow = true; // доски на окнах
+      boardPlan.forEach(([oid, bid, m], i) => { (boardIdx[oid] = boardIdx[oid] || []).push([i, m, bid]); boardMesh.setMatrixAt(i, objs[oid].dead ? zero : m); boardMesh.setColorAt(i, new T.Color([0x6b5238, 0x5a4430, 0x7a6040][(oid + i) % 3])); }); scene.add(boardMesh); }
     if (glassPlan.length) { glassMesh = new T.InstancedMesh(geo.box, GROUNDED ? new T.MeshPhongMaterial({ color: 0x9cb2bd, specular: 0x9cabb0, shininess: 55, transparent: true, opacity: .28, depthWrite: false }) : new T.MeshLambertMaterial({ color: 0xbfe4ff, transparent: true, opacity: .32, depthWrite: false }), glassPlan.length); glassMesh.frustumCulled = false;
       glassPlan.forEach(([oid, bid, m], i) => { glassIdx[oid] = [i, m, bid]; glassMesh.setMatrixAt(i, objs[oid].broken ? zero : m); }); scene.add(glassMesh); }
     for (const key in plan) {
@@ -697,9 +711,10 @@ void main(){
   }
   const streetPlane = new T.PlaneGeometry(1, 1); streetPlane.rotateX(-Math.PI / 2);
   let streetMeshes = [];
+  let streetPlan = null;
   function buildStreets(objs) {
     for (const m of streetMeshes) scene.remove(m); streetMeshes = [];
-    const plan = planStreets(objs), paths = [];
+    const plan = planStreets(objs), paths = []; streetPlan = plan;
     for (const walk of plan.walks) for (let i = 1; i < walk.points.length; i++) paths.push([walk.points[i - 1], walk.points[i]]);
     const layer = (segments, width, y, tx, color) => {
       const mesh = new T.InstancedMesh(streetPlane, texMat(tx, 48), segments.length);
@@ -718,6 +733,7 @@ void main(){
     const set = (id, open) => { for (const [mesh, i, m, role, low, wid] of bParts[id] || []) { mesh.setMatrixAt(i, wallGone.has(wid) ? zero : !open || role === 'floor' || role === 'prop' ? m : low || zero); mesh.instanceMatrix.needsUpdate = true; } };
     if (insideB >= 0) set(insideB, false); insideB = bid; if (bid >= 0) set(bid, true);
     for (const k in deco) for (const m of deco[k]) m.visible = +k !== bid;
+    if (boardMesh) { for (const oid in boardIdx) for (const [i, m, b] of boardIdx[oid]) boardMesh.setMatrixAt(i, b === bid || wallGone.has(+oid) ? zero : m); boardMesh.instanceMatrix.needsUpdate = true; }
     if (glassMesh) { for (const oid in glassIdx) { const [i, m, b] = glassIdx[oid]; glassMesh.setMatrixAt(i, b === bid || glassBroken.has(+oid) ? zero : m); } glassMesh.instanceMatrix.needsUpdate = true; }
   }
   // осквернённый алтарь: сам алтарь скрыт, вместо него обломки, красная надпись на полу
@@ -780,9 +796,58 @@ void main(){
     for (let i = fires.length - 1; i >= 0; i--) if (fires[i].t > fires[i].life) fires.splice(i, 1);
     for (const [id, b] of burning) { b.t += dt; if (b.s === 2 && b.t < 25 && Math.abs(b.p[0] - camP_[0]) < 900 && Math.abs(b.p[1] - camP_[1]) < 900) for (let i = 0; i < 4; i++) { const f = .75 + .3 * Math.sin(now / 80 + i * 1.9 + id); put(b.p[0] + (i - 1.5) * 12, 18, b.p[1] + Math.sin(i * 2.1) * 8, 22 * f, 38 * f); }
       if (Math.random() < dt * (b.s === 2 ? 4 : 2.2)) { const sm = smokes.find(x => x.userData.t > 2.5); if (sm) { sm.userData.t = 0; sm.userData.p = [b.p[0] + (Math.random() - .5) * 20, b.p[1] + (Math.random() - .5) * 20]; sm.visible = true; } } }
+    // постоянные очаги: горящие остовы машин, бочки, окна сгоревших домов — только рядом с камерой, не больше 8
+    let nf = 0; for (const f of fireSpots) { if (nf >= 8 || fi >= flames.length - 3) break; if (Math.abs(f.p[0] - camP_[0]) > 650 || Math.abs(f.p[1] - camP_[1]) > 650) continue; const o = objs[f.id]; if (o && (o.dead && !f.win || burning.has(f.id))) continue; nf++;
+      for (let i = 0; i < f.n; i++) { const k = .72 + .28 * Math.sin(now / 70 + i * 2.3 + f.p[0]) + .14 * Math.sin(now / 29 + i * 1.3); put(f.p[0] + (i - (f.n - 1) / 2) * 10 * f.s, f.h, f.p[1] + Math.sin(i * 2.1) * 7 * f.s, 30 * f.s * k, 52 * f.s * k); } }
+    drawPlumes(now, objs);
     return fi;
   }
   let camP_ = [0, 0];
+  // ===== постапокалипсис: завалы, мусор, трещины и ямы на асфальте, очаги огня и столбы дыма =====
+  const ruinMeshes = []; let fireSpots = [], plumeSrc = [], ruinDecals = [], ruinV = 0;
+  function buildRuin(objs) {
+    for (const m of ruinMeshes) scene.remove(m); ruinMeshes.length = 0; fireSpots = []; plumeSrc = []; const dec = [];
+    const rnd = mkRng(9137), Bl = objs.blds || [], R = () => rnd();
+    const KIND = { chunk: [geo.dod, [0x8a857a, 0x6e6a62, 0x9a948a, 0x7a746a]], brick: [geo.box, [0x8a4a3a, 0x7a3e30, 0x9a5a44]], tire: [geo.cyl10, [0x1c1c1c, 0x242422]], bag: [geo.sph, [0x1e2620, 0x2a2a2a, 0x3a3428]], paper: [geo.box, [0xd8d4c8, 0xc8c0a8, 0xe8e4da]], plank: [geo.box, [0x5a4430, 0x6b5238, 0x4a3828]] }, items = {};
+    for (const k in KIND) items[k] = [];
+    const add_ = (k, p, y, sx, sy, sz, ry = R() * 6.28, rx = 0) => items[k].push(new T.Matrix4().compose(new T.Vector3(p[0], y, p[1]), new T.Quaternion().setFromEuler(new T.Euler(rx, ry, 0)), new T.Vector3(sx, sy, sz)));
+    const okAt = (p, r) => inMap(p, 60) && bldAt(Bl, p) < 0 && !nearObjs(objs, p, r + 30).some(o => !o.nc && !o.dead && o.type !== 'bush' && objPush(o, p, r));
+    const junk = p => { const r = R(); if (r < .3) add_('paper', p, .4, 6 + R() * 4, .3, 7 + R() * 4); else if (r < .5) add_('bag', p, 3, 5, 4, 6); else if (r < .64) add_('tire', p, 1.6, 6, 3, 6, 0, R() < .3 ? 1.2 : 0); else if (r < .82) add_('plank', p, 1, 18 + R() * 10, 1.5, 4); else { add_('brick', p, 1.5, 6, 3, 3); add_('brick', add(p, [3, 4]), 1.5, 6, 3, 3); } };
+    const pile = (c, n, rad) => { for (let i = 0; i < n; i++) { const q = add(c, [(R() - .5) * rad * 2, (R() - .5) * rad * 2]); if (!okAt(q, 4)) continue; const big = 1 - dist(q, c) / (rad * 1.5); if (R() < .7) { const sz = 3 + R() * 5 * Math.max(.4, big); add_('chunk', q, sz * .45 + big * 3, sz, sz * .7, sz); } else add_('brick', q, 1.5 + big * 3, 6, 3, 3, R() * 6.28, R() * .6); } dec.push([c[0], c[1], rad * 2.6, 'b2', 0x5a554c, .5, R() * 6.28, 1]); };
+    // дороги: трещины, ямы, заплатки, мазут, мусор у обочин
+    for (const [a, b] of (streetPlan && streetPlan.roads) || []) { const d = norm(sub(b, a)), n = perp(d), L = dist(a, b), ang = Math.atan2(d[0], d[1]);
+      for (let t = 20; t < L; t += 46) { const c = add(a, d, t), r = R(), q = add(c, n, (R() - .5) * 36);
+        if (r < .5) dec.push([q[0], q[1], 46 + R() * 50, 'crack', 0x161412, .78, R() * 6.28, 1]);
+        else if (r < .62) dec.push([q[0], q[1], 16 + R() * 18, 'hole', 0x6a6258, 1, R() * 6.28, 1]);
+        else if (r < .74) dec.push([q[0], q[1], 30 + R() * 24, 'patch', 0x2e2d2a, .6, -ang + (R() - .5) * .2, .55 + R() * .4]);
+        else if (r < .8) dec.push([q[0], q[1], 28 + R() * 36, 'b1', 0x0a0806, .5, R() * 6.28, .7]);
+        if (R() < .4) { const e = add(c, n, (R() < .5 ? -1 : 1) * (19 + R() * 7)); if (okAt(e, 4)) junk(e); }
+        if (R() < .05) { const e = add(c, n, (R() < .5 ? -1 : 1) * 18); if (okAt(e, 12)) pile(e, 10, 14); } } }
+    // дома: завалы у стен, сгоревшие — копоть вокруг, огонь в окнах и дым над крышей
+    for (const b of Bl) { if (b.kind && b.kind.startsWith('ch')) continue; const burnt = b.burnt, n = burnt ? 3 : R() < .45 ? 1 : 0;
+      for (let i = 0; i < n; i++) { const sx = R() < .5 ? -1 : 1, sy = R() < .5 ? -1 : 1, c = add(add(b.p, b.u, sx * (b.w / 2 + 16)), b.v, sy * (b.h / 2 * R() + 10)); pile(c, burnt ? 18 : 12, burnt ? 22 : 15); }
+      if (burnt) { dec.push([b.p[0], b.p[1], Math.max(b.w, b.h) * 1.5, 'scorch', 0x16100c, .55, R() * 6.28, 1]); plumeSrc.push({ p: b.p, big: 1.3, seed: R() });
+        const ws = b.walls.map(i => objs[i]).filter(o => o && o.win); for (let i = 0; i < Math.min(2, ws.length); i++) { const o = ws[Math.floor(R() * ws.length)]; fireSpots.push({ p: o.p, h: 30, n: 2, s: 1, id: o.id, win: 1 }); } } }
+    // машины и бочки: сгоревшие остовы дымят, часть ещё горит
+    for (const o of objs) { const wk = wreckOf(o);
+      if (wk >= 2) { dec.push([o.p[0], o.p[1], 90 + R() * 30, 'scorch', 0x16100c, .7, R() * 6.28, 1]); if (rh(o.id, 12) < .45) { fireSpots.push({ p: o.p, h: wk === 3 ? 34 : 38, n: 3, s: 1.1, id: o.id }); plumeSrc.push({ p: o.p, big: 1, seed: R(), id: o.id }); } }
+      else if (o.type === 'barrel' && rh(o.id, 13) < .3) fireSpots.push({ p: o.p, h: 24, n: 2, s: .8, id: o.id }); }
+    // подпалины и мусор по всей карте
+    for (let i = 0; i < 160; i++) { const p = rndMap(rnd, 120); if (bldAt(Bl, p) >= 0) continue; if (R() < .5) dec.push([p[0], p[1], 40 + R() * 90, 'scorch', 0x16100c, .45, R() * 6.28, 1]); else if (okAt(p, 5)) junk(p); }
+    for (const k in KIND) { const L = items[k]; if (!L.length) continue; const mesh = new T.InstancedMesh(KIND[k][0], worldMat(), L.length); mesh.frustumCulled = false; mesh.receiveShadow = true;
+      L.forEach((m, i) => { mesh.setMatrixAt(i, m); mesh.setColorAt(i, new T.Color(KIND[k][1][i % KIND[k][1].length])); }); scene.add(mesh); ruinMeshes.push(mesh); }
+    ruinDecals = dec.map(d => [d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7]]); ruinV++;
+  }
+  // столбы дыма: видно издалека, по 7 спрайтов на столб, не больше 5 столбов
+  let plT = null; const plumeTex = () => plT || (plT = cvTex(64, 64, g => { for (let i = 0; i < 7; i++) { const x = 20 + Math.random() * 24, y = 20 + Math.random() * 24, r = 14 + Math.random() * 12, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,.9)'); gr.addColorStop(.6, 'rgba(255,255,255,.5)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); } }));
+  const plumes = []; for (let i = 0; i < 35; i++) { const s = new T.Sprite(new T.SpriteMaterial({ map: plumeTex(), color: 0x4a4440, transparent: true, depthWrite: false })); s.visible = false; s.renderOrder = 7; scene.add(s); plumes.push(s); }
+  function drawPlumes(now, objs) {
+    let pi = 0; const tt = now / 1000;
+    for (const src of plumeSrc) { if (pi + 7 > plumes.length) break; if (Math.abs(src.p[0] - camP_[0]) > 1300 || Math.abs(src.p[1] - camP_[1]) > 1300) continue; if (src.id !== undefined && objs[src.id] && objs[src.id].dead) continue;
+      for (let i = 0; i < 7; i++) { const s = plumes[pi++], ph = (tt * .09 / src.big + i / 7 + src.seed) % 1, h = 30 + ph * 300 * src.big, w = Math.pow(ph, 1.5) * 150 * src.big;
+        s.position.set(src.p[0] + w * .9 + Math.sin(tt * .7 + i) * 6, h, src.p[1] - w * .4); s.scale.setScalar((34 + ph * 150) * src.big); s.material.opacity = Math.min(1, Math.min(1, ph * 6) * Math.pow(1 - ph, 1.1) * 1.3); s.material.color.setHex(ph < .12 ? 0x7a5a40 : ph < .5 ? 0x5e5854 : 0x8a847e); s.visible = true; } }
+    for (; pi < plumes.length; pi++) plumes[pi].visible = false;
+  }
   function killObj(id) { for (const [mesh, i] of objIdx[id] || []) { mesh.setMatrixAt(i, zero); mesh.instanceMatrix.needsUpdate = true; } }
 
   // ===== персонажи: реалистичные солдаты =====
@@ -1245,5 +1310,5 @@ void main(){
     if (st.extra) st.extra(dt, now);
     renderer.render(scene, camera);
   }
-  return { scene, camera, MAT, smashWall, flash: (p, h, s) => flashAt(at(p, h), s), puff: (p, h) => puffAt(at(p, h)), hitNear: (objs, p) => hitNear(objs, p), chars, frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt, altarBroken, breakGlass, reviveObj, boom, objState, debris: (p, h, n, col, sp, sz) => debrisAt(at(p, h), n, col, sp, sz) };
+  return { ruin: () => ({ decals: ruinDecals, v: ruinV, fires: fireSpots, plumes: plumeSrc }), scene, camera, MAT, smashWall, flash: (p, h, s) => flashAt(at(p, h), s), puff: (p, h) => puffAt(at(p, h)), hitNear: (objs, p) => hitNear(objs, p), chars, frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt, altarBroken, breakGlass, reviveObj, boom, objState, debris: (p, h, n, col, sp, sz) => debrisAt(at(p, h), n, col, sp, sz) };
 })();

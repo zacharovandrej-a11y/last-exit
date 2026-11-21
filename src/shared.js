@@ -103,6 +103,7 @@ const OT = {
   house: { s: 0 }, car: { s: 1, hp: 160 }, truck: { s: 1, hp: 240 }, crate: { s: 0, hp: 45 }, wall: { s: 1 }, igloo: { s: 0 }, tent: { s: 1 },
   bw: { s: 1 }, furn: { s: 1, pass: 1 }, barrel: { s: 0, hp: 30 }, fence: { s: 1, pass: 1 }, bush: { s: 0, nc: 1, pass: 1 },
   grave: { s: 1, pass: 1 }, deadtree: { s: 0 }, ifence: { s: 1, pass: 1 }, antenna: { s: 0, pass: 1 }, billboard: { s: 1 }, dish: { s: 0, pass: 1 }, junk: { s: 0 }, shed: { s: 1 },
+  sandbag: { s: 1, pass: 1 }, jersey: { s: 1 }, // баррикады: мешки (пули пролетают, ранние зомби не перелезают) и бетонные блоки
 };
 // здания: план из комнат (BSP-деление), двери между комнатами, окна (пули и взгляд проходят, человек — нет)
 // style: стены/пол/крыша; hall — большой зал без деления; maxRoom — размер комнаты
@@ -285,6 +286,13 @@ function genWorld() {
     putA('tree', local(240, 175), 64, 64, b.a);
     putA('shed', local(-240, -210), 100, 80, b.a);
   }
+  // постапокалипсис: брошенные блокпосты из мешков и бетонных блоков (свой генератор — остальной мир не меняется)
+  { const r2 = mkRng(31337), rot = (a, x, y) => [Math.cos(a) * x - Math.sin(a) * y, Math.sin(a) * x + Math.cos(a) * y], cens = [B[3].c, B[0].c, B[1].c, null];
+    for (let k = 0; k < 18; k++) { const cen = cens[k % 4];
+      for (let t = 0; t < 90; t++) { const p = cen ? nearPt(r2, cen, 600) : rndMap(r2, 200), a = r2() * 6.2832; if (!inMap(p, 120) || !free(p, 62)) continue;
+        putA('sandbag', add(p, rot(a, 0, -34)), 76, 14, a); for (const sd of [-1, 1]) putA('sandbag', add(p, rot(a, sd * 44, -6)), 48, 14, a + 1.5708);
+        if (r2() < .7) putA('jersey', add(p, rot(a, (r2() - .5) * 40, 58)), 58, 16, a + (r2() - .5) * .5); break; } }
+    for (let k = 0; k < 26; k++) for (let t = 0; t < 30; t++) { const p = rndMap(r2, 200); if (!inMap(p, 100) || !free(p, 50)) continue; const a = r2() * 6.2832; putA('jersey', p, 58, 16, a); if (r2() < .5) putA('jersey', add(p, rot(a, 64, (r2() - .5) * 10)), 58, 16, a + (r2() - .5) * .4); break; } }
   // убираем «лишнюю» мебель и перенумеровываем
   const keep = objs.filter(o => !o.gone), idm = new Map(); objs.length = 0; keep.forEach((o, i) => { idm.set(o.id, i); o.id = i; objs.push(o); });
   for (const b of blds) { b.walls = b.walls.map(i => idm.get(i)); b.furn = b.furn.filter(i => idm.has(i)).map(i => idm.get(i)); if (b.altar !== undefined) b.altar = idm.get(b.altar); if (b.box !== undefined) b.box = idm.get(b.box); }
@@ -467,4 +475,4 @@ const ZB = [
 ];
 function zPickBonus(rnd) { let s = 0; for (const b of ZB) s += b.w; let r = rnd() * s; for (let i = 0; i < ZB.length; i++) { r -= ZB[i].w; if (r < 0) return i; } return 0; }
 // прочность препятствий для громил
-const zObjHp = o => o.type === 'bw' ? (o.win ? 140 : 520) : o.type === 'fence' ? 90 : o.type === 'ifence' ? 150 : o.type === 'furn' ? 60 : o.type === 'shed' ? 300 : 0;
+const zObjHp = o => o.type === 'bw' ? (o.win ? 140 : 520) : o.type === 'fence' ? 90 : o.type === 'ifence' ? 150 : o.type === 'furn' ? 60 : o.type === 'shed' ? 300 : o.type === 'sandbag' ? 160 : o.type === 'jersey' ? 600 : 0;

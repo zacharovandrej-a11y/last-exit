@@ -47,7 +47,7 @@ const near = (ds, q) => ds.reduce((m, d) => dist(d.o, q) < dist(m.o, q) ? d : m)
 const toLocal = (b, p) => { const r = sub(p, b.p); return [dot(r, b.u), dot(r, b.v)]; };
 const toWorld = (b, l) => add(add(b.p, b.u, l[0]), b.v, l[1]);
 function roomAt(b, l) { let best = 0, bd = 1e9; b.rooms.forEach((r, i) => { const dx = Math.max(r.x0 - l[0], 0, l[0] - r.x1), dy = Math.max(r.y0 - l[1], 0, l[1] - r.y1), d = Math.hypot(dx, dy); if (d < bd) { bd = d; best = i; } }); return best; }
-const SMASH = new Set(['bw', 'fence', 'ifence', 'furn', 'shed', 'car', 'truck', 'crate', 'barrel', 'tent', 'grave']);
+const SMASH = new Set(['bw', 'fence', 'ifence', 'furn', 'shed', 'car', 'truck', 'crate', 'barrel', 'tent', 'grave', 'sandbag', 'jersey']);
 
 // ===== комната =====
 export class World {
@@ -272,7 +272,7 @@ export class World {
     let air = false;
     for (const o of nearObjs(this.objs, p, z.r + 6)) {
       if (o.dead || o.nc) continue;
-      if ((z.ab & 1) && (o.type === 'fence' || o.type === 'ifence')) { if (objPush(o, p, z.r)) air = true; continue; }
+      if ((z.ab & 1) && (o.type === 'fence' || o.type === 'ifence' || o.type === 'sandbag')) { if (objPush(o, p, z.r)) air = true; continue; }
       if ((z.ab & 2) && o.type === 'bw' && o.win) { if (objPush(o, p, z.r)) air = true; continue; }
       const lim = o.rad + z.r + 2; if (Math.abs(o.p[0] - p[0]) > lim || Math.abs(o.p[1] - p[1]) > lim) continue;
       const pu = objPush(o, p, z.r); if (pu) { p = add(p, pu); z.block = o; }

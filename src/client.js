@@ -8,7 +8,7 @@ let ws = null, myId = -1, roomCode = '', inRoom = false, roster = [];
 let snaps = [], lastSnap = null, meP = [...ZSPAWN], meAim = [1, 0], meSt = 0, myW = 0, unl = [0], pk = {}, wl = ZW.map(() => 1), maxHp = 100;
 let perkOpts = null, perkLv = 0, msgs = [], overInfo = null, bigMsg = null, startedT = 0;
 const ammo = ZW.map(w => w.mag); let relT = 0, fireT = 0, bloom = 0;
-const zst = new Map(), loot = new Map(), tracers = [], trails = [], walks = {}; let frameShots = [], shake = 0, shakeV = [0, 0], buf = { rage: 0, spd: 0, ammo: 0, shield: 0, frz: 0 };
+const zst = new Map(), loot = new Map(), tracers = [], trails = [], walks = {}; const ash = []; let frameShots = [], shake = 0, shakeV = [0, 0], buf = { rage: 0, spd: 0, ammo: 0, shield: 0, frz: 0 };
 const ZSKIN = 10; let mySkin = (+localStorage.getItem('zskin') || 0) % ZSKIN;
 $('rec').textContent = +(localStorage.getItem('zbest') || 0) ? '🏆 Твой рекорд: волна ' + localStorage.getItem('zbest') : '';
 $('name').value = localStorage.getItem('zname') || '';
@@ -281,6 +281,11 @@ function hud(now, dt, cur, meS, plist, zl) {
   const pl_ = inRoom && cur && cur.st !== 0 && !$('lobby').classList.contains('on'); cv.style.cursor = pl_ && !touchUI ? 'none' : '';
   if (!pl_) return;
   if (hurtFlash > 0) { const g = ctx.createRadialGradient(W_ / 2, H_ / 2, Math.min(W_, H_) * .3, W_ / 2, H_ / 2, Math.max(W_, H_) * .7); g.addColorStop(0, 'rgba(160,0,0,0)'); g.addColorStop(1, 'rgba(160,0,0,' + hurtFlash * .6 + ')'); ctx.fillStyle = g; ctx.fillRect(0, 0, W_, H_); }
+  // пепел и дымка заката (рисуется поверх мира, дёшево — 2D)
+  { const hz = ctx.createLinearGradient(0, 0, W_ * .3, H_); hz.addColorStop(0, 'rgba(255,120,40,.1)'); hz.addColorStop(.5, 'rgba(255,120,40,0)'); hz.addColorStop(1, 'rgba(40,10,0,.12)'); ctx.fillStyle = hz; ctx.fillRect(0, 0, W_, H_);
+    if (!ash.length) for (let i = 0; i < 46; i++) ash.push({ x: Math.random() * W_, y: Math.random() * H_, v: 12 + Math.random() * 22, s: 1 + Math.random() * 2.2, ph: Math.random() * 6, e: Math.random() < .12 });
+    for (const f of ash) { f.y += f.v * dt; f.x += (Math.sin(now / 900 + f.ph) * 10 - 8) * dt; if (f.y > H_ + 5) { f.y = -5; f.x = Math.random() * W_ * 1.2; } if (f.x < -5) f.x = W_ + 5;
+      ctx.fillStyle = f.e ? 'rgba(255,150,60,' + (.5 + .4 * Math.sin(now / 120 + f.ph)) + ')' : 'rgba(200,190,180,.55)'; ctx.fillRect(f.x, f.y, f.s, f.s); } }
   if (now < buf.frz) { ctx.fillStyle = 'rgba(120,190,255,' + (.08 + .04 * Math.sin(now / 200)) + ')'; ctx.fillRect(0, 0, W_, H_); }
   // лазерный прицел и перекрестие (как в Crimsonland)
   if (meS && meS.st === 0) { const W = ZW[myW], [px, py] = G3.project(meP, 24), far = G3.project(add(meP, meAim, Math.min(W.range, 460)), 24);
