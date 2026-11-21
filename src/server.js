@@ -129,7 +129,7 @@ export class World {
     if (this.wave % 5 === 0) this.spawnZ(5);
     for (const p of this.players) if (p.st === 2) { p.st = 0; p.hp = p.maxHp; const m = this.players.find(q => q.st === 0 && q !== p); p.p = m ? collide(this.objs, add(m.p, [20, 20])) : this.spawnAt(p.id); p.inv = this.t + 3; this.send(p.c, { t: 'sp', sp: p.p }); this.msg('✨ ' + p.name + ' вернулся'); }
     const nw = ZW.map((w, i) => w.wave === this.wave && this.cyc === 0 ? i : -1).filter(i => i >= 0);
-    const tips = { 5: '⚠ Бегуны теперь перепрыгивают заборы', 1: '⚠ Громилы могут ломать укрытия', 12: '⚠ Через заборы лезут уже все' };
+    const tips = { 5: '⚠ Бегуны теперь перепрыгивают заборы', 1: 'Знаменосец с кругом усиливает союзников — цельтесь в него', 12: '⚠ Через заборы лезут уже все' };
     this.sendAll({ t: 'wave', w: this.wave, n: this.toSpawn, cyc: this.cyc, boss: this.wave % 5 === 0 ? 1 : 0, unl: zUnlocked(this.wave), nw, tip: this.cyc === 0 ? tips[this.wave] : null });
     this.report();
   }
@@ -153,6 +153,16 @@ export class World {
     this.zid = this.zid % 65000 + 1; this.zs.set(z.id, z); return z;
   }
   // ===== ввод игрока: позиция (доверяем, но ограничиваем скорость), оружие, попадания =====
+  damageRaider(z, damage) {
+    if (z.ty !== RAIDER_SUPPORT) {
+      for (const ally of this.zs.values()) {
+        if (ally.ty !== RAIDER_SUPPORT || ally.hp <= 0 || dist(z.p, ally.p) > SUPPORT_RADIUS) continue;
+        damage /= SUPPORT_HEALTH;
+        break;
+      }
+    }
+    z.hp -= damage;
+  }
   input(p, m) {
     const now = this.t, el = Math.min(.5, now - (p.lastT || now)) || DT; p.lastT = now;
     if (Array.isArray(m.p) && p.st !== 2) {
@@ -167,7 +177,7 @@ export class World {
     if (Array.isArray(m.h)) for (const h of m.h.slice(0, 80)) {
       const z = this.zs.get(h[0] | 0); if (!z) continue;
       const dmg = Math.min(maxD, Math.max(0, +h[1] || 0)); if (dist(z.p, p.p) > W.range + (W.boom || 0) + 120) continue;
-      z.hp -= dmg; z.lastDir = norm(sub(z.p, p.p));
+      this.damageRaider(z, dmg); z.lastDir = norm(sub(z.p, p.p));
       if (W.kb && !ZT[z.ty].boss) { const sc = ZT[z.ty].sc, k = W.kb * Math.min(1.5, dmg / W.dmg) / (sc * sc); z.kbv = add(z.kbv || [0, 0], z.lastDir, k); if (len(z.kbv) > 45) z.kbv = mul(norm(z.kbv), 45); z.stag = Math.min(.35, (z.stag || 0) + .08 + k * .01); } // отбрасывание и запинка, как в Crimsonland
       if (W.fire) { z.burn = 3; z.burnBy = p; }
       const g = W.gore;
@@ -206,7 +216,7 @@ export class World {
   }
   explode(c, by, R, dmg) {
     this.sendAll({ t: 'boom', p: [Math.round(c[0]), Math.round(c[1])], r: R });
-    for (const z of this.zs.values()) { const d = dist(z.p, c); if (d < R + z.r) { const k = 1 - Math.min(1, d / R); z.hp -= dmg * (.3 + k * k); z.lastDir = norm(sub(z.p, c)); if (z.hp <= 0) this.killZ(z, by, 5); } }
+    for (const z of this.zs.values()) { const d = dist(z.p, c); if (d < R + z.r) { const k = 1 - Math.min(1, d / R); this.damageRaider(z, dmg * (.3 + k * k)); z.lastDir = norm(sub(z.p, c)); if (z.hp <= 0) this.killZ(z, by, 5); } }
     for (const o of nearObjs(this.objs, c, R)) { if (o.dead || !(o.hp > 0) || dist(o.p, c) > R * .8) continue; if (o.type === 'barrel' || o.type === 'crate') { o.hp = 0; this.later.push([this.t + .15 + this.rnd() * .2, o, by]); } else if ((o.type === 'car' || o.type === 'truck') && !o.burnt) { o.hp -= dmg * .8; this.later.push([this.t + .3, o, by]); } }
   }
   hurt(p, dmg) {
@@ -320,7 +330,7 @@ export class World {
     for (const z of this.zs.values()) { const k = key(z.p[0], z.p[1]); let a = G.get(k); if (!a) G.set(k, a = []); a.push(z); }
     const targets = this.players.filter(p => p.st < 2), B = this.objs.blds;
     for (const z of this.zs.values()) {
-      if (z.burn > 0) { z.burn -= dt; z.hp -= 14 * dt; if (z.hp <= 0) { this.killZ(z, z.burnBy, 1); continue; } }
+      if (z.burn > 0) { z.burn -= dt; this.damageRaider(z, 14 * dt); if (z.hp <= 0) { this.killZ(z, z.burnBy, 1); continue; } }
       z.air = Math.max(0, z.air - dt); z.block = null;
       if (z.kbv) { const m = mul(z.kbv, Math.min(1, dt * 14)); z.p = this.zCollide(z, add(z.p, m)); z.kbv = sub(z.kbv, m); if (len(z.kbv) < .5) z.kbv = null; } // отлетает от пуль
       z.stag = Math.max(0, (z.stag || 0) - dt);
@@ -328,7 +338,8 @@ export class World {
       if (!z.tg || z.tg.st === 2 || !this.players.includes(z.tg) || this.tick % 15 === z.id % 15) { let bd = 1e9; z.tg = null; for (const p of targets) { const d = dist(p.p, z.p) * (p.st === 1 ? 1.3 : 1); if (d < bd) { bd = d; z.tg = p; } } }
       const T = z.tg; z.atk = 0; if (!T) continue;
       if (this.tick % 4 === z.id % 4) z.bi = bldAt(B, z.p);
-      const d = dist(T.p, z.p), reach = z.r + PR + 5;
+      const support = z.ty === RAIDER_SUPPORT;
+      const d = dist(T.p, z.p), reach = support ? 105 : z.r + PR + 5;
       if (d > reach) {
         z.backKickAt = 0;
         const goal = d < 60 && (z.bi === T.bi) ? T.p : this.zGoal(z, T.p, T.bi);
@@ -343,7 +354,7 @@ export class World {
         z.stT = Math.max(0, (z.stT || 0) - dt * .5);
         if (this.tick % 100 === z.id % 100) { z.noProg = d >= (z.lastD || 1e9) - 25 ? (z.noProg || 0) + 1 : 0; z.lastD = d; } // не приближается 10 с (застрял у забора) — заходит с другой стороны
         if ((z.noProg >= 2 || z.stT > 8) && d > 220) { const q = this.spawnPoint(); if (q) { z.p = q; z.stT = 0; z.noProg = 0; z.lastD = 1e9; z.entry = null; } }
-      } else {
+      } else if (!support) {
         z.atk = 1; z.atkT -= dt;
         const backKick = z.ty === 1 && raiderBackKick(z.id) && !(z.lost & 4);
         if (backKick && !z.backKickAt && z.atkT <= 0) z.backKickAt = t + .32;

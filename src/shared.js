@@ -440,7 +440,7 @@ const ZT = [
   { n: 'налётчик', hp: 42, sp: 44, r: 10, dmg: 10, sc: 1, wave: 1, xp: 1, ab: 0 },
   { n: 'бегун', hp: 30, sp: 98, r: 9, dmg: 8, sc: 1.02, wave: 1, xp: 1, ab: 1 },
   { n: 'знаменосица', hp: 200, sp: 30, r: 16, dmg: 22, sc: 1.45, wave: 1, xp: 4, ab: 0 },
-  { n: 'лазун', hp: 55, sp: 70, r: 9, dmg: 12, sc: .95, wave: 7, xp: 2, ab: 3 },
+  { n: 'знаменосец поддержки', hp: 52, sp: 50, r: 11, dmg: 0, sc: 1.2, wave: 1, xp: 2, ab: 0 },
   { n: 'громила', hp: 650, sp: 50, r: 20, dmg: 30, sc: 1.9, wave: 1, xp: 12, ab: 4 },
   { n: 'босс', hp: 3500, sp: 42, r: 30, dmg: 40, sc: 2.8, wave: 99, xp: 60, ab: 5, boss: 1 },
 ];
@@ -461,12 +461,15 @@ const zXpNeed = lv => Math.round(12 * Math.pow(lv, 1.45));
 const zWaveCount = (w, n, cyc = 0) => Math.round((6 + w * 4 + w * w * .22) * (1 + .6 * (n - 1)) * (1 + cyc * .5));
 const zHpMul = (w, n, cyc = 0) => (1 + (w - 1) * .06 + .15 * (n - 1)) * (1 + cyc * .8);
 const raiderBackKick = id => id % 2 === 0;
-const FIRST_WAVE_TYPES = [0, 1, 2, 4, 0, 0];
+const RAIDER_SUPPORT = 3, SUPPORT_RADIUS = 145, SUPPORT_HEALTH = 1.35;
+const streetWalksBackward = id => id % 3 === 1;
+const FIRST_WAVE_TYPES = [0, 1, RAIDER_SUPPORT, 2, 0, 4, 0];
 function zPickType(w, rnd, index) {
   const r = rnd();
   if (w === 1 && index < FIRST_WAVE_TYPES.length) return FIRST_WAVE_TYPES[index];
   if (r < (w < 5 ? .045 : .08)) return 4;
-  if (r < .19) return 2;
+  if (r < .115) return RAIDER_SUPPORT;
+  if (r < .22) return 2;
   if (r < .43) return 1;
   return 0;
 }
