@@ -353,8 +353,11 @@ void main(){
     for (let i = 0; i < C.count; i++) { const r = C.getX(i), gg = C.getY(i), b = C.getZ(i); if (r > .95 && gg > .9 && b > .7) C.setXYZ(i, 1.9, 1.8, 1.45); else if (r > .7 && gg < .15) C.setXYZ(i, 1.6, .18, .16); }
     return g;
   })();
-  geo.wheel = (() => { const tire = new T.LatheGeometry([[5.2, -3.7], [8.4, -3.9], [9.2, -2.8], [9.4, 0], [9.2, 2.8], [8.4, 3.9], [5.2, 3.7]].map(([x, y]) => new T.Vector2(x, y)), 12);
-    return mergeG([[tire, RX(0, 0, 0, 1, 1, 1, Math.PI / 2), 0x1d1d1d], [geo.cyl10, RX(0, 0, 0, 5.4, 6.6, 5.4, Math.PI / 2), 0x8c8a84], [geo.cyl6, RX(0, 0, 0, 2.2, 7.4, 2.2, Math.PI / 2), 0x55534e]]); })();
+  geo.wheel = (() => { const tire = new T.LatheGeometry([[5.6, -3.7], [8.2, -3.95], [9.1, -3.1], [9.45, -1.6], [9.5, 0], [9.45, 1.6], [9.1, 3.1], [8.2, 3.95], [5.6, 3.7]].map(([x, y]) => new T.Vector2(x, y)), 16);
+    const L = [[tire, RX(0, 0, 0, 1, 1, 1, Math.PI / 2), 0x1b1b1b], [geo.cyl10, RX(0, 0, 0, 5.8, 7.2, 5.8, Math.PI / 2), 0x3a3a38], [geo.cyl10, RX(0, 0, 0, 5.4, 7.6, 5.4, Math.PI / 2), 0x9a9890], [geo.cyl10, RX(0, 0, 0, 1.6, 8.2, 1.6, Math.PI / 2), 0x6a6862]];
+    for (let k = 0; k < 5; k++) { const a = k / 5 * 6.28; for (const z of [-3.95, 3.95]) L.push([geo.box, RX(Math.cos(a) * 2.9, Math.sin(a) * 2.9, z, 4.2, 1.4, .5, 0, 0, a), 0x5a5852]); } // спицы диска
+    for (let k = 0; k < 18; k++) { const a = k / 18 * 6.28; L.push([geo.box, RX(Math.cos(a) * 9.45, Math.sin(a) * 9.45, 0, 1, .9, 7.4, 0, 0, a), 0x232323]); } // протектор
+    return mergeG(L); })();
   // ===== разнообразный транспорт: хэтчбек, внедорожник, микроавтобус, пикап; грузовики (фургон, армейский), автобус =====
   // кузов легковушки по профилю: арки колёс, капот, лобовое, багажник (длина 120, ширина 52)
   function carShape({ rear, front, bot, belt, hood, ws, wx, wr }, depth = 48) { return extr(null, depth, 2, sh => { sh.moveTo(rear + 3, bot); sh.lineTo(wx[0] - wr - 1, bot); sh.absarc(wx[0], bot, wr + 1, Math.PI, 0, true); sh.lineTo(wx[1] - wr - 1, bot); sh.absarc(wx[1], bot, wr + 1, Math.PI, 0, true);
@@ -366,16 +369,44 @@ void main(){
     for (const z of [-1, 1]) { L.push([geo.box, RX(front + .2, hood - 4, z * hw * .66, 1.4, 4, W * .17), 0xfff4c8], [geo.box, RX(rear - .2, belt - 6, z * hw * .62, 1.4, 4, W * .2), 0xc01c1c], [geo.box, RX(ws - 3, belt + 2, z * (hw + .8), 4, 3, 2.6), 0x1c1c1c], [geo.box, RX((rear + front) / 2, bot + 2, z * hw * .985, (front - rear) * .55, 2.4, 1), 0x1c1c1c]);
       for (const x of [ws - 26, ws - 6]) L.push([geo.box, RX(x, belt - 3.4, z * hw * 1.006, 4, 1, .6), 0x8a8a86]); } }
   const glow = g => { const C = g.attributes.color; for (let i = 0; i < C.count; i++) { const r = C.getX(i), gg = C.getY(i), b = C.getZ(i); if (r > .95 && gg > .9 && b > .7) C.setXYZ(i, 1.9, 1.8, 1.45); else if (r > .7 && gg < .15) C.setXYZ(i, 1.6, .18, .16); } return g; };
-  function makeCar(kind) { const P = [], T_ = [], W = 52; let spec, wheels, wr = 9.4;
-    if (kind === 'hatch') { spec = { rear: -52, front: 58, bot: 5, belt: 23, hood: 20, ws: 20, wx: [-34, 36], wr: 10.5 }; T_.push([extr([[-50, 23], [-45, 35], [6, 36], [20, 23]], 44, 1, poly), RX(0, 0, 0, 1, 1, 1), 0x24323c]); P.push([extr([[-46.5, 34.4], [6.5, 35.3], [6, 37.3], [-46, 36.8]], 46, .8, poly), RX(0, 0, 0, 1, 1, 1)]); wheels = [-34, 36]; }
-    else if (kind === 'suv') { wr = 12; spec = { rear: -58, front: 60, bot: 8, belt: 31, hood: 29, ws: 24, wx: [-37, 38], wr: 13 }; T_.push([extr([[-56, 31], [-54, 47], [12, 47.5], [24, 31]], 46, 1, poly), RX(0, 0, 0, 1, 1, 1), 0x24323c]); P.push([extr([[-54.5, 46.4], [12.5, 46.8], [12, 48.8], [-54, 48.4]], 48, .8, poly), RX(0, 0, 0, 1, 1, 1)]);
-      for (const z of [-17, 17]) T_.push([geo.box, RX(-20, 50.5, z, 56, 1.4, 1.6), 0x2a2a2a]); T_.push([geo.cyl10, RX(-60.5, 22, 0, 9, 4, 9, 0, 0, Math.PI / 2), 0x1d1d1d]); wheels = [-37, 38]; } // рейлинги и запаска
-    else if (kind === 'van') { wr = 10.5; spec = { rear: -60, front: 60, bot: 7, belt: 30, hood: 27, ws: 44, wx: [-38, 40], wr: 11.5 }; P.push([extr([[-60, 29], [-60, 53], [28, 54.5], [44, 29.5]], 48, 1.6, poly), RX(0, 0, 0, 1, 1, 1)]);
-      T_.push([extr([[43.4, 30.5], [28.4, 53.4], [30, 53.6], [44.8, 30.8]], 46.6, 0, poly), RX(0, 0, 0, 1, 1, 1), 0x24323c]); for (const z of [-25.6, 25.6]) T_.push([geo.box, RX(-14, 43, z, 74, 10, .8), 0x24323c], [geo.box, RX(-2, 18, z * 1.01, .6, 22, .4), 0x141414]); wheels = [-38, 40]; } // окна салона, сдвижная дверь
-    else if (kind === 'pickup') { wr = 11; spec = { rear: -60, front: 60, bot: 7, belt: 26, hood: 25, ws: 26, wx: [-38, 38], wr: 12 }; T_.push([extr([[-12, 26], [-8, 42], [14, 42.5], [26, 26]], 44, 1, poly), RX(0, 0, 0, 1, 1, 1), 0x24323c]); P.push([extr([[-8.5, 41.4], [14.5, 41.8], [14, 43.6], [-8, 43.4]], 46, .8, poly), RX(0, 0, 0, 1, 1, 1)]);
-      for (const z of [-24.5, 24.5]) P.push([geo.box, RX(-37, 30, z, 46, 8, 2.2)]); P.push([geo.box, RX(-59, 30, 0, 2.2, 8, 50)], [geo.box, RX(-14, 31, 0, 2, 10, 50)]); T_.push([geo.box, RX(-37, 26.4, 0, 44, .6, 46), 0x1e1e1c]); wheels = [-38, 38]; } // открытый кузов
-    P.unshift([carShape(spec), RX(0, 0, 0, 1, 1, 1)]); T_.push([geo.box, RX(0, spec.bot + 1, 0, 100, 3, 44), 0x141414]); carTrim(T_, spec);
-    return { paint: mergeG(P.map(([g, m]) => [g, m, 0xffffff])), trim: glow(mergeG(T_)), wheels: wheels.flatMap(x => [-1, 1].map(sd => [x, sd * 22, wr / 9.4])) }; }
+  // кузов «лофтом»: поперечные сечения (скруглённый прямоугольник) вдоль длины — округлые борта, заваленные к крыше стойки, арки колёс;
+  // стёкла, стойки, швы дверей, решётка кузова пикапа — цветом вершин (одна геометрия на модель)
+  const lerpK = (kp, x) => { if (x <= kp[0][0]) return kp[0][1]; for (let i = 1; i < kp.length; i++) if (x <= kp[i][0]) { const [x0, y0] = kp[i - 1], [x1, y1] = kp[i], t = (x - x0) / (x1 - x0), e = t * t * (3 - 2 * t); return y0 + (y1 - y0) * (t * .35 + e * .65); } return kp[kp.length - 1][1]; };
+  function loftCar(P) { const S = 90, Mr = 28, x0 = P.top[0][0], x1 = P.top[P.top.length - 1][0], pos = [], col = [], idx = [], W2 = P.W / 2, xc = (x0 + x1) / 2, hl = (x1 - x0) / 2, n = 4;
+    const glassC = [.1, .12, .14], seamC = [.3, .3, .3], bedC = [.2, .2, .2];
+    for (let i = 0; i <= S; i++) { const x = x0 + (x1 - x0) * i / S, top = lerpK(P.top, x); let bot = P.bot; for (const wx of P.wx) { const d = Math.abs(x - wx), R = P.wr + 1.8; if (d < R) bot = Math.max(bot, P.wr * .95 + Math.sqrt(R * R - d * d) * .55); }
+      const u = Math.abs(x - xc) / hl, hw = W2 * (.7 + .3 * Math.sqrt(Math.max(0, 1 - Math.pow(u, 9)))), mid = (bot + top) / 2, half = (top - bot) / 2, inGH = x > P.gh[0] && x < P.gh[1];
+      for (let j = 0; j < Mr; j++) { const th = j / Mr * 6.2832, c = Math.cos(th), sn = Math.sin(th), yy = Math.sign(sn) * Math.pow(Math.abs(sn), 2 / n); let y = mid + yy * half, z = Math.sign(c) * Math.pow(Math.abs(c), 2 / n) * hw;
+        if (y > P.belt && inGH) z *= 1 - .2 * Math.min(1, (y - P.belt) / Math.max(1, top - P.belt)); // заваливание стоек к крыше
+        pos.push(x, y, z); let cl = [1, 1, 1];
+        const side = Math.abs(z) / hw, roof = x > P.roof[0] && x < P.roof[1] && y > top - 1.4;
+        if (inGH && y > P.belt + .8 && !roof && y < (P.gTop || 999) && !(Math.abs(x - P.bx) < 2.2 && side > .5) && !(x > P.roof[1] - 1 && side > .86) && !(x < P.roof[0] + 1 && side > .86) && !(x - P.gh[0] < 2.5) && !(P.gh[1] - x < 2.5)) cl = glassC;
+        else if (y < P.belt - 1 && y > bot + 2 && side > .9 && P.seams.some(sx => Math.abs(x - sx) < .55)) cl = seamC;
+        else if (P.bed && x > P.bed[0] && x < P.bed[1] && y > top - .6 && side < .86) cl = bedC;
+        col.push(...cl); } }
+    for (let i = 0; i < S; i++) for (let j = 0; j < Mr; j++) { const a = i * Mr + j, b = i * Mr + (j + 1) % Mr, c = a + Mr, d = b + Mr; idx.push(a, c, b, b, c, d); }
+    for (const [ring, flip] of [[0, 0], [S, 1]]) { const ci = pos.length / 3, base = ring * Mr; let cx = 0, cy = 0; for (let j = 0; j < Mr; j++) { cy += pos[(base + j) * 3 + 1]; } pos.push(pos[base * 3], cy / Mr, 0); col.push(1, 1, 1); for (let j = 0; j < Mr; j++) flip ? idx.push(ci, base + j, base + (j + 1) % Mr) : idx.push(ci, base + (j + 1) % Mr, base + j); }
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new T.Float32BufferAttribute(col, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(new Array(pos.length / 3 * 2).fill(0), 2)); g.setIndex(idx); g.computeVertexNormals(); return g.toNonIndexed(); }
+  const CARP = {
+    sedan: { top: [[-60, 14], [-59, 20], [-52, 22.6], [-36, 23.2], [-27, 34.5], [-18, 37.2], [4, 37.6], [11, 35.6], [24, 23.8], [40, 22.4], [55, 20.4], [60, 15.5]], bot: 6, W: 52, belt: 23.4, gh: [-35, 24], roof: [-19, 6], bx: -6, seams: [-6, 16], wx: [-37, 37], wr: 9.4 },
+    hatch: { top: [[-55, 15], [-54.5, 22], [-52, 32], [-46, 36.6], [4, 37], [11, 35], [22, 23.6], [40, 22.2], [53, 20.2], [58, 15.2]], bot: 6, W: 52, belt: 23.2, gh: [-53, 22], roof: [-45, 5], bx: -10, seams: [-10, 14], wx: [-34, 36], wr: 10 },
+    suv: { top: [[-60, 20], [-59.5, 30], [-58, 45.5], [-53, 48], [10, 48.2], [16, 46], [26, 31.5], [44, 30.2], [57, 28.6], [61, 21]], bot: 9, W: 54, belt: 31.4, gh: [-57.5, 26], roof: [-52, 11], bx: -14, seams: [-14, 8], wx: [-37, 38], wr: 12 },
+    van: { top: [[-60, 20], [-60, 50], [-57, 54.6], [28, 55], [34, 52], [46, 31], [56, 28.8], [61, 21]], bot: 8, W: 54, belt: 37, gTop: 50, gh: [-56, 46], roof: [-56, 30], bx: 10, seams: [-2, 18], wx: [-38, 40], wr: 11 },
+    pickup: { top: [[-60, 22], [-59, 26], [-15, 26.3], [-12, 27], [-9, 41.6], [13, 42], [16, 40], [26, 26.5], [44, 25.4], [57, 23.2], [61, 16]], bot: 8, W: 54, belt: 27, gh: [-11, 26], roof: [-8, 13], bx: 99, seams: [3], wx: [-38, 38], wr: 11, bed: [-58, -16] },
+  };
+  function makeCar(kind) { const C = CARP[kind], T_ = [], x0 = C.top[0][0], x1 = C.top[C.top.length - 1][0], hood = lerpK(C.top, x1 - 6), back = lerpK(C.top, x0 + 4), hw = C.W / 2;
+    // бамперы, решётка, фары (горят), фонари, номера, зеркала, ручки, дворники, выхлоп, антенна
+    T_.push([geo.lay, RX(x1 + .6, C.bot + 4, 0, 4, 3.2, C.W * .48), 0x9a9c9e], [geo.lay, RX(x0 - .6, C.bot + 4, 0, 4, 3.2, C.W * .47), 0x2a2a2a]);
+    T_.push([geo.box, RX(x1 + 1.6, C.bot + 4.8, 0, .6, 3.6, 11), 0xe2ded2], [geo.box, RX(x0 - 1.6, C.bot + 4.8, 0, .6, 3.6, 11), 0xe2ded2]);
+    T_.push([geo.box, RX(x1 - .2, (C.bot + hood) / 2 + 2, 0, 1.6, (hood - C.bot) * .3, C.W * .34), 0x111111]); for (let k = -2; k <= 2; k++) T_.push([geo.box, RX(x1 + .3, (C.bot + hood) / 2 + 2, k * 3.6, .5, (hood - C.bot) * .26, .7), 0x9a9c9e]);
+    for (const z of [-1, 1]) { T_.push([geo.sph, RX(x1 - 1.4, hood - 3.4, z * hw * .66, 2, 2.6, 5.6), 0xfff4c8], [geo.box, RX(x0 + .4, back - 4, z * hw * .64, 2, 3.4, 9), 0xc01c1c], [geo.box, RX(x1 - 5, hood - 3, z * hw * .9, 3, 1.4, 3), 0xd89a2a]);
+      T_.push([geo.sph, RX(C.gh[1] - 3, C.belt + 2.4, z * (hw + 1.6), 2.4, 2, 1.4), 0x1c1c1c], [geo.box, RX(C.gh[1] - 4, C.belt + 1.4, z * (hw - .4), 2, 1, 3), 0x1c1c1c]);
+      for (const sx of C.seams) T_.push([geo.box, RX(sx - 5, C.belt - 3.2, z * (hw - 2.6), 4, 1, 1.2), 0x8a8a86]); }
+    for (const z of [-7, 7]) T_.push([geo.box, RX(C.gh[1] + .5, C.belt + .8, z, 1, .6, 11, 0, .3, 0), 0x101010]);
+    T_.push([geo.cyl6, RX(x0 - 1, C.bot + 1.5, hw * .5, 1.3, 5, 1.3, 0, 0, Math.PI / 2), 0x4a4a46], [geo.cyl6, RX(C.roof[0] + 2, lerpK(C.top, C.roof[0] + 2) + 5, -hw * .4, .25, 10, .25), 0x222222]);
+    if (kind === 'suv') { for (const z of [-17, 17]) T_.push([geo.box, RX(-20, 49.4, z, 56, 1.4, 1.6), 0x2a2a2a]); T_.push([geo.cyl10, RX(x0 - 2.6, 22, 0, 9, 4, 9, 0, 0, Math.PI / 2), 0x1d1d1d]); }
+    const PB = [[loftCar(C), new T.Matrix4(), 0xffffff]]; if (kind === 'pickup') { for (const z of [-1, 1]) PB.push([geo.box, RX(-37, 29.5, z * (hw - 1.6), 44, 6, 2.2), 0xffffff]); PB.push([geo.box, RX(-58.6, 29.5, 0, 2.2, 6, C.W - 3), 0xffffff]); } // борта кузова — в цвет машины
+    return { paint: mergeG(PB), trim: glow(mergeG(T_)), wheels: C.wx.flatMap(x => [-1, 1].map(sd => [x, sd * (hw - 4.5), C.wr / 9.4])) }; }
   // грузовики и автобус (длина 170, ширина 62)
   function makeTruck(kind) { const P = [], T_ = []; let wheels;
     const cab = (x0, x1, top) => { P.push([extr([[x0, 9], [x1, 9], [x1, 32], [x1 - 4, top - 2], [x0 + 6, top], [x0, top]], 58, 1.5, poly), RX(0, 0, 0, 1, 1, 1)]);
@@ -491,7 +522,7 @@ void main(){
   const LEAFC = [0x8c9c5c, 0x80965a, 0x98a462, 0x7e8e50, 0x8a9a56, 0xb0a24e, 0xa89846, 0xb8763c];
   const leafOf = id => { const r = rh(id, 41); return LEAFC[r < .72 ? Math.floor(rh(id, 42) * 5) : r < .92 ? 5 + Math.floor(rh(id, 43) * 2) : 7]; };
   const CARK = ['sedan', 'sedan', 'hatch', 'hatch', 'suv', 'van', 'pickup'], TRUCKK = ['box', 'army', 'bus', 'bus'];
-  const VEH = { hatch: makeCar('hatch'), suv: makeCar('suv'), van: makeCar('van'), pickup: makeCar('pickup'), box: makeTruck('box'), army: makeTruck('army'), bus: makeTruck('bus') };
+  const VEH = { sedan: makeCar('sedan'), hatch: makeCar('hatch'), suv: makeCar('suv'), van: makeCar('van'), pickup: makeCar('pickup'), box: makeTruck('box'), army: makeTruck('army'), bus: makeTruck('bus') };
   // приглушённые реальные цвета; у каждого экземпляра свой оттенок
   const VAR = {
     house: [0xd8cfbe, 0xc9b79c, 0xb9b3a6, 0xe0d5c0, 0xc4a98a], roof: [0x7e3a2c, 0x4a4f57, 0x6b4a3a, 0x5b4636, 0x8a4a34],
@@ -526,9 +557,8 @@ void main(){
     barn: (w, h) => [[geo.box, 0x72302a, M(0, 23, 0, w, 46, h)], [geo.roof, 0x4e535a, M(0, 46, 0, w * 1.05, 28, h * 1.1)], [geo.box, 0xd6d2c8, M(0, 16, h / 2 + .6, 32, 32, 1.2)], [geo.box, 0x5a2520, M(0, 16, h / 2 + .9, 28, 28, 1.2)]],
     market: (w, h) => [[geo.box, 0xcfcac0, M(0, 26, 0, w, 52, h)], [geo.box, 0x7a2e38, M(0, 46, h / 2 + 1, w * .98, 9, 2)], [geo.box, 0x77726a, M(0, 53, 0, w * 1.01, 3, h * 1.01)], [geo.box, 0x34474f, M(0, 18, h / 2 + .6, w * .7, 22, 1.5)], [geo.box, 0x8e8a82, M(w * .3, 58, 0, 22, 9, 16)]],
     car: (w, h, o) => { const sx = w / 120, sz = h / 52, kind = CARK[Math.floor(rh(o ? o.id : 0, 60) * CARK.length)];
-      if (kind !== 'sedan') { const V = VEH[kind]; return [[V.paint, 'car', M(0, 0, 0, sx, 1, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1, sz)], ...V.wheels.map(([x, z, k]) => [geo.wheel, 0xffffff, M(x * sx, 9.4 * k, z * sz, k, k, k)])]; }
-      return [[geo.carBody, 'car', M(0, 0, 0, sx, 1, sz)], [geo.carTrim, 0xffffff, M(0, 0, 0, sx, 1, sz)],
-      ...[-37, 37].flatMap(x => [-22, 22].map(z => [geo.wheel, 0xffffff, M(x * sx, 9.4, z * sz, 1, 1, 1)]))]; },
+      if (kind !== 'sedan') { const V = VEH[kind]; /* кузов-лофт */ return [[V.paint, 'car', M(0, 0, 0, sx, 1, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1, sz)], ...V.wheels.map(([x, z, k]) => [geo.wheel, 0xffffff, M(x * sx, 9.4 * k, z * sz, k, k, k)])]; }
+      const V = VEH.sedan; return [[V.paint, 'car', M(0, 0, 0, sx, 1, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1, sz)], ...V.wheels.map(([x, z, k]) => [geo.wheel, 0xffffff, M(x * sx, 9.4 * k, z * sz, k, k, k)])]; },
     truck: (w, h, o) => { const kind = TRUCKK[Math.floor(rh(o ? o.id : 0, 61) * TRUCKK.length)], V = VEH[kind], sx = w / 170, sz = h / 62;
       return [[V.paint, kind === 'bus' ? 'bus' : 'cab', M(0, 0, 0, sx, 1, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1, sz)], ...V.wheels.map(([x, z, k]) => [geo.wheel, 0xffffff, M(x * sx, 9.4 * k, z * sz, k, k, k)])]; },
     bus: (w, h, o) => { const V = VEH.bus, sx = w / 170, sz = h / 62; return [[V.paint, 'bus', M(0, 0, 0, sx, 1.08, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1.08, sz)], ...[-.78, -.28, .7].flatMap(x => [-1, 1].map(sd => [geo.wheel, 0xffffff, M(x * w / 2, 12.7, sd * 25 * sz, 1.35, 1.35, 1.35)]))]; }, // большой городской автобус
