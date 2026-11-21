@@ -5,8 +5,13 @@
 <link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="theme-color" content="#120606"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
 <style>
-html,body{margin:0;height:100%;background:#120606;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;font-family:system-ui,sans-serif;color:#fff}
+html,body{margin:0;height:100%;background:#120606;overflow:hidden;-webkit-user-select:none;user-select:none;font-family:system-ui,sans-serif;color:#fff}
 canvas#g,canvas#c{display:block;position:fixed;inset:0;width:100vw;height:100vh}
+#c{touch-action:none}
+#weapons{position:fixed;left:50%;bottom:calc(54px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(318px,calc(100vw - 32px));display:flex;gap:4px;overflow-x:auto;overscroll-behavior-x:contain;touch-action:pan-x;scroll-snap-type:x mandatory;scrollbar-width:thin}
+#weapons[hidden]{display:none}
+#weapons button{box-sizing:border-box;flex:0 0 calc((100% - 8px) / 3);scroll-snap-align:start;min-width:0;min-height:44px;padding:4px;font-size:12px;line-height:1.1;overflow-wrap:anywhere;border:1px solid #9b7a6d;border-radius:8px;background:rgba(29,16,12,.92);box-shadow:none}
+#weapons button[aria-pressed="true"]{color:#ffd43b;border-color:#ffd43b;background:#3e2b16}
 .scr{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:radial-gradient(circle at 50% 120%,#6b0d0d 0,#2a0808 30%,#0c0404 65%);overflow:auto;padding:12px;box-sizing:border-box}
 .scr.on{display:flex}
 h1{margin:0;font-size:min(64px,12vw,13vh);font-weight:900;color:#ff3b3b;letter-spacing:4px;text-shadow:0 4px 0 #5a0000,0 10px 24px #000}
@@ -27,6 +32,7 @@ button.alt{background:#2a1212;border:2px solid #ff3b3b;box-shadow:none}
 #skin{width:90px;height:90px;position:static;display:block}button.sk{padding:8px 12px;font-size:18px}
 </style></head><body>
 <canvas id="g"></canvas><canvas id="c"></canvas>
+<div id="weapons" role="group" aria-label="Оружие" hidden></div>
 <div id="start" class="scr on">
   <h1>LAST EXIT</h1><div class="sub">Город захвачен зомби. Отбивайтесь вместе — до 4 игроков</div>
   <div class="row"><button id="skp" class="alt sk">◀</button><canvas id="skin" width="90" height="90"></canvas><button id="skn" class="alt sk">▶</button><input id="name" maxlength="12" placeholder="Имя" autocomplete="off"></div>
