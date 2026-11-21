@@ -193,7 +193,7 @@ void main(){
  vec3 col=grassBase;
  float terrain=noise(vP*.012);
  col*=.88+.24*terrain;
- ${GROUNDED ? 'col=mix(vec3(.29,.36,.20),vec3(.53,.46,.27),terrain);col=mix(col,vec3(.31,.38,.21),smoothstep(.50,.79,noise(vP*.015))*.55);col=mix(col,grassBase*vec3(.73,.7,.50),.32);' : ''}
+ ${GROUNDED ? 'col=mix(vec3(.29,.36,.20),vec3(.53,.46,.27),terrain);col=mix(col,vec3(.31,.38,.21),smoothstep(.50,.79,noise(vP*.015))*.55);col=mix(col,grassBase*vec3(.73,.7,.50),.32);float meadow_=smoothstep(.18,.78,terrain);col=mix(col,col*vec3(.94,1.08,.85),meadow_*.54);' : ''}
  ${STYLE === 'real' ? 'col=mix(vec3(dot(col,vec3(.3,.59,.11))),col,.72)*vec3(.93,.9,.7);' : 'col*=vec3(1.02,1.05,.95);'} // трава: оливковая (реализм) или сочная
  float nb=noise(vP*.04);
  // вытоптанная земля и грязь пятнами
@@ -432,8 +432,18 @@ void main(){
     stucco: tex((g, n, rnd) => { noiseFill(g, n, rnd, 245, 10, 1200); }),
     slate: tex((g, n) => { g.fillStyle = '#eeeeee'; g.fillRect(0, 0, n, n); g.fillStyle = '#d4d4d4'; for (let x = 0; x < n; x += 32) g.fillRect(x, 0, 2, n); }),
     brick: tex((g, n, rnd) => { g.fillStyle = '#d8d4cc'; g.fillRect(0, 0, n, n); for (let y = 0; y < n; y += 8) for (let x = -16; x < n; x += 16) { const o = (y / 8) % 2 ? 8 : 0, v = 150 + rnd() * 50 | 0; g.fillStyle = `rgb(${v + 20},${v},${v - 10})`; g.fillRect(x + o + 1, y + 1, 14, 6); } }),
-    plaster: tex((g, n, rnd) => { noiseFill(g, n, rnd, 225, 30); g.strokeStyle = 'rgba(90,80,70,.35)'; for (let i = 0; i < 4; i++) { g.beginPath(); let x = rnd() * n, y = rnd() * n; g.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (rnd() - .5) * 16; y += rnd() * 10; g.lineTo(x, y); } g.stroke(); } }),
-    concrete: tex((g, n, rnd) => { noiseFill(g, n, rnd, 200, 40); g.fillStyle = 'rgba(70,70,70,.35)'; g.fillRect(0, 0, n, 1); g.fillRect(0, 63, n, 1); g.fillRect(0, 0, 1, n); g.fillRect(63, 0, 1, n); }),
+    plaster: tex((g, n, rnd) => { noiseFill(g, n, rnd, 230, 46, 3600);
+      for (let i = 0; i < 36; i++) {
+        g.fillStyle = i % 3 ? '#594f3c12' : '#fff9df27';
+        g.beginPath(); g.ellipse(rnd() * n, rnd() * n, 1 + rnd() * 5, 1 + rnd() * 12, rnd() * 1.4, 0, Math.PI * 2); g.fill();
+      }
+      g.strokeStyle = 'rgba(90,80,70,.35)'; for (let i = 0; i < 4; i++) { g.beginPath(); let x = rnd() * n, y = rnd() * n; g.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (rnd() - .5) * 16; y += rnd() * 10; g.lineTo(x, y); } g.stroke(); } }),
+    concrete: tex((g, n, rnd) => { noiseFill(g, n, rnd, 210, 43, 3200);
+      for (let y = 8; y < n; y += 16) for (let x = 8; x < n; x += 16) {
+        g.fillStyle = rnd() < .5 ? '#ffffff13' : '#332b2420';
+        g.fillRect(x + rnd() * 5, y + rnd() * 2, 1 + rnd() * 4, 3 + rnd() * 8);
+      }
+      g.fillStyle = 'rgba(70,70,70,.35)'; g.fillRect(0, 0, n, 1); g.fillRect(0, 63, n, 1); g.fillRect(0, 0, 1, n); g.fillRect(63, 0, 1, n); }),
     wood: tex((g, n, rnd) => { for (let x = 0; x < n; x += 12) { const v = 165 + rnd() * 50 | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x, 0, 12, n); g.fillStyle = 'rgba(40,30,20,.45)'; g.fillRect(x, 0, 1, n); for (let k = 0; k < 6; k++) { g.fillStyle = 'rgba(60,45,30,.2)'; g.fillRect(x + 2 + rnd() * 8, rnd() * n, 1, 10 + rnd() * 20); } } }),
     metal: tex((g, n) => { for (let x = 0; x < n; x++) { const v = 185 + Math.sin(x / 4 * Math.PI) * 35 | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(x, 0, 1, n); } }),
     adobe: tex((g, n, rnd) => { noiseFill(g, n, rnd, 215, 45, 2600); }),
@@ -442,18 +452,35 @@ void main(){
     floorc: tex((g, n, rnd) => { noiseFill(g, n, rnd, 190, 30); g.fillStyle = 'rgba(0,0,0,.08)'; for (let i = 0; i < 6; i++) { g.beginPath(); g.arc(rnd() * n, rnd() * n, 6 + rnd() * 16, 0, 6.28); g.fill(); } }),
     dirt: tex((g, n, rnd) => { noiseFill(g, n, rnd, 180, 60, 3000); }),
     rooftile: tex((g, n, rnd) => { g.fillStyle = '#9a9a9a'; g.fillRect(0, 0, n, n); for (let y = 0; y < n; y += 8) for (let x = (y / 8) % 2 ? -6 : 0; x < n; x += 12) { const v = 175 + rnd() * 50 | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.beginPath(); g.ellipse(x + 6, y + 4, 6, 5, 0, 0, Math.PI); g.fill(); } }),
-    gravel: tex((g, n, rnd) => { noiseFill(g, n, rnd, 170, 70, 4000); }),
+    gravel: tex((g, n, rnd) => {
+      noiseFill(g, n, rnd, 172, 65, 5600);
+      for (let i = 0; i < 6; i++) {
+        const x = rnd() * n, y = rnd() * n, r = 7 + rnd() * 16;
+        const stain = g.createRadialGradient(x, y, 1, x, y, r);
+        stain.addColorStop(0, '#372b2847'); stain.addColorStop(1, '#372b2800');
+        g.fillStyle = stain; g.fillRect(x - r, y - r, r * 2, r * 2);
+      }
+    }),
+    roofing: tex((g, n, rnd) => {
+      noiseFill(g, n, rnd, 170, 40, 3700);
+      g.fillStyle = '#746c6940'; g.fillRect(0, 2, n, 3); g.fillRect(n / 2, 0, 2, n / 2);
+      g.fillStyle = '#e5d8c426'; g.fillRect(0, 5, n, 1);
+      for (let i = 0; i < 18; i++) g.fillRect(rnd() * n, rnd() * n, 2 + rnd() * 9, 1);
+    }),
   };
   // материал с текстурой «по миру»: стены, пол, крыша любой длины без растяжения
   const texMats = {};
   function texMat(name, scale) {
     const k = name + scale; if (texMats[k]) return texMats[k];
     const m = GROUNDED ? new T.MeshLambertMaterial({ color: 0xffffff, map: TX[name] }) : MAT({ color: 0xffffff, map: TX[name] });
+    const facade = ['plaster', 'stucco', 'brick', 'ashlar', 'concrete', 'adobe'].includes(name);
+    m.customProgramCacheKey = () => (facade ? 'facade' : 'surface') + '|' + scale;
     m.onBeforeCompile = sh => {
       sh.uniforms.zc = U.zc; sh.uniforms.zrho = U.zrho;
       sh.vertexShader = 'varying vec3 vWP;varying vec3 vWN;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n#ifdef USE_INSTANCING\nmat4 mw_=modelMatrix*instanceMatrix;\n#else\nmat4 mw_=modelMatrix;\n#endif\nvWP=(mw_*vec4(transformed,1.)).xyz;vWN=normalize(mat3(mw_)*objectNormal);');
       sh.fragmentShader = 'varying vec3 vWP;varying vec3 vWN;uniform vec2 zc;uniform float zrho;\n' + sh.fragmentShader
-        .replace('#include <map_fragment>', `vec3 an_=abs(vWN);vec2 wuv_=an_.y>.6?vWP.xz:(an_.x>an_.z?vWP.zy:vWP.xy);vec4 texelColor=texture2D(map,wuv_/${scale.toFixed(1)});texelColor=mapTexelToLinear(texelColor);diffuseColor*=texelColor;`)
+        .replace('#include <map_fragment>', `vec3 an_=abs(vWN);vec2 wuv_=an_.y>.6?vWP.xz:(an_.x>an_.z?vWP.zy:vWP.xy);vec4 texelColor=texture2D(map,wuv_/${scale.toFixed(1)});texelColor=mapTexelToLinear(texelColor);diffuseColor*=texelColor;
+        ${facade ? 'if(an_.y<.6){float damp_=1.-smoothstep(1.,23.,vWP.y); diffuseColor.rgb*=mix(vec3(1.),vec3(.72,.75,.70),damp_*.85);}' : ''}`)
         .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n' + GRADE + 'if(length(vWP.xz-zc)>zrho)gl_FragColor.rgb=gl_FragColor.rgb*.16+vec3(.05,.02,.01);');
     };
     return texMats[k] = m;
@@ -716,7 +743,19 @@ void main(){
           const oz = o.hor ? Z + Math.sign(Z) * (WALLT / 2 + .6) : Z;
           const trim = b.kind === 'market' ? 0x79646b : 0xc5baa5;
           pcs.push([geo.box, 'plaster', 48, trim, M(ox, wallH - 10, oz, o.hor ? L : 2, 3.5, o.hor ? 2 : L), 'top']);
-          if (o.win) pcs.push([geo.box, 'concrete', 48, 0x9a958b, M(ox, sill - 2, oz, o.hor ? L + 5 : 4.6, 3, o.hor ? 4.6 : L + 5), 'win']);
+          if (o.win) {
+            pcs.push([geo.box, 'concrete', 48, 0xaaa59a, M(ox, sill - 2, oz, o.hor ? L + 5 : 4.6, 3, o.hor ? 4.6 : L + 5), 'win']);
+            if (b.kind === 'house' || b.kind === 'villa') {
+              const shutter = b.kind === 'house' ? 0x506764 : 0x745841;
+              for (const side of [-1, 1]) pcs.push([geo.box, 'wood', 24, shutter,
+                M(ox + (o.hor ? side * (L / 2 + 4) : 0), (sill + winTop) / 2, oz + (o.hor ? 0 : side * (L / 2 + 4)),
+                  o.hor ? 7 : 2.5, winTop - sill + 1, o.hor ? 2.5 : 7), 'win']);
+            } else if (b.kind === 'market') {
+              const nx = o.hor ? 0 : Math.sign(X), nz = o.hor ? Math.sign(Z) : 0;
+              pcs.push([geo.box, 'metal', 24, 0x555e61,
+                M(ox + nx * 5, winTop + 5, oz + nz * 5, o.hor ? L + 6 : 12, 2.4, o.hor ? 12 : L + 6), 'top']);
+            }
+          }
         }
         for (let k = pc0; k < pcs.length; k++) pcs[k][7] = id; // какой стене принадлежит кусок — чтобы громила мог её проломить
       }
@@ -745,7 +784,7 @@ void main(){
       const rc = ROOFC[b.id % ROOFC.length];
       const GR = { gable: [.38, K.style === 'metal' ? 0x7a807a : rc], lowgable: [.2, K.church === 0 ? 0x315855 : 0x5a6068], steep: [K.church === 1 ? .55 : .75, 0x2a2730] }[K.roof];
       if (GR) { const along = b.w >= b.h; pcs.push([geo.roof, K.church === 0 ? 'slate' : 'rooftile', 24, GR[1], along ? M(0, wallH, 0, b.w * 1.04, Math.min(b.h, b.w) * GR[0], b.h * 1.08) : M(0, wallH, 0, b.h * 1.04, Math.min(b.h, b.w) * GR[0], b.w * 1.08, 1.5708), 'roof']); }
-      else { pcs.push([geo.box, K.roof === 'foil' ? 'metal' : 'gravel', K.roof === 'foil' ? 9 : 32, K.roof === 'foil' ? 0x8a9692 : 0x8a867e, M(0, wallH + 1.5, 0, b.w + 2, 3, b.h + 2), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, wallH + 4.5, b.h / 2 - 1, b.w + 3, 6, 3), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, wallH + 4.5, -b.h / 2 + 1, b.w + 3, 6, 3), 'roof']);
+      else { pcs.push([geo.box, K.roof === 'foil' ? 'metal' : b.kind === 'market' || b.kind === 'office' ? 'roofing' : 'gravel', K.roof === 'foil' ? 9 : 45, K.roof === 'foil' ? 0x8a9692 : 0x8a867e, M(0, wallH + 1.5, 0, b.w + 2, 3, b.h + 2), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, wallH + 4.5, b.h / 2 - 1, b.w + 3, 6, 3), 'roof']); pcs.push([geo.box, wm, 48, wc, M(0, wallH + 4.5, -b.h / 2 + 1, b.w + 3, 6, 3), 'roof']);
         pcs.push([geo.box, wm, 48, wc, M(b.w / 2 - 1, wallH + 4.5, 0, 3, 6, b.h), 'roof']); pcs.push([geo.box, wm, 48, wc, M(-b.w / 2 + 1, wallH + 4.5, 0, 3, 6, b.h), 'roof']);
         if (b.kind === 'market' || b.kind === 'office') {
           for (const x of [-b.w * .19, b.w * .19]) {
@@ -800,6 +839,52 @@ void main(){
     }
     layer(dashes, 2.1, .12, 'asphaltMark', 0xb7ad91);
     layer(paths, 28, .16, 'paving', 0xb1a995);
+    if (GROUNDED) buildVergeGrass(objs, plan.roads, paths);
+
+  }
+  const vergeGrassGeometry = (() => {
+    const pos = [];
+    for (const [x, z, height, tip] of [[-2, .4, 7, -2.3], [0, -1.2, 9.5, 1.2], [1.9, .7, 6.4, 3.6], [.9, 1.9, 7.8, -.5]]) {
+      pos.push(x - .7, 0, z, x + .8, 0, z + 1.1, tip, height, z + .65);
+      pos.push(x, 0, z - .7, x, 0, z + .8, tip, height, z + .65);
+    }
+    const geometry = new T.BufferGeometry();
+    geometry.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+    geometry.computeVertexNormals();
+    return geometry;
+  })();
+  const vergeGrassMaterial = new T.MeshLambertMaterial({ color: 0xffffff, side: T.DoubleSide });
+  function buildVergeGrass(objs, roads, paths) {
+    const occupied = roads.map(segment => [segment, 29]).concat(paths.map(segment => [segment, 17]));
+    const clear = p => !occupied.some(([[a, b], radius]) => {
+      const ab = sub(b, a), delta = sub(p, a);
+      const t = Math.min(1, Math.max(0, dot(delta, ab) / Math.max(1, dot(ab, ab))));
+      return dist(p, add(a, ab, t)) < radius;
+    }) && bldAt(objs.blds, p) < 0 && !nearObjs(objs, p, 7).some(o => !o.nc && objPush(o, p, 7));
+    const tufts = [], spacing = lowEnd ? 92 : 68, cap = lowEnd ? 360 : 540;
+    const colors = [0x757544, 0x857543, 0x62703c, 0x9e8b55];
+    for (const [i, [a, b]] of roads.entries()) {
+      const dir = norm(sub(b, a)), n = perp(dir), length = dist(a, b);
+      for (let t = 17; t < length - 15 && tufts.length < cap; t += spacing) {
+        const id = i * 100 + Math.floor(t);
+        const p = add(add(a, dir, t + rh(id, 6) * 8), n, (rh(id, 8) < .5 ? -1 : 1) * (32 + rh(id, 10) * 19));
+        if (!clear(p)) continue;
+        for (let k = 0; k < 3 && tufts.length < cap; k++) {
+          const q = add(add(p, dir, (k - 1) * 6), n, (rh(id, 11 + k) - .5) * 7);
+          if (!clear(q)) continue;
+          const h = .58 + rh(id, 14 + k) * .62;
+          tufts.push([M(q[0], .12, q[1], 1.3, h, 1.25, rh(id, 17 + k) * 6.28), colors[(id + k) % colors.length]]);
+        }
+      }
+      if (tufts.length >= cap) break;
+    }
+    if (!tufts.length) return;
+    const mesh = new T.InstancedMesh(vergeGrassGeometry, vergeGrassMaterial, tufts.length);
+    tufts.forEach(([matrix, color], i) => { mesh.setMatrixAt(i, matrix); mesh.setColorAt(i, new T.Color(color)); });
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+    scene.add(mesh);
+    streetMeshes.push(mesh);
   }
   // игрок внутри здания: крыша исчезает, стены опускаются — видно, что внутри
   function setInside(bid) {
