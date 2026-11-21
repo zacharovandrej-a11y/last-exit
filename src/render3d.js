@@ -171,8 +171,8 @@ vec4 wp_=modelMatrix*p_;vec3 wn_=normalize(mat3(modelMatrix)*normalize(nm_*norma
     const m = charrable((GROUNDED ? o => new T.MeshLambertMaterial(o) : MAT)(Object.assign({ color: 0xffffff, map: grunge }, opt))), prev = m.onBeforeCompile, pk = m.customProgramCacheKey;
     m.onBeforeCompile = sh => { prev(sh); sh.uniforms.uT = U.t; sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       #ifdef USE_INSTANCING
-      { vec3 ip_ = instanceMatrix[3].xyz; float h_ = clamp(ip_.y / 55.0, 0.0, 1.4); float ph_ = uT * 1.25 + ip_.x * .011 + ip_.z * .013;
-        transformed.x += (sin(ph_) * .11 + sin(uT * 3.7 + position.y * 4.0 + ip_.x) * .025) * h_; transformed.z += (cos(ph_ * .83) * .08 + cos(uT * 3.1 + position.x * 4.0) * .02) * h_; }
+      { vec3 ip_ = instanceMatrix[3].xyz; vec4 wp_ = instanceMatrix * vec4(transformed, 1.0); float sc_ = max(.001, length(instanceMatrix[0].xyz)); float h_ = clamp(wp_.y / 55.0, 0.0, 1.4); float ph_ = uT * 1.25 + ip_.x * .011 + ip_.z * .013;
+        transformed.x += (sin(ph_) * 1.3 + sin(uT * 3.7 + wp_.y * .3 + wp_.x * .2) * .3) * h_ / sc_; transformed.z += (cos(ph_ * .83) * .95 + cos(uT * 3.1 + wp_.x * .25) * .25) * h_ / sc_; }
       #endif`); };
     m.customProgramCacheKey = () => (pk ? pk.call(m) : '') + '|wind'; return windMats[k] = m; };
   const worldMat = (opt = {}) => { const k = JSON.stringify(opt); return worldMats[k] || (worldMats[k] = charrable((GROUNDED ? o => new T.MeshLambertMaterial(o) : MAT)(Object.assign({ color: 0xffffff, map: grunge }, opt)))); };
@@ -314,17 +314,24 @@ void main(){
     return mergeG(L.map(([g, m]) => [g, m, 0xffffff]));
   })();
   geo.carTrim = (() => { const D = 0x1c1c1c, L = [];
-    L.push([extr([[-30, 23], [-20, 36], [8, 36.4], [22, 23]], 44, 1, poly), RX(0, 0, 0, 1, 1, 1), 0x24323c]); // стёкла
-    L.push([geo.box, RX(0, 6, 0, 100, 3, 44), 0x141414]); // днище
-    for (const x of [61.6, -60.6]) L.push([geo.box, RX(x, 9, 0, 4, 6, 50), 0x2a2a2a], [geo.box, RX(x + Math.sign(x) * 2.2, 9.5, 0, .6, 3.6, 11), 0xe2ded2]); // бамперы, номера
-    L.push([geo.box, RX(61, 15.5, 0, 1, 5, 22), 0x121212]); // решётка
-    for (const z of [-17, 17]) L.push([geo.box, RX(60.6, 16.5, z, 1.4, 3.6, 9), 0xf0e4bc], [geo.box, RX(-59.4, 17, z * 1.06, 1.4, 3.4, 9), 0x9a1616]);
+    // перед (+X): большое наклонное лобовое стекло, хромированная решётка, яркие фары сверху и спереди; зад (−X): короткое заднее стекло, широкая полоса красных фонарей
+    L.push([extr([[-30, 23], [-20, 36], [8, 36.4], [22, 23]], 44, 1, poly), RX(0, 0, 0, 1, 1, 1), 0x24323c]);
+    L.push([extr([[21.4, 23.4], [8.3, 35.9], [9.6, 36.1], [22.8, 23.4]], 44.6, 0, poly), RX(0, 0, 0, 1, 1, 1), 0x3e5464]); // светлый блик на лобовом
+    L.push([geo.box, RX(0, 6, 0, 100, 3, 44), 0x141414]);
+    L.push([geo.box, RX(61.8, 9, 0, 4.4, 6.4, 51), 0x9a9c9e], [geo.box, RX(64.1, 9.5, 0, .6, 3.6, 11), 0xe2ded2]); // передний бампер (хром), номер
+    L.push([geo.box, RX(-60.8, 9, 0, 4, 6, 50), 0x2a2a2a], [geo.box, RX(-63, 9.5, 0, .6, 3.6, 11), 0xe2ded2]); // задний бампер, номер
+    L.push([geo.box, RX(61, 15.5, 0, 1.2, 5.5, 24), 0x111111]); for (let k = -2; k <= 2; k++) L.push([geo.box, RX(61.5, 15.5, k * 4.4, .5, 5, .8), 0xa8aaa8]); // решётка с хромом
+    for (const z of [-1, 1]) { L.push([geo.box, RX(60.9, 16.6, z * 17.5, 1.6, 4.2, 10), 0xfff4c8], [geo.box, RX(58.5, 19.2, z * 17.5, 4.5, .8, 10, 0, 0, -.12), 0xfff4c8]); // фары: видны и спереди, и сверху
+      L.push([geo.box, RX(-59.3, 17.4, z * 14, 1.6, 3.8, 20), 0xc01c1c], [geo.box, RX(-57.4, 21, z * 14, 3.6, .8, 20, 0, 0, .1), 0xb01818]); } // широкие задние фонари
     for (const z of [-26, 26]) { L.push([geo.box, RX(19, 25, z, 4, 3, 2.6), D], [geo.box, RX(-5, 7.2, z * .985, 70, 2.4, 1), D]);
+      L.push([geo.box, RX(56, 15, z * .99, 6, 2.2, 1), 0xd89a2a]); // поворотники спереди на крыльях
       for (const x of [-6, 16]) L.push([geo.box, RX(x, 15, z * 1.005, .6, 14, .4), 0x141414]);
       for (const x of [-2, 20]) L.push([geo.box, RX(x, 19.6, z * 1.008, 4, 1, .6), 0x8a8a86]); }
-    for (const z of [-7, 7]) L.push([geo.box, RX(24, 23.6, z, 1, .6, 11, 0, .3, 0), 0x101010]); // дворники
-    L.push([geo.cyl6, RX(-61, 6.5, 15, 1.3, 5, 1.3, 0, 0, Math.PI / 2), 0x4a4a46]); // выхлоп
-    return mergeG(L);
+    for (const z of [-7, 7]) L.push([geo.box, RX(24, 23.6, z, 1, .6, 11, 0, .3, 0), 0x101010]);
+    L.push([geo.cyl6, RX(-61, 6.5, 15, 1.3, 5, 1.3, 0, 0, Math.PI / 2), 0x4a4a46]);
+    const g = mergeG(L), C = g.attributes.color; // фары светятся: цвет вершин ярче единицы
+    for (let i = 0; i < C.count; i++) { const r = C.getX(i), gg = C.getY(i), b = C.getZ(i); if (r > .95 && gg > .9 && b > .7) C.setXYZ(i, 1.9, 1.8, 1.45); else if (r > .7 && gg < .15) C.setXYZ(i, 1.6, .18, .16); }
+    return g;
   })();
   geo.wheel = (() => { const tire = new T.LatheGeometry([[5.2, -3.7], [8.4, -3.9], [9.2, -2.8], [9.4, 0], [9.2, 2.8], [8.4, 3.9], [5.2, 3.7]].map(([x, y]) => new T.Vector2(x, y)), 12);
     return mergeG([[tire, RX(0, 0, 0, 1, 1, 1, Math.PI / 2), 0x1d1d1d], [geo.cyl10, RX(0, 0, 0, 5.4, 6.6, 5.4, Math.PI / 2), 0x8c8a84], [geo.cyl6, RX(0, 0, 0, 2.2, 7.4, 2.2, Math.PI / 2), 0x55534e]]); })();
@@ -357,6 +364,19 @@ void main(){
     for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28 + r() * .5, rr = R + r() * 5, y = 38 + r() * Y; out.push([Math.cos(a) * rr, y, Math.sin(a) * rr, (10.5 + r() * 4.5) * s, y < 44 ? 'leaf2' : r() < .35 ? 'leafTip' : 'leaf']); }
     for (let i = 0; i < 2; i++) { const a = r() * 6.28; out.push([Math.cos(a) * (R + 4), 31 + r() * 4, Math.sin(a) * (R + 4), 8.5 * s, 'leaf2']); } // нижние ветви свисают — крона не «леденец на палке»
     out.push([(r() - .5) * 6, top + r() * 3, (r() - .5) * 6, 11.5 * s, 'leafTip']); return out; });
+  // листовые карточки: плоскости с рисунком листьев (вырез по альфе) по поверхности кроны — даёт «лиственный» край вместо гладких комков
+  const leafCardTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), r = mkRng(77);
+    for (let i = 0; i < 70; i++) { const x = 14 + r() * 100, y = 14 + r() * 100, d = Math.hypot(x - 64, y - 64); if (d > 56) continue; const a = r() * 6.28, l = 9 + r() * 7, sh = .55 + r() * .45;
+      g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = `rgb(${190 * sh | 0},${215 * sh | 0},${150 * sh | 0})`; g.beginPath(); g.ellipse(0, 0, l, l * .42, 0, 0, 7); g.fill();
+      g.strokeStyle = `rgba(60,70,40,.5)`; g.lineWidth = 1; g.beginPath(); g.moveTo(-l, 0); g.lineTo(l, 0); g.stroke(); g.restore(); }
+    const t = new T.CanvasTexture(c); t.anisotropy = 2; return t; })();
+  geo.leafCards = [0, 1, 2].map(v => { const r = mkRng(1201 + v * 17), L = [], quad = new T.PlaneGeometry(1, 1);
+    const cr = [[13, 16, 60], [10, 24, 70], [18, 11, 54]][v];
+    for (let i = 0; i < 30; i++) { const a = r() * 6.28, up = r(), rad = cr[0] + 9 + r() * 6 - Math.abs(up - .45) * 10, y = 33 + up * (cr[1] + 22), sz = 15 + r() * 9;
+      const n = new T.Vector3(Math.cos(a) * .8, 1.1 + r() * .5, Math.sin(a) * .8).normalize() /* смотрят наружу и вверх: сверху видны листья, а не рёбра */, q = new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 0, 1), n).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 0, 1), r() * 6.28));
+      L.push([quad, new T.Matrix4().compose(new T.Vector3(Math.cos(a) * rad, y, Math.sin(a) * rad), q, new T.Vector3(sz, sz, 1)), y < 42 ? 0x9aa88a : 0xffffff]); }
+    for (let i = 0; i < 4; i++) { const a = r() * 6.28; L.push([quad, RX(Math.cos(a) * 6, cr[2] + 4 + r() * 4, Math.sin(a) * 6, 16 + r() * 6, 16 + r() * 6, 1, -Math.PI / 2 + (r() - .5) * .6, 0, r() * 6.28), 0xffffff]); } // макушка
+    const g = mergeG(L); g.userData.cards = 1; return g; });
   // приглушённые реальные цвета; у каждого экземпляра свой оттенок
   const VAR = {
     house: [0xd8cfbe, 0xc9b79c, 0xb9b3a6, 0xe0d5c0, 0xc4a98a], roof: [0x7e3a2c, 0x4a4f57, 0x6b4a3a, 0x5b4636, 0x8a4a34],
@@ -371,8 +391,8 @@ void main(){
       [geo.box, 0x40352a, M(0, 24, h / 2 + .6, 38, 48, 1.2)], [geo.box, 0xb8aea0, M(14, 24, h / 2 + 1.4, 2, 3, 1.5)]],
     tree: (w, h, o) => {
       const k = w / 44 * 1.15, v = o.id % 3, tall = [1, 1.12, .9][v];
-      return [[geo.treeWood[v], 0x5a4432, M(0, 0, 0, k, k * tall, k, o.id * .7)],
-        ...CROWN[v].map(([x, y, z, sz, c], i) => [geo.clump[(o.id + i) % 3], c, M(x * k, y * k * tall, z * k, sz * k, sz * k, sz * k, i * 1.3 + o.id)])];
+      return [[geo.treeWood[v], 0x5a4432, M(0, 0, 0, k, k * tall, k, o.id * .7)], [geo.leafCards[v], 'leaf', M(0, 0, 0, k, k * tall, k, o.id * .7)],
+        ...CROWN[v].map(([x, y, z, sz, c], i) => [geo.clump[(o.id + i) % 3], c, M(x * k, y * k * tall, z * k, sz * k * .85, sz * k * .85, sz * k * .85, i * 1.3 + o.id)])];
     },
     pine: (w) => { const k = w / 40; return [[geo.cyl6, 0x4a3626, M(0, 8 * k, 0, 2.6 * k, 16 * k, 2.6 * k)], [geo.cone7, 'pine', M(0, 26 * k, 0, 21 * k, 30 * k, 21 * k)], [geo.cone7, 'pine', M(0, 44 * k, 0, 16 * k, 26 * k, 16 * k, .5)], [geo.cone7, 'pine', M(0, 60 * k, 0, 10 * k, 22 * k, 10 * k, 1)], [geo.cone7, 'pine', M(0, 66 * k, 0, 5 * k, 10 * k, 5 * k)]]; },
     rock: (w) => { const k = w / 36; return [[geo.dod, 'rock', M(0, 5 * k, 0, 18 * k, 12 * k, 15 * k, 0, .2)], [geo.dod, 'rock', M(9 * k, 3 * k, 6 * k, 9 * k, 7 * k, 8 * k, 1)]]; },
@@ -480,9 +500,9 @@ void main(){
       const options = surface === 'crate' && crateTex ? { map: crateTex }
         : surface === 'foliage' ? { map: leafPattern, vertexColors: !!g.attributes.color }
         : surface === 'bark' ? { map: barkPattern, vertexColors: !!g.attributes.color } : g.attributes.color ? { vertexColors: true } : {};
-      const mesh = new T.InstancedMesh(g, (surface === 'foliage' ? windMat : worldMat)(options), items.length);
+      const mesh = new T.InstancedMesh(g, g.userData.cards ? windMat({ map: leafCardTex, alphaTest: .5, side: T.DoubleSide, vertexColors: true }) : (surface === 'foliage' ? windMat : worldMat)(options), items.length);
       mesh.frustumCulled = false;
-      mesh.castShadow = true;
+      mesh.castShadow = !g.userData.cards;
       mesh.receiveShadow = GROUNDED && surface === 'foliage';
       items.forEach(([o, lm, col], i) => {
         const wk = wreckOf(o), m = basisAt(o); if (wk === 3) m.multiply(FLIP); m.multiply(lm); mesh.setMatrixAt(i, m);
