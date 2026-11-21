@@ -165,7 +165,16 @@ vec4 wp_=modelMatrix*p_;vec3 wn_=normalize(mat3(modelMatrix)*normalize(nm_*norma
   const lam = (col, opt = {}) => { const k = col + JSON.stringify(opt); return matCache[k] || (matCache[k] = charrable(MAT(Object.assign({ color: col, map: grunge }, opt)))); };
 
   // Материалы окружения имеют плавное освещение; персонажи сохраняют читаемый toon-силуэт.
-  const worldMats = {};
+  const worldMats = {}, windMats = {};
+  // листва качается на ветру: смещение вершин в шейдере, сильнее у верхушки кроны (тени не качаются — это дёшево)
+  const windMat = (opt = {}) => { const k = JSON.stringify(opt); if (windMats[k]) return windMats[k];
+    const m = charrable((GROUNDED ? o => new T.MeshLambertMaterial(o) : MAT)(Object.assign({ color: 0xffffff, map: grunge }, opt))), prev = m.onBeforeCompile, pk = m.customProgramCacheKey;
+    m.onBeforeCompile = sh => { prev(sh); sh.uniforms.uT = U.t; sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      #ifdef USE_INSTANCING
+      { vec3 ip_ = instanceMatrix[3].xyz; float h_ = clamp(ip_.y / 55.0, 0.0, 1.4); float ph_ = uT * 1.25 + ip_.x * .011 + ip_.z * .013;
+        transformed.x += (sin(ph_) * .11 + sin(uT * 3.7 + position.y * 4.0 + ip_.x) * .025) * h_; transformed.z += (cos(ph_ * .83) * .08 + cos(uT * 3.1 + position.x * 4.0) * .02) * h_; }
+      #endif`); };
+    m.customProgramCacheKey = () => (pk ? pk.call(m) : '') + '|wind'; return windMats[k] = m; };
   const worldMat = (opt = {}) => { const k = JSON.stringify(opt); return worldMats[k] || (worldMats[k] = charrable((GROUNDED ? o => new T.MeshLambertMaterial(o) : MAT)(Object.assign({ color: 0xffffff, map: grunge }, opt)))); };
 
   // ===== земля =====
@@ -175,7 +184,7 @@ vec4 wp_=modelMatrix*p_;vec3 wn_=normalize(mat3(modelMatrix)*normalize(nm_*norma
   const crateTex = typeof ART === 'object' && ART.crate ? loader.load(ART.crate) : null;
   const gsize = HALF * 2 + 4000, gg = new T.PlaneGeometry(gsize, gsize, 1, 1); gg.rotateX(-Math.PI / 2);
   const ground = new T.Mesh(gg, new T.ShaderMaterial({
-    uniforms: Object.assign(T.UniformsUtils.clone(T.UniformsLib.lights), { grass: { value: grassTex }, hasGrass: { value: grassTex ? 1 : 0 }, bc: { value: BIOMES.map(b => new T.Vector2(b.c[0], b.c[1])) }, bcol: { value: BIOMES.map(b => new T.Color(b.col)) }, brad: { value: BIOMES.map(b => b.r) }, hallC: { value: new T.Vector2(1e6, 1e6) }, hallU: { value: new T.Vector2(1, 0) }, hallHalf: { value: new T.Vector2() }, orderC: { value: new T.Vector2(1e6, 1e6) } }, U),
+    uniforms: Object.assign(T.UniformsUtils.clone(T.UniformsLib.lights), { grass: { value: grassTex }, hasGrass: { value: grassTex ? 1 : 0 }, bc: { value: BIOMES.map(b => new T.Vector2(b.c[0], b.c[1])) }, bcol: { value: BIOMES.map(b => new T.Color(b.n === 'snow' ? '#7a6a48' : b.col)) }, brad: { value: BIOMES.map(b => b.r) }, hallC: { value: new T.Vector2(1e6, 1e6) }, hallU: { value: new T.Vector2(1, 0) }, hallHalf: { value: new T.Vector2() }, orderC: { value: new T.Vector2(1e6, 1e6) } }, U),
     lights: true,
     vertexShader: '#include <common>\n#include <shadowmap_pars_vertex>\nvarying vec2 vP;void main(){vec3 transformedNormal=normalMatrix*vec3(0.,1.,0.);vec4 worldPosition=modelMatrix*vec4(position,1.);vP=worldPosition.xz;gl_Position=projectionMatrix*viewMatrix*worldPosition;\n#include <shadowmap_vertex>\n}',
     fragmentShader: `
@@ -338,11 +347,16 @@ void main(){
   geo.clump = [0, 1, 2].map(v => { const g = new T.IcosahedronGeometry(1, 1), P = g.attributes.position, cols = [];
     for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), k = .78 + .4 * hash3(Math.round(x * 100), Math.round(y * 100), Math.round(z * 100), v); P.setXYZ(i, x * k, y * k * .86, z * k);
       const t = .56 + (y + 1) * .24 + (hash3(Math.round(x * 50), Math.round(y * 50), Math.round(z * 50), v + 9) - .5) * .14; cols.push(t, t * 1.02, t * .9); }
-    g.setAttribute('color', new T.Float32BufferAttribute(cols, 3)); g.computeVertexNormals(); return g; });
+    g.setAttribute('color', new T.Float32BufferAttribute(cols, 3)); g.computeVertexNormals();
+    // мягкие нормали: смесь «шара» и граней — крона читается объёмной массой листвы, а не гранёным камнем
+    const N = g.attributes.normal; for (let i = 0; i < N.count; i++) { const n = new T.Vector3(P.getX(i), P.getY(i) * 1.2, P.getZ(i)).normalize().multiplyScalar(.7).add(new T.Vector3(N.getX(i), N.getY(i), N.getZ(i)).multiplyScalar(.3)).normalize(); N.setXYZ(i, n.x, n.y, n.z); }
+    return g; });
   // крона: раскладка облаков на вариант (центр, размер, оттенок)
-  const CROWN = [0, 1, 2].map(v => { const r = mkRng(911 + v * 7), out = [[0, 46, 0, 19, 'leaf2']];
-    for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28 + r() * .5, rr = 11 + r() * 5, y = 42 + r() * 16; out.push([Math.cos(a) * rr, y, Math.sin(a) * rr, 9 + r() * 4, r() < .3 ? 'leafTip' : 'leaf']); }
-    out.push([(r() - .5) * 6, 61 + r() * 3, (r() - .5) * 6, 10, 'leafTip']); return out; });
+  // варианты: 0 — круглая крона, 1 — высокая узкая, 2 — широкая раскидистая; низ кроны тёмный, верх — светлый
+  const CROWN = [[13, 16, 60, 1], [10, 24, 70, .9], [18, 11, 54, 1.15]].map(([R, Y, top, s], v) => { const r = mkRng(911 + v * 7), out = [[0, 44, 0, 21 * s, 'leaf2']];
+    for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28 + r() * .5, rr = R + r() * 5, y = 38 + r() * Y; out.push([Math.cos(a) * rr, y, Math.sin(a) * rr, (10.5 + r() * 4.5) * s, y < 44 ? 'leaf2' : r() < .35 ? 'leafTip' : 'leaf']); }
+    for (let i = 0; i < 2; i++) { const a = r() * 6.28; out.push([Math.cos(a) * (R + 4), 31 + r() * 4, Math.sin(a) * (R + 4), 8.5 * s, 'leaf2']); } // нижние ветви свисают — крона не «леденец на палке»
+    out.push([(r() - .5) * 6, top + r() * 3, (r() - .5) * 6, 11.5 * s, 'leafTip']); return out; });
   // приглушённые реальные цвета; у каждого экземпляра свой оттенок
   const VAR = {
     house: [0xd8cfbe, 0xc9b79c, 0xb9b3a6, 0xe0d5c0, 0xc4a98a], roof: [0x7e3a2c, 0x4a4f57, 0x6b4a3a, 0x5b4636, 0x8a4a34],
@@ -356,17 +370,17 @@ void main(){
     shed: (w, h) => [[geo.box, 0x79614b, M(0, 30, 0, w, 60, h)], [geo.roof, 0x4c555a, M(0, 60, 0, w + 8, 24, h + 8)],
       [geo.box, 0x40352a, M(0, 24, h / 2 + .6, 38, 48, 1.2)], [geo.box, 0xb8aea0, M(14, 24, h / 2 + 1.4, 2, 3, 1.5)]],
     tree: (w, h, o) => {
-      const k = w / 44, v = o.id % 3, tall = [1, 1.12, .9][v];
+      const k = w / 44 * 1.15, v = o.id % 3, tall = [1, 1.12, .9][v];
       return [[geo.treeWood[v], 0x5a4432, M(0, 0, 0, k, k * tall, k, o.id * .7)],
         ...CROWN[v].map(([x, y, z, sz, c], i) => [geo.clump[(o.id + i) % 3], c, M(x * k, y * k * tall, z * k, sz * k, sz * k, sz * k, i * 1.3 + o.id)])];
     },
-    pine: (w) => { const k = w / 40; return [[geo.cyl6, 0x4a3626, M(0, 8 * k, 0, 2.6 * k, 16 * k, 2.6 * k)], [geo.cone7, 'pine', M(0, 26 * k, 0, 21 * k, 30 * k, 21 * k)], [geo.cone7, 'pine', M(0, 44 * k, 0, 16 * k, 26 * k, 16 * k, .5)], [geo.cone7, 'pine', M(0, 60 * k, 0, 10 * k, 22 * k, 10 * k, 1)], [geo.cone7, 0xe4e9ec, M(0, 66 * k, 0, 5 * k, 10 * k, 5 * k)]]; },
+    pine: (w) => { const k = w / 40; return [[geo.cyl6, 0x4a3626, M(0, 8 * k, 0, 2.6 * k, 16 * k, 2.6 * k)], [geo.cone7, 'pine', M(0, 26 * k, 0, 21 * k, 30 * k, 21 * k)], [geo.cone7, 'pine', M(0, 44 * k, 0, 16 * k, 26 * k, 16 * k, .5)], [geo.cone7, 'pine', M(0, 60 * k, 0, 10 * k, 22 * k, 10 * k, 1)], [geo.cone7, 'pine', M(0, 66 * k, 0, 5 * k, 10 * k, 5 * k)]]; },
     rock: (w) => { const k = w / 36; return [[geo.dod, 'rock', M(0, 5 * k, 0, 18 * k, 12 * k, 15 * k, 0, .2)], [geo.dod, 'rock', M(9 * k, 3 * k, 6 * k, 9 * k, 7 * k, 8 * k, 1)]]; },
     hay: (w) => { const k = w / 30; return [[geo.lay, 0xbfa25a, M(0, 14 * k, 0, 21 * k, 14 * k, 14 * k)]]; },
     cactus: (w) => { const k = w / 26; return [[geo.cyl6, 0x55703a, M(0, 22 * k, 0, 5 * k, 44 * k, 5 * k)], [geo.cyl6, 0x4f6a35, M(7 * k, 20 * k, 0, 3 * k, 6 * k, 3 * k, 0, 1.57)], [geo.cyl6, 0x4f6a35, M(10 * k, 28 * k, 0, 3 * k, 16 * k, 3 * k)],
       [geo.cyl6, 0x4f6a35, M(-6 * k, 16 * k, 0, 3 * k, 5 * k, 3 * k, 0, 1.57)], [geo.cyl6, 0x4f6a35, M(-8.5 * k, 22 * k, 0, 3 * k, 12 * k, 3 * k)]]; },
-    snowman: (w) => { const k = w / 24; return [[geo.dod, 0x76746e, M(0, 5 * k, 0, 12 * k, 9 * k, 11 * k)], [geo.dod, 0xe6eaed, M(0, 8 * k, 0, 11 * k, 6 * k, 10 * k, .4)]]; }, // заснеженный валун
-    igloo: (w) => [[geo.box, 0x6b4a2e, M(0, 13, 0, w * .7, 26, w * .7)], [geo.roof, 0x3e3328, M(0, 26, 0, w * .8, 18, w * .82)], [geo.box, 0xe4e9ec, M(0, 35, 0, w * .76, 1.5, w * .5)], [geo.box, 0x3a2a1c, M(0, 9, w * .35 + .6, 9, 18, 1.2)], [geo.box, 0x2e3a40, M(w * .2, 15, w * .35 + .6, 7, 6, 1.2)]], // бревенчатый домик
+    snowman: (w) => { const k = w / 24; return [[geo.dod, 0x76746e, M(0, 5 * k, 0, 12 * k, 9 * k, 11 * k)], [geo.dod, 0x5e6a3e, M(0, 8 * k, 0, 11 * k, 6 * k, 10 * k, .4)]]; }, // валун со мхом (сезон один — без снега)
+    igloo: (w) => [[geo.box, 0x6b4a2e, M(0, 13, 0, w * .7, 26, w * .7)], [geo.roof, 0x3e3328, M(0, 26, 0, w * .8, 18, w * .82)], [geo.box, 0x2e261e, M(0, 35, 0, w * .76, 1.5, w * .5)], [geo.box, 0x3a2a1c, M(0, 9, w * .35 + .6, 9, 18, 1.2)], [geo.box, 0x2e3a40, M(w * .2, 15, w * .35 + .6, 7, 6, 1.2)]], // бревенчатый домик
     house: (w, h) => [[geo.box, 'house', M(0, 20, 0, w * .75, 40, h * .75)], [geo.roof, 'roof', M(0, 40, 0, w * .86, 26, h * .9)],
       [geo.box, 0x4a3524, M(0, 12, h * .375 + .6, 11, 24, 1.5)], [geo.box, 0xe8e4da, M(w * .22, 25, h * .375 + .5, 13, 12, 1.2)], [geo.box, 0x2b363c, M(w * .22, 25, h * .375 + .8, 10, 9, 1.2)],
       [geo.box, 0xe8e4da, M(-w * .22, 25, h * .375 + .5, 13, 12, 1.2)], [geo.box, 0x2b363c, M(-w * .22, 25, h * .375 + .8, 10, 9, 1.2)], [geo.box, 0x2b363c, M(-w * .375 - .6, 25, 0, 1.2, 9, 12)], [geo.box, 0x7a4a3a, M(w * .2, 58, -h * .15, 7, 16, 7)], [geo.box, 0x6b6b66, M(0, 1.5, h * .375 + 4, 16, 3, 7)]],
@@ -466,7 +480,7 @@ void main(){
       const options = surface === 'crate' && crateTex ? { map: crateTex }
         : surface === 'foliage' ? { map: leafPattern, vertexColors: !!g.attributes.color }
         : surface === 'bark' ? { map: barkPattern, vertexColors: !!g.attributes.color } : g.attributes.color ? { vertexColors: true } : {};
-      const mesh = new T.InstancedMesh(g, worldMat(options), items.length);
+      const mesh = new T.InstancedMesh(g, (surface === 'foliage' ? windMat : worldMat)(options), items.length);
       mesh.frustumCulled = false;
       mesh.castShadow = true;
       mesh.receiveShadow = GROUNDED && surface === 'foliage';
@@ -918,18 +932,25 @@ void main(){
     }
   }
   const streetPlane = new T.PlaneGeometry(1, 1); streetPlane.rotateX(-Math.PI / 2);
+  const roadCap = new T.CircleGeometry(.5, 24); roadCap.rotateX(-Math.PI / 2);
   let streetMeshes = [];
   let streetPlan = null;
   function buildStreets(objs) {
     for (const m of streetMeshes) scene.remove(m); streetMeshes = [];
     const plan = planStreets(objs), paths = []; streetPlan = plan;
     for (const walk of plan.walks) for (let i = 1; i < walk.points.length; i++) paths.push([walk.points[i - 1], walk.points[i]]);
-    const layer = (segments, width, y, tx, color) => {
+    const layer = (segments, width, y, tx, color, caps = true) => {
       const mesh = new T.InstancedMesh(streetPlane, texMat(tx, 48), segments.length);
       segments.forEach(([a, b], i) => { const d = sub(b, a), length = len(d);
-        mesh.setMatrixAt(i, M((a[0] + b[0]) / 2, y, (a[1] + b[1]) / 2, width, 1, length + (tx === 'asphalt' || width === 56 ? width : 2), Math.atan2(d[0], d[1])));
+        mesh.setMatrixAt(i, M((a[0] + b[0]) / 2, y, (a[1] + b[1]) / 2, width, 1, length + (caps ? 0 : 2), Math.atan2(d[0], d[1])));
         mesh.setColorAt(i, new T.Color(color)); });
       mesh.receiveShadow = true; mesh.frustumCulled = false; scene.add(mesh); streetMeshes.push(mesh);
+      if (!caps) return;
+      // круглые «шайбы» в узлах: стыки и повороты дорог гладкие, без торчащих углов прямоугольников
+      const nodes = new Map(); for (const [a, b] of segments) for (const q of [a, b]) nodes.set(Math.round(q[0]) + ',' + Math.round(q[1]), q);
+      const cm = new T.InstancedMesh(roadCap, texMat(tx, 48), nodes.size); let i = 0;
+      for (const q of nodes.values()) { cm.setMatrixAt(i, M(q[0], y, q[1], width, 1, width)); cm.setColorAt(i++, new T.Color(color)); }
+      cm.receiveShadow = true; cm.frustumCulled = false; scene.add(cm); streetMeshes.push(cm);
     };
     layer(plan.roads, 56, .04, 'paving', 0x8e8a7b);
     layer(plan.roads, 50, .08, 'asphalt', 0x565b62);
@@ -940,7 +961,7 @@ void main(){
       const dir = norm(sub(b, a));
       for (let t = 37; t + 18 < length - 37; t += 45) dashes.push([add(a, dir, t), add(a, dir, t + 18)]);
     }
-    layer(dashes, 2.1, .12, 'asphaltMark', 0xb7ad91);
+    layer(dashes, 2.1, .12, 'asphaltMark', 0xb7ad91, false);
     layer(paths, 28, .16, 'paving', 0xb1a995);
     if (GROUNDED) buildVergeGrass(objs, plan.roads, paths);
 
@@ -970,6 +991,7 @@ void main(){
       const t = Math.min(1, Math.max(0, dot(delta, ab) / Math.max(1, dot(ab, ab))));
       return dist(p, add(a, ab, t)) < radius;
     }) && bldAt(objs.blds, p) < 0 && !nearObjs(objs, p, 7).some(o => !o.nc && objPush(o, p, 7));
+    const paved = BIOMES.filter(b => b.n === 'city' || b.n === 'market' || b.n === 'base'), onPave = q => paved.some(b => dist(q, b.c) < b.r * 1.02);
     const tufts = [], spacing = lowEnd ? 80 : 52, cap = lowEnd ? 3200 : 5000;
     const colors = [0x8a8a50, 0x9a8a4e, 0x74844a, 0xae9a5e, 0x6e7a44];
     for (const [i, [a, b]] of roads.entries()) {
@@ -977,7 +999,7 @@ void main(){
       for (let t = 17; t < length - 15 && tufts.length < cap; t += spacing) {
         const id = i * 100 + Math.floor(t);
         const p = add(add(a, dir, t + rh(id, 6) * 8), n, (rh(id, 8) < .5 ? -1 : 1) * (32 + rh(id, 10) * 19));
-        if (!clear(p)) continue;
+        if (!clear(p) || onPave(p)) continue;
         for (let k = 0; k < 3 && tufts.length < cap; k++) {
           const q = add(add(p, dir, (k - 1) * 6), n, (rh(id, 11 + k) - .5) * 7);
           if (!clear(q)) continue;
@@ -989,9 +1011,9 @@ void main(){
     }
     // у стволов деревьев и кустов — по паре пучков
     for (const o of objs) { if (tufts.length >= cap * .55) break; if (o.type !== 'tree' && o.type !== 'bush' && o.type !== 'deadtree') continue;
-      for (let k = 0; k < 3; k++) { const a = rh(o.id, 30 + k) * 6.28, q = add(o.p, [Math.cos(a), Math.sin(a)], o.w * (.35 + rh(o.id, 33 + k) * .4)); if (clear(q)) tufts.push([M(q[0], .12, q[1], 1.7, 1 + rh(o.id, 36 + k) * .6, 1.7, a), colors[(o.id + k) % colors.length]]); } }
+      for (let k = 0; k < 3; k++) { const a = rh(o.id, 30 + k) * 6.28, q = add(o.p, [Math.cos(a), Math.sin(a)], o.w * (.35 + rh(o.id, 33 + k) * .4)); if (clear(q) && !onPave(q)) tufts.push([M(q[0], .12, q[1], 1.7, 1 + rh(o.id, 36 + k) * .6, 1.7, a), colors[(o.id + k) % colors.length]]); } }
     // поле: разбросанные пучки на траве (не в городе, на рынке, базе, в снегу и пустыне)
-    { const r2 = mkRng(555), noGrass = BIOMES.filter(b => b.n !== 'farm');
+    { const r2 = mkRng(555), noGrass = BIOMES.filter(b => b.n !== 'farm' && b.n !== 'snow');
       for (let i = 0; i < cap * 3 && tufts.length < cap; i++) { const q = rndMap(r2, 80); if (noGrass.some(b => dist(q, b.c) < b.r * .95)) continue; if (!clear(q)) continue;
         const n = 2 + Math.floor(r2() * 4); for (let k = 0; k < n && tufts.length < cap; k++) { const qq = add(q, [(r2() - .5) * 26, (r2() - .5) * 26]); tufts.push([M(qq[0], .12, qq[1], 1.5 + r2() * .9, .9 + r2() * .8, 1.5 + r2() * .9, r2() * 6.28), colors[Math.floor(r2() * colors.length)]]); } } }
     if (!tufts.length) return;
@@ -1107,6 +1129,7 @@ void main(){
     for (const o of objs) { const wk = wreckOf(o);
       if (wk >= 2) { dec.push([o.p[0], o.p[1], 90 + R() * 30, 'scorch', 0x16100c, .7, R() * 6.28, 1]); if (rh(o.id, 12) < .45) { fireSpots.push({ p: o.p, h: wk === 3 ? 34 : 38, n: 3, s: 1.1, id: o.id }); plumeSrc.push({ p: o.p, big: 1, seed: R(), id: o.id }); } }
       else if (o.type === 'barrel' && rh(o.id, 13) < .3) fireSpots.push({ p: o.p, h: 24, n: 2, s: .8, id: o.id }); }
+    for (const o of objs) if (o.type === 'tree' && rh(o.id, 1) >= .38) dec.push([o.p[0] + (R() - .5) * 8, o.p[1] + (R() - .5) * 8, o.w * (1.5 + R() * .6), 'b2', [0x6a5a2a, 0x7a5a26, 0x5a5228][o.id % 3], .32, R() * 6.28, 1]); // опавшая листва
     // подпалины и мусор по всей карте
     for (let i = 0; i < 160; i++) { const p = rndMap(rnd, 120); if (bldAt(Bl, p) >= 0) continue; if (R() < .5) dec.push([p[0], p[1], 40 + R() * 90, 'scorch', 0x16100c, .45, R() * 6.28, 1]); else if (okAt(p, 5)) junk(p); }
     for (const k in KIND) { const L = items[k]; if (!L.length) continue; const mesh = new T.InstancedMesh(KIND[k][0], worldMat(), L.length); mesh.frustumCulled = false; mesh.receiveShadow = true;
