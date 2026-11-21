@@ -32,7 +32,7 @@ $('go').onclick = () => { send({ t: 'start' }); audioInit(); };
 const setSkin = d => { mySkin = (mySkin + d + ZSKIN) % ZSKIN; localStorage.setItem('zskin', mySkin); };
 $('skp').onclick = () => setSkin(-1); $('skn').onclick = () => setSkin(1);
 $('leave').onclick = () => leaveRoom();
-$('share').onclick = () => { const url = location.origin + '/?r=' + roomCode; if (navigator.share) navigator.share({ title: 'LAST EXIT', text: 'Заходи отбиваться от зомби!', url }).catch(() => { }); else { navigator.clipboard && navigator.clipboard.writeText(url); $('share').textContent = '✔ Ссылка скопирована'; } };
+$('share').onclick = () => { const url = location.origin + '/?r=' + roomCode; if (navigator.share) navigator.share({ title: 'LAST EXIT', text: 'Заходи отбиваться от налётчиков!', url }).catch(() => { }); else { navigator.clipboard && navigator.clipboard.writeText(url); $('share').textContent = '✔ Ссылка скопирована'; } };
 function connect(code) {
   localStorage.setItem('zname', myName()); audioInit(); $('err').textContent = '';
   if (ws) { ws.onclose = null; ws.close(); }
@@ -277,7 +277,10 @@ function loop(now) {
     for (const [id, zb] of S.b.z) { const za = S.a.z.get(id) || zb, p = lerp(za.p, zb.p, S.k);
       let z = zst.get(id); if (!z) { z = Object.assign({ id, p, lp: p, walk: Math.random() * 6, yaw: Math.atan2(meP[0] - p[0], meP[1] - p[1]), flash: 0 }, ZFX.look(id, zb.ty)); zst.set(id, z); }
       const d = dist(p, z.lp); z.walk += d * .12 / ZT[zb.ty].sc; if (d > .2) { const ty = Math.atan2(p[0] - z.lp[0], p[1] - z.lp[1]); let dy = ty - z.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); z.yaw += dy * .2; }
-      z.lp = p; z.p = p; z.ty = zb.ty; z.lost = zb.lost; z.fl = zb.fl; z.hp = zb.hp; z.flash = Math.max(0, z.flash - dt * 6); z.kick = Math.max(0, (z.kick || 0) - dt * 7);
+      z.lp = p; z.p = p; z.ty = zb.ty; z.lost = zb.lost; z.fl = zb.fl;
+      const facingBack = zb.ty === 1 && raiderBackKick(id) && !(zb.lost & 4) && (zb.fl & 1);
+      z.backTurn = Math.max(0, Math.min(1, (z.backTurn || 0) + (facingBack ? 5 : -5) * dt));
+      z.hp = zb.hp; z.flash = Math.max(0, z.flash - dt * 6); z.kick = Math.max(0, (z.kick || 0) - dt * 7);
       if (zb.hp < .5 && Math.random() < dt * 2) ZFX.decal(p, 5 + Math.random() * 5, 'drop', 0x6e0000, .8); // раненый оставляет кровавый след
       if (zb.lost & 4 && Math.random() < dt * 8) ZFX.decal(p, 9, 'drop', 0x5e0000, .5);
       if (zb.fl & 2 && Math.random() < dt * 10) ZFX.flame(p, [0, 0], 1);
@@ -348,7 +351,7 @@ function hud(now, dt, cur, meS, plist, zl) {
     else { const cx = W_ / 2, cy = H_ / 2 + 15, dx = x - cx, dy = y - cy, k = Math.min((W_ / 2 - 30) / Math.max(1, Math.abs(dx)), (H_ / 2 - 70) / Math.max(1, Math.abs(dy))), ex = cx + dx * k, ey = cy + dy * k, a = Math.atan2(dy, dx);
       ctx.save(); ctx.translate(ex, ey); ctx.rotate(a); const pu = 1 + .15 * Math.sin(now / 150); ctx.scale(pu, pu); ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-8, -11); ctx.lineTo(-3, 0); ctx.lineTo(-8, 11); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
       txt(Math.round(dist(z.p, meP) * .036) + ' м', ex - Math.cos(a) * 26, ey - Math.sin(a) * 26 + 5, 12, '#ffb3b3'); } }
-  const s = cur.phase === 1 ? 'ВОЛНА ' + cur.wave + '  ·  🧟 ' + cur.left + (cur.left <= 5 ? ' — ищи по красным стрелкам' : '') : cur.wave ? 'Перерыв · следующая волна через ' + Math.ceil(cur.timer) + ' с' : 'Приготовьтесь… ' + Math.ceil(cur.timer);
+  const s = cur.phase === 1 ? 'ВОЛНА ' + cur.wave + '  ·  Враги: ' + cur.left + (cur.left <= 5 ? ' — ищи по красным стрелкам' : '') : cur.wave ? 'Перерыв · следующая волна через ' + Math.ceil(cur.timer) + ' с' : 'Приготовьтесь… ' + Math.ceil(cur.timer);
   txt(s, W_ / 2, 30, 18, '#fff');
   if (bigMsg && now - bigMsg.t < 2600) { ctx.globalAlpha = Math.min(1, (2600 - (now - bigMsg.t)) / 500); txt(bigMsg.s, W_ / 2, H_ * .3, Math.min(54, W_ / 12), bigMsg.c || '#ff4b4b', 'center', 900); ctx.globalAlpha = 1; }
   msgs = msgs.filter(m => now - m.t < 5000); msgs.filter(m => m.t <= now).slice(-5).forEach((m, i) => txt(m.s, W_ / 2, 56 + i * 22, 15, m.c || '#ffe3e3'));
@@ -375,9 +378,9 @@ function hud(now, dt, cur, meS, plist, zl) {
   if (touchUI) for (const k of ['L', 'R']) { const st = sticks[k]; if (!st) continue; ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(st.o[0], st.o[1], 60, 0, 7); ctx.stroke(); const d = sub(st.p, st.o), l = Math.min(60, len(d)), q = l > 0 ? add(st.o, norm(d), l) : st.o; ctx.fillStyle = k === 'R' ? 'rgba(255,80,80,.5)' : 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.arc(q[0], q[1], 24, 0, 7); ctx.fill(); }
   if (touchUI && !sticks.L && !sticks.R && now - startedT < 9000) txt('левый палец — бежать, правый — целиться и стрелять', W_ / 2, H_ - 14, 13, 'rgba(255,255,255,.7)');
   const xb = { x: W_ - 44, y: 10, w: 34, h: 34, f: () => { if (confirm('Выйти из игры?')) leaveRoom(); } }; btns.push(xb); ctx.fillStyle = 'rgba(0,0,0,.5)'; rr(xb.x, xb.y, xb.w, xb.h, 8); ctx.fill(); txt('✕', xb.x + 17, xb.y + 24, 18, '#fff');
-  if (location.hash === '#perf') txt(Math.round(fps) + ' fps · 🧟 ' + zst.size, 10, 20, 12, '#0f0', 'left');
+  if (location.hash === '#perf') txt(Math.round(fps) + ' fps · враги: ' + zst.size, 10, 20, 12, '#0f0', 'left');
   if (overInfo) { ctx.fillStyle = 'rgba(10,0,0,.8)'; ctx.fillRect(0, 0, W_, H_); txt('ВСЕ ПАЛИ', W_ / 2, H_ * .28, 48, '#ff3b3b', 'center', 900);
-    txt('Дошли до волны ' + overInfo.w + (overInfo.cyc ? ' (круг ' + (overInfo.cyc + 1) + ')' : '') + ' · убито зомби: ' + overInfo.kills, W_ / 2, H_ * .28 + 40, 18, '#fff');
+    txt('Дошли до волны ' + overInfo.w + (overInfo.cyc ? ' (круг ' + (overInfo.cyc + 1) + ')' : '') + ' · побеждено: ' + overInfo.kills, W_ / 2, H_ * .28 + 40, 18, '#fff');
     overInfo.pl.forEach(([n, k, l], i) => txt(n + ' — ' + k + ' убийств, ур. ' + l, W_ / 2, H_ * .28 + 80 + i * 24, 15, '#e0c0c0'));
     txt('🏆 рекорд: волна ' + (+(localStorage.getItem('zbest') || 0)), W_ / 2, H_ * .28 + 190, 15, '#ffd43b'); txt('Возврат в комнату…', W_ / 2, H_ * .28 + 220, 13, '#aaa'); }
 }

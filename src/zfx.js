@@ -53,21 +53,18 @@ const ZFX = (() => {
   function flame(from, d, end) { for (let i = 0; i < 2; i++) sprite(add(from, d, Math.random() * end), 18, 6, 22, .35, Math.random() < .5 ? 0xff8a20 : 0xffd040, [d[0] * 120, 20, d[1] * 120]); }
   function boom(c, r = 100) { G3.boom(c, r); decal(c, r * 1.2, 'scorch', 0x16100c, .85); spray(c, 10, [1, 0], 30, 160, 2.4); }
   // ===== зомби =====
-  const ZN = 400, PART = ['legL', 'legR', 'torso', 'head', 'armL', 'armR', 'eyes', 'jaw', 'stain', 'hair', 'brow', 'nose', 'ears', 'wound'], PG = {
-    legL: [new T.CylinderGeometry(.5, .43, 1, 6).scale(5.2, 16, 5.4).translate(0, -8, 0), [-3.3, 16, 0]], legR: [new T.CylinderGeometry(.5, .43, 1, 6).scale(5.2, 16, 5.4).translate(0, -8, 0), [3.3, 16, 0]],
-    torso: [new T.CylinderGeometry(.5, .43, 1, 6).scale(13.5, 16, 8.5).translate(0, 8, 0), [0, 15, 0]], head: [new T.SphereGeometry(1, 8, 6).scale(4.5, 4.8, 4.5).translate(0, 4.5, 0), [0, 30, 2]],
-    armL: [new T.CylinderGeometry(.5, .43, 1, 6).scale(4.2, 15, 4.2).translate(0, -7, 0), [-8.8, 29, 0]], armR: [new T.CylinderGeometry(.5, .43, 1, 6).scale(4.2, 15, 4.2).translate(0, -7, 0), [8.8, 29, 0]],
-    eyes: [new T.BoxGeometry(7.4, 2.2, .8).translate(0, 5.4, 4.8), [0, 30, 2]], stain: [new T.BoxGeometry(9, 8, .8).translate(1, 7, 4.4), [0, 15, 0]], jaw: [new T.BoxGeometry(7, 2.6, 2).translate(0, 1.2, 4.4), [0, 30, 2]],
-    hair: [new T.BoxGeometry(9.2, 2.4, 9.4).translate(0, 9.4, -.5), [0, 30, 2]], brow: [new T.BoxGeometry(8.2, 1.5, 1.6).translate(0, 7.1, 4.5), [0, 30, 2]], nose: [new T.BoxGeometry(1.6, 2.4, 1.6).translate(0, 4, 5), [0, 30, 2]],
-    ears: [new T.BoxGeometry(10.4, 3, 1.8).translate(0, 4.8, 0), [0, 30, 2]], wound: [new T.BoxGeometry(.7, 3.6, 3.8).translate(4.4, 5.4, 1), [0, 30, 2]] }; // голова: волосы клочьями, надбровья, нос, уши, рана
-  const ZM = {}; for (const k of PART) { const m = new T.InstancedMesh(PG[k][0], k === 'eyes' ? new T.MeshBasicMaterial({ color: 0xffffff }) : MAT(0xffffff), ZN); m.frustumCulled = false; m.castShadow = k === 'torso'; m.setColorAt(0, new T.Color()); m.count = 0; scene.add(m); ZM[k] = m; }
+  const ZN = 400;
   const zShadow = new T.InstancedMesh(new T.CircleGeometry(1, 12).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0, transparent: true, opacity: .28, depthWrite: false }), ZN); zShadow.frustumCulled = false; scene.add(zShadow);
   const base = new T.Matrix4(), loc = new T.Matrix4(), tmp = new T.Matrix4(), C = new T.Color(), WHITE = new T.Color(1, 1, 1), FIRE = new T.Color(1, .45, .1), ICE = new T.Color(.6, .85, 1);
-  const HAIR = [0x2a1e16, 0x4a3424, 0x1a1a1a, 0x6a5a40, 0x8a8a84, 0x5a2a14];
-  // одежда — как у горожан, только грязная и в крови
-  const SHIRT = [0x6a2c2c, 0x2c4468, 0x46602e, 0x5e523a, 0x523a5e, 0x7e735a, 0x2c2c2c, 0x6a5020, 0x385252, 0x8a8478], PANTS = [0x23283a, 0x3a2e20, 0x2c3a48, 0x1e1e1e, 0x46382a], SKIN = [0x5d7350, 0x67765a, 0x536649, 0x6f7058, 0x5f6a55, 0x77806a];
-  const SPEC = { 2: [0x6a5a48, 0x3a3020], 4: [0x2f2f36, 0x22222a], 5: [0x3a1a1a, 0x201010] }; // толстяк, громила, босс — своя одежда
-  function look(id, ty) { const h = n => ((id * 9301 + n * 49297) % 233280) / 233280; const sp = SPEC[ty]; return { skin: SKIN[Math.floor(h(1) * SKIN.length)], shirt: sp ? sp[0] : SHIRT[Math.floor(h(2) * SHIRT.length)], pants: sp ? sp[1] : PANTS[Math.floor(h(3) * PANTS.length)], seed: h(4) * 6, hair: HAIR[Math.floor(h(5) * HAIR.length)], bald: h(6) < .3 || ty === 4, wnd: h(7) < .55 }; }
+  const STREET_LOOKS = [
+    { skin: 0xb98162, shirt: 0xef5658, pants: 0x4b76a5, hair: 0x41c7ef, shorts: true, open: true },
+    { skin: 0xd49c82, shirt: 0xe9edf4, pants: 0x3a6a9a, hair: 0xff5ba9, shorts: true, crop: true, unicorn: true },
+    { skin: 0x815740, shirt: 0x79da57, pants: 0x36638d, hair: 0x9a6ee9, crop: true },
+    { skin: 0xc38c68, shirt: 0xffb039, pants: 0x416b98, hair: 0x29b8bc, open: true }
+  ];
+  function look(id) {
+    return { ...STREET_LOOKS[(id - 1 + Math.floor((id - 1) / STREET_LOOKS.length)) % STREET_LOOKS.length], seed: ((id * 9301) % 233280) / 38880 };
+  }
   // Бегун: округлый костюм и маска, два пакета инстансов на всех налётчиков.
   const RAIDER = 1, STANDARD_BEARER = 2, ENFORCER = 4;
   const raiderGeo = new T.SphereGeometry(1, 8, 6);
@@ -84,8 +81,8 @@ const ZFX = (() => {
   }
   const limb = new T.Vector3(), limbUp = new T.Vector3(0, 1, 0);
   let suitCount = 0, markCount = 0;
-  function enemyPart(mesh, i, color, x, y, z, sx, sy, sz, rx = 0, rz = 0) {
-    loc.compose(V3.set(x, y, z), Q.setFromEuler(E.set(rx, 0, rz)), S3.set(sx, sy, sz));
+  function enemyPart(mesh, i, color, x, y, z, sx, sy, sz, rx = 0, rz = 0, ry = 0) {
+    loc.compose(V3.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz)), S3.set(sx, sy, sz));
     mesh.setMatrixAt(i, tmp.multiplyMatrices(base, loc));
     mesh.setColorAt(i, color);
   }
@@ -108,9 +105,11 @@ const ZFX = (() => {
     const fall = z.fall || 0, noLegs = z.lost & 4, phase = z.walk / (Math.PI * 2);
     const air = z.fl & 4 ? 10 * Math.abs(Math.sin(t * 6)) : 0;
     const lunge = z.fl & 1 ? .5 + .5 * Math.sin(t * 16) : 0;
-    const height = noLegs ? 9 : 19 + Math.cos(z.walk * 2) * .8 - lunge * 2;
+    const turn = fall ? 0 : (z.backTurn || 0);
+    const kick = Math.max(0, turn * 2 - 1);
+    const height = noLegs ? 9 : 19 + Math.cos(z.walk * 2) * .8 - lunge * 2 + kick * 3;
     const recoil = (z.kick || 0) * .2;
-    base.compose(V3.set(z.p[0], air, z.p[1]), Q.setFromEuler(E.set(0, z.yaw, 0)), S3.setScalar(sc));
+    base.compose(V3.set(z.p[0], air, z.p[1]), Q.setFromEuler(E.set(0, z.yaw + Math.PI * turn, 0)), S3.setScalar(sc));
     if (fall) {
       base.multiply(tmp.makeTranslation(0, 6, 0));
       base.multiply(tmp.makeRotationZ(fall * Math.PI / 2));
@@ -121,8 +120,8 @@ const ZFX = (() => {
     enemyPart(raiderMarks, markCount++, enemyColor(0xe88757, z, t), 0, height + 5.2, 6, 5.3, 1.4, 6.5);
     if (!(z.lost & 16)) {
       const headZ = 16 + lunge * 3;
-      enemyPart(suit, suitCount++, enemyColor(0x625770, z, t), 0, height + 1, headZ, 4.8, 5.8, 5.4, recoil);
-      enemyPart(raiderMarks, markCount++, enemyColor(0xf2af68, z, t), 0, height + 2.5, headZ + 4.7, 3.9, 1.35, 1.2);
+      enemyPart(suit, suitCount++, enemyColor(0x625770, z, t), turn * 2.8, height + 1, headZ - turn * 3, 4.8, 5.8, 5.4, recoil, 0, turn * 1.25);
+      enemyPart(raiderMarks, markCount++, enemyColor(0xf2af68, z, t), turn * 6.7, height + 2.5, headZ + 4.7 - turn * 6, 3.9, 1.35, 1.2, 0, 0, turn * 1.25);
     }
     enemyColor(0x594e64, z, t);
     for (const side of [-1, 1]) {
@@ -134,8 +133,8 @@ const ZFX = (() => {
         const swing = Math.max(0, (step - .58) / .42);
         const stride = step < .58 ? 1 - 2 * step / .58 : -Math.cos(swing * Math.PI);
         const lift = Math.sin(swing * Math.PI) * 7;
-        const jointZ = front ? 11 : -10, endZ = jointZ + stride * 12 + (front ? 3 : -1);
-        const endY = fall ? height - 4 : 2 + lift;
+        const jointZ = front ? 11 : -10, endZ = jointZ + stride * 12 + (front ? 3 : -1) - (front ? 0 : kick * 12);
+        const endY = fall ? height - 4 : 2 + lift * (1 - turn) + (front ? 0 : kick * 13);
         const jointY = height - (front ? 1 : 2);
         const bendY = (jointY + endY) / 2 + (front ? 2 : 5);
         const bendZ = (jointZ + endZ) / 2 + (front ? -4 : 6);
@@ -254,43 +253,95 @@ const ZFX = (() => {
       enemyPart(suit, suitCount++, enemyColor(LEATHER, z, t), side * 11.9, 18.5 + bob + punch * 8, 7 + motion * 4 + punch * 8, 3.2, 3.6, 3.6);
     }
   }
+  const printCanvas = document.createElement('canvas');
+  printCanvas.width = printCanvas.height = 32;
+  const ink = printCanvas.getContext('2d');
+  // Голова единорога и розовая грива. Крупный принт читается с игровой камеры.
+  ink.fillStyle = '#ec4f9f';
+  ink.beginPath();
+  ink.ellipse(15, 20, 10, 11, -.32, 0, Math.PI * 2);
+  ink.fill();
+  ink.fillStyle = '#eefaff';
+  ink.beginPath();
+  for (const [x, y] of [[9, 28], [12, 13], [16, 7], [18, 13], [23, 15], [29, 23], [25, 27], [18, 24], [18, 30]]) ink.lineTo(x, y);
+  ink.closePath();
+  ink.fill();
+  ink.fillStyle = '#f3b53a';
+  ink.beginPath(); ink.moveTo(20, 14); ink.lineTo(25, 2); ink.lineTo(26, 17); ink.fill();
+  ink.fillStyle = '#4b4269'; ink.fillRect(20, 17, 3, 3);
+  const prints = new T.InstancedMesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({
+    map: new T.CanvasTexture(printCanvas), alphaTest: .3, side: T.DoubleSide
+  }), ZN * 2);
+  prints.setColorAt(0, WHITE);
+  prints.count = 0;
+  prints.frustumCulled = false;
+  scene.add(prints);
+  let printCount = 0;
+
+  function drawStreetRaider(z, sc, t, fall) {
+    const crawl = z.lost & 4, stride = Math.sin(z.walk * .85);
+    const attack = z.fl & 1 ? .5 + .5 * Math.sin(t * 14) : 0;
+    const air = z.fl & 4 ? 8 * Math.abs(Math.sin(t * 6)) : 0;
+    const lean = .13 + attack * .24 - (z.kick || 0) * .35;
+    const bob = Math.abs(stride);
+    base.compose(V3.set(z.p[0], air, z.p[1]), Q.setFromEuler(E.set(0, z.yaw, 0)), S3.setScalar(sc));
+    if (fall) base.multiply(tmp.makeRotationX(-fall * 1.48));
+    else if (crawl) base.multiply(tmp.makeRotationX(1.35)).multiply(tmp.makeTranslation(0, -18, -8));
+
+    if (z.open || z.crop) enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), 0, 26 + bob, 1, 5.8, 7, 4.4, lean);
+    if (z.open) {
+      for (const side of [-1, 1]) enemyPart(suit, suitCount++, enemyColor(z.shirt, z, t), side * 3.7, 29 + bob, .3, 3.6, 8, 4.7, lean, side * .08);
+    } else {
+      enemyPart(suit, suitCount++, enemyColor(z.shirt, z, t), 0, 29.5 + bob, 1.3, 6.8, z.crop ? 5.2 : 8.4, 4.55, lean);
+      if (z.unicorn) {
+        enemyPart(prints, printCount++, enemyColor(0xffffff, z, t), 0, 30 + bob, 5.85, 6, 6, 1, lean);
+        enemyPart(prints, printCount++, enemyColor(0xffffff, z, t), 0, 31 + bob, -3.4, 6, 6, 1, -lean, 0, Math.PI);
+      }
+    }
+    enemyPart(suit, suitCount++, enemyColor(z.pants, z, t), 0, 20, 0, 6.4, 3.9, 4.6);
+    if (!(z.lost & 16)) {
+      enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), 0, 38 + bob, 2.4, 4.15, 4.75, 4.25, lean);
+      enemyPart(suit, suitCount++, enemyColor(z.hair, z, t), -.65, 40.7 + bob, 2.15, 4.55, 3.1, 4.5, lean, .29);
+      enemyPart(raiderMarks, markCount++, enemyColor(0x523d39, z, t), 0, 38.7 + bob, 6.48, 2.7, .57, .44);
+    }
+    for (const side of [-1, 1]) {
+      const step = stride * side, lift = Math.max(0, step) * 2.5;
+      if (!crawl) {
+        enemyPart(suit, suitCount++, enemyColor(z.pants, z, t), side * 3.4, 15.5 + lift, step * 4, 3.3, z.shorts ? 5 : 7, 3.4, step * .4);
+        const shin = z.shorts ? enforcerSkin : suit;
+        const shinIndex = z.shorts ? enforcerSkinCount++ : suitCount++;
+        enemyPart(shin, shinIndex, enemyColor(z.shorts ? z.skin : z.pants, z, t), side * 3.85, 7.6 + lift, step * 5.4, 2.4, 5.7, 2.5, -step * .13);
+        enemyPart(suit, suitCount++, enemyColor(z.shorts ? 0xe1e7f2 : 0x322936, z, t), side * 4, 2.8 + lift, 1.6 + step * 6, 2.8, 2.6, 4.1);
+      }
+      if (z.lost & (side < 0 ? 1 : 2)) continue;
+      const reach = attack * (side === 1 ? 1 : .45);
+      enemyPart(suit, suitCount++, enemyColor(z.shirt, z, t), side * 7, 31 + bob, 1, 2.75, 3.55, 2.75, .2 * step, side * .2);
+      enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), side * 8.2, 26 + bob + reach * 3, 2 - step * 2.3 + reach * 2.5, 2.05, 5.4, 2.3, -.19 + step * .5 - reach);
+      enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), side * 8.35, 21.7 + bob + reach * 6, 3 - step * 4.8 + reach * 6, 1.85, 4.1, 2.1, -.38 + step * .45 - reach);
+    }
+  }
   function draw(list, now) {
-    let n = 0, shadowCount = 0; const t = now / 1000;
-    suitCount = markCount = bannerCount = enforcerSkinCount = 0;
+    let shadowCount = 0;
+    const t = now / 1000;
+    suitCount = markCount = bannerCount = enforcerSkinCount = printCount = 0;
     for (const z of list) {
-      if (shadowCount >= ZN) break; const Tz = ZT[z.ty], sc = Tz.sc, crawl = z.lost & 4, ph = z.walk, sw = Math.sin(ph), att = z.fl & 1, air = z.fl & 4 ? 1 : 0, fall = z.fall || 0;
+      if (shadowCount >= ZN) break;
+      const Tz = ZT[z.ty], sc = Tz.sc, fall = z.fall || 0;
       zShadow.setMatrixAt(shadowCount++, M4.compose(V3.set(z.p[0], .6, z.p[1]),
         Q.setFromEuler(E.set(0, z.ty === RAIDER ? z.yaw : 0, 0)),
         S3.set(Tz.r * 1.1, 1, Tz.r * (z.ty === RAIDER ? 2 : 1.1))));
-      if (z.ty === RAIDER) { drawRaider(z, sc, t); continue; }
-      if (z.ty === STANDARD_BEARER) { drawStandardBearer(z, sc, t, fall); continue; }
-      if (z.ty === ENFORCER) { drawEnforcer(z, sc, t, fall); continue; }
-      base.compose(V3.set(z.p[0], (crawl ? 2 : 0) + air * 10 * Math.abs(Math.sin(t * 6)), z.p[1]), Q.setFromEuler(E.set(0, z.yaw, 0)), S3.set(sc, sc, sc));
-      if (fall) base.multiply(tmp.makeRotationX(-(1 - Math.pow(1 - fall, 3)) * 1.5));
-      else if (crawl) base.multiply(tmp.makeRotationX(1.35)).multiply(tmp.makeTranslation(0, -14, -8));
-      const flash = Math.max(0, z.flash || 0), burn = z.fl & 2;
-      for (const k of PART) {
-        const m = ZM[k], j = PG[k][1]; let rx = 0, rz = 0, hide = false;
-        if (k === 'legL' || k === 'legR') { rx = (k === 'legL' ? sw : -sw) * .6 * (crawl ? .2 : 1) * (fall ? 0 : 1) + (fall ? .3 * fall : 0); hide = crawl; }
-        else if (k === 'armL') { rx = fall ? -1.2 - fall : -1.45 + (att ? Math.sin(t * 14) * .5 : Math.sin(ph * .5) * .12) + air * -.4; rz = -.1; hide = z.lost & 1; }
-        else if (k === 'armR') { rx = fall ? -1.4 - fall : -1.45 + (att ? Math.cos(t * 14) * .5 : Math.cos(ph * .5) * .12) + air * -.4; rz = .1; hide = z.lost & 2; }
-        else if (k === 'torso' || k === 'stain') { rx = .3 + (att ? .15 : 0) + ZT[z.ty].sc * .03 - (z.kick || 0) * .6; rz = Math.sin(ph * .5) * .08; }
-        else { rx = .25 - (z.kick || 0) * .7 + (att && k === 'jaw' ? Math.abs(Math.sin(t * 12)) * .4 : 0); rz = Math.sin(t * 2 + (z.seed || 0)) * .25; hide = (z.lost & 16) || (k === 'hair' && z.bald) || (k === 'wound' && !z.wnd); }
-        if (hide) loc.copy(ZERO); else { loc.makeTranslation(j[0], j[1], j[2]); loc.multiply(tmp.makeRotationFromEuler(E.set(rx, 0, rz))); }
-        m.setMatrixAt(n, tmp.multiplyMatrices(base, loc));
-        if (k === 'eyes') C.setHex(z.ty === 5 ? 0xff2020 : z.ty === 4 ? 0xff6a20 : 0xffe060); else if (k === 'stain' || k === 'wound') C.setHex(k === 'wound' ? 0x6a0808 : 0x4a0606); else if (k === 'hair') C.setHex(z.hair || 0x2a1e16); else if (k === 'brow' || k === 'nose' || k === 'ears') { C.setHex(z.skin); C.multiplyScalar(k === 'brow' ? .62 : .88); } else C.setHex(k === 'head' || k === 'armL' || k === 'armR' || k === 'jaw' ? (k === 'jaw' ? 0x3a0c0c : z.skin) : k === 'torso' ? z.shirt : z.pants);
-        if (burn) C.lerp(FIRE, .35 + .2 * Math.sin(t * 20 + (z.seed || 0))); if (z.fl & 8 && k !== 'eyes') C.lerp(ICE, .6); if (flash > 0) C.lerp(WHITE, flash); if (fall > .8 && k !== 'eyes') C.multiplyScalar(.85);
-        m.setColorAt(n, C);
-      }
-      n++;
+      if (z.ty === RAIDER) drawRaider(z, sc, t);
+      else if (z.ty === STANDARD_BEARER) drawStandardBearer(z, sc, t, fall);
+      else if (z.ty === ENFORCER || Tz.boss) drawEnforcer(z, sc, t, fall);
+      else drawStreetRaider(z, sc, t, fall);
     }
-    for (const k of PART) { ZM[k].count = n; ZM[k].instanceMatrix.needsUpdate = true; if (ZM[k].instanceColor) ZM[k].instanceColor.needsUpdate = true; }
     zShadow.count = shadowCount; zShadow.instanceMatrix.needsUpdate = true;
     suit.count = suitCount;
     raiderMarks.count = markCount;
     banners.count = bannerCount;
     enforcerSkin.count = enforcerSkinCount;
-    for (const mesh of [suit, raiderMarks, banners, enforcerSkin]) {
+    prints.count = printCount;
+    for (const mesh of [suit, raiderMarks, banners, enforcerSkin, prints]) {
       if (!mesh.count) continue;
       mesh.instanceMatrix.updateRange.count = mesh.count * 16;
       mesh.instanceColor.updateRange.count = mesh.count * 3;
@@ -303,12 +354,12 @@ const ZFX = (() => {
   const dying = [];
   function kill(p, d, g, ty, lost, z) {
     const sc = ZT[ty].sc;
-    const L = ty === RAIDER ? { skin: 0x625770, shirt: 0x625472 } : ty === STANDARD_BEARER ? { skin: 0xbb8970, shirt: 0x713343 } : ty === ENFORCER ? { skin: enforcerTone(z?.seed), shirt: LEATHER } : z || look(Math.floor(Math.random() * 999), ty);
+    const L = ty === RAIDER ? { skin: 0x625770, shirt: 0x625472 } : ty === STANDARD_BEARER ? { skin: 0xbb8970, shirt: 0x713343 } : (ty === ENFORCER || ZT[ty].boss) ? { skin: enforcerTone(z?.seed), shirt: LEATHER } : z || look(Math.floor(Math.random() * 999), ty);
     spray(p, 20 * sc, d, 10 + g * 10, 120 + g * 50, 1.6 + g * .3); bloodAt(p, 30 * sc + g * 8, 1);
     for (let i = 0; i < 2 + g; i++) bloodAt(add(p, d, 15 + Math.random() * 40 * (g * .4 + .6)), 10 + Math.random() * 16, .9);
     if (g >= 5) { for (let i = 0; i < 14; i++) gib(p, 18 * sc, d, [3 + Math.random() * 5, 3 + Math.random() * 5, 3 + Math.random() * 5].map(v => v * sc), Math.random() < .4 ? L.skin : Math.random() < .5 ? L.shirt : 0x7a0a0a, 230); bloodAt(p, 70 * sc, 1); return; }
     if (g >= 3) { if (!(lost & 1) && Math.random() < .6) { gib(p, 26 * sc, d, [4 * sc, 14 * sc, 4 * sc], L.skin, 160); lost |= 1; } if (!(lost & 2) && Math.random() < .6) { gib(p, 26 * sc, d, [4 * sc, 14 * sc, 4 * sc], L.skin, 160); lost |= 2; } if (Math.random() < .55) { gib(p, 32 * sc, d, [9 * sc, 9 * sc, 9 * sc], L.skin, 200); lost |= 16; } }
-    dying.push({ p: [...p], d, yaw: z ? z.yaw : Math.atan2(-d[0], -d[1]), ty, lost, t: 0, skin: L.skin, shirt: L.shirt, pants: L.pants, hair: L.hair, bald: L.bald, wnd: L.wnd, seed: z?.seed ?? 1, kb: 4 + g * 7 });
+    dying.push({ ...(z || look(1)), p: [...p], d, yaw: z ? z.yaw : Math.atan2(-d[0], -d[1]), ty, lost, t: 0, seed: z?.seed ?? 1, kb: 4 + g * 7 });
   }
   // ===== кровавые следы ног =====
   const feet = {};
@@ -335,7 +386,7 @@ const ZFX = (() => {
     const all = zl.slice();
     for (let i = dying.length - 1; i >= 0; i--) { const z = dying[i]; z.t += dt;
       if (z.t > 2.4) { decal(add(z.p, z.d, 14 * ZT[z.ty].sc), 34 * ZT[z.ty].sc, 'body', 0x3a1812, .95, -z.yaw + Math.PI); bloodAt(z.p, 26 * ZT[z.ty].sc, .7); dying.splice(i, 1); continue; }
-      const k = Math.min(1, z.t / .35); all.push({ p: add(z.p, z.d, k * 10 + Math.min(1, z.t / .25) * (z.kb || 0)), ty: z.ty, lost: z.lost, yaw: z.yaw, walk: 0, fl: 0, skin: z.skin, shirt: z.shirt, pants: z.pants, hair: z.hair, bald: z.bald, wnd: z.wnd, seed: z.seed, flash: 0, fall: Math.max(.01, k) }); }
+      const k = Math.min(1, z.t / .35); all.push({ ...z, p: add(z.p, z.d, k * 10 + Math.min(1, z.t / .25) * (z.kb || 0)), walk: 0, fl: 0, flash: 0, fall: Math.max(.01, k) }); }
     draw(all, now);
     for (const s of sps) { if (!s.visible) continue; const u = s.userData; u.t += dt; if (u.t > u.life) { s.visible = false; continue; } const k = u.t / u.life; s.scale.setScalar(u.s0 + (u.s1 - u.s0) * k); s.material.opacity = 1 - k; s.position.x += u.v[0] * dt; s.position.y += u.v[1] * dt; s.position.z += u.v[2] * dt; }
   }

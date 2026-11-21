@@ -123,13 +123,13 @@ export class World {
   // ===== волны =====
   startWave() {
     this.wave++;
-    if (this.wave > ZWAVES) { this.wave = 1; this.cyc++; this.sendAll({ t: 'msg', s: '🔁 Круг ' + (this.cyc + 1) + '! Зомби злее, оружие остаётся' }); }
+    if (this.wave > ZWAVES) { this.wave = 1; this.cyc++; this.sendAll({ t: 'msg', s: '🔁 Круг ' + (this.cyc + 1) + '! Налётчики сильнее, оружие остаётся' }); }
     const n = this.players.length; this.phase = 1;
-    this.toSpawn = zWaveCount(this.wave, n, this.cyc); this.spRate = this.toSpawn / (14 + this.wave * .7); this.spAcc = 0;
+    this.waveSpawned = 0; this.toSpawn = zWaveCount(this.wave, n, this.cyc); this.spRate = this.toSpawn / (14 + this.wave * .7); this.spAcc = 0;
     if (this.wave % 5 === 0) this.spawnZ(5);
     for (const p of this.players) if (p.st === 2) { p.st = 0; p.hp = p.maxHp; const m = this.players.find(q => q.st === 0 && q !== p); p.p = m ? collide(this.objs, add(m.p, [20, 20])) : this.spawnAt(p.id); p.inv = this.t + 3; this.send(p.c, { t: 'sp', sp: p.p }); this.msg('✨ ' + p.name + ' вернулся'); }
     const nw = ZW.map((w, i) => w.wave === this.wave && this.cyc === 0 ? i : -1).filter(i => i >= 0);
-    const tips = { 5: '⚠ Бегуны теперь перепрыгивают заборы', 7: '⚠ Лазуны лезут в окна!', 10: '⚠ Громилы ломают стены, окна и машины!', 12: '⚠ Через заборы лезут уже все' };
+    const tips = { 5: '⚠ Бегуны теперь перепрыгивают заборы', 1: '⚠ Громилы могут ломать укрытия', 12: '⚠ Через заборы лезут уже все' };
     this.sendAll({ t: 'wave', w: this.wave, n: this.toSpawn, cyc: this.cyc, boss: this.wave % 5 === 0 ? 1 : 0, unl: zUnlocked(this.wave), nw, tip: this.cyc === 0 ? tips[this.wave] : null });
     this.report();
   }
@@ -148,7 +148,8 @@ export class World {
   spawnZ(type) {
     const p = this.spawnPoint(); if (!p) return null;
     const T = ZT[type], hm = zHpMul(this.wave, this.players.length, this.cyc) * (type === 5 ? this.players.length * .6 + .4 : 1);
-    const z = { id: this.zid, ty: type, p, hp: T.hp * hm, mhp: T.hp * hm, sp: T.sp * (.85 + this.rnd() * .3) * (1 + this.cyc * .12), r: T.r, ab: zAbil(type, this.wave), atkT: 0, lost: 0, burn: 0, burnBy: null, tg: null, atk: 0, air: 0, smT: 0, stuck: 0, side: this.rnd() < .5 ? 1 : -1, bi: -1, navB: -1, navR: -1 };
+    const hp = raiderHealth(type, this.wave) * hm;
+    const z = { id: this.zid, ty: type, p, hp, mhp: hp, sp: T.sp * (.85 + this.rnd() * .3) * (1 + this.cyc * .12), r: T.r, ab: zAbil(type, this.wave), atkT: 0, lost: 0, burn: 0, burnBy: null, tg: null, atk: 0, air: 0, smT: 0, stuck: 0, side: this.rnd() < .5 ? 1 : -1, bi: -1, navB: -1, navR: -1 };
     this.zid = this.zid % 65000 + 1; this.zs.set(z.id, z); return z;
   }
   // ===== ввод игрока: позиция (доверяем, но ограничиваем скорость), оружие, попадания =====
@@ -293,7 +294,7 @@ export class World {
     const t = this.t;
     if (this.phase === 0 && t >= this.timerT) this.startWave();
     if (this.phase === 1) {
-      if (this.toSpawn > 0) { this.spAcc += this.spRate * dt; const cap = 120 + 30 * this.players.length; while (this.spAcc >= 1 && this.toSpawn > 0 && this.zs.size < cap) { this.spAcc--; if (this.spawnZ(zPickType(this.wave, this.rnd))) this.toSpawn--; } }
+      if (this.toSpawn > 0) { this.spAcc += this.spRate * dt; const cap = 120 + 30 * this.players.length; while (this.spAcc >= 1 && this.toSpawn > 0 && this.zs.size < cap) { this.spAcc--; if (this.spawnZ(zPickType(this.wave, this.rnd, this.waveSpawned || 0))) { this.toSpawn--; this.waveSpawned = (this.waveSpawned || 0) + 1; } } }
       else if (!this.zs.size) { this.phase = 0; this.timerT = t + ZBREAK; this.sendAll({ t: 'clear', w: this.wave }); }
     }
     if (this.later.length) { const now_ = this.later.filter(l => l[0] <= t); this.later = this.later.filter(l => l[0] > t); for (const [, o, by] of now_) this.objHurt(o, by); }
@@ -323,12 +324,13 @@ export class World {
       z.air = Math.max(0, z.air - dt); z.block = null;
       if (z.kbv) { const m = mul(z.kbv, Math.min(1, dt * 14)); z.p = this.zCollide(z, add(z.p, m)); z.kbv = sub(z.kbv, m); if (len(z.kbv) < .5) z.kbv = null; } // отлетает от пуль
       z.stag = Math.max(0, (z.stag || 0) - dt);
-      if (t < this.frzT) { z.atk = 0; continue; } // заморозка: стоят как статуи
+      if (t < this.frzT) { z.atk = 0; z.backKickAt = 0; continue; } // заморозка: стоят как статуи
       if (!z.tg || z.tg.st === 2 || !this.players.includes(z.tg) || this.tick % 15 === z.id % 15) { let bd = 1e9; z.tg = null; for (const p of targets) { const d = dist(p.p, z.p) * (p.st === 1 ? 1.3 : 1); if (d < bd) { bd = d; z.tg = p; } } }
       const T = z.tg; z.atk = 0; if (!T) continue;
       if (this.tick % 4 === z.id % 4) z.bi = bldAt(B, z.p);
       const d = dist(T.p, z.p), reach = z.r + PR + 5;
       if (d > reach) {
+        z.backKickAt = 0;
         const goal = d < 60 && (z.bi === T.bi) ? T.p : this.zGoal(z, T.p, T.bi);
         let dir = norm(sub(goal, z.p)); if (z.stuck > 0) { dir = norm(add(dir, perp(dir), z.side * 1.4)); z.stuck--; }
         const sp = z.sp * (z.lost & 4 ? .35 : 1) * (z.burn > 0 ? 1.2 : 1) * (z.air > 0 ? .6 : 1) * (z.stag > 0 ? .3 : 1), want = add(z.p, dir, sp * dt);
@@ -343,7 +345,16 @@ export class World {
         if ((z.noProg >= 2 || z.stT > 8) && d > 220) { const q = this.spawnPoint(); if (q) { z.p = q; z.stT = 0; z.noProg = 0; z.lastD = 1e9; z.entry = null; } }
       } else {
         z.atk = 1; z.atkT -= dt;
-        if (z.atkT <= 0) { z.atkT = .85; if (t > T.inv) this.hurt(T, ZT[z.ty].dmg * (1 + this.cyc * .3) * ((z.lost & 3) === 3 ? .4 : 1)); }
+        const backKick = z.ty === 1 && raiderBackKick(z.id) && !(z.lost & 4);
+        if (backKick && !z.backKickAt && z.atkT <= 0) z.backKickAt = t + .32;
+        const strike = backKick ? z.backKickAt > 0 && t >= z.backKickAt : z.atkT <= 0;
+        if (backKick) z.atk = z.backKickAt > 0 || z.atkT > .70 ? 1 : 0;
+        if (strike) {
+          z.backKickAt = 0;
+          z.atkT = .85;
+          const earlyHeavy = (z.ty === 2 || z.ty === 4) && this.wave < 4 ? .65 : 1;
+          if (t > T.inv) this.hurt(T, ZT[z.ty].dmg * earlyHeavy * (1 + this.cyc * .3) * ((z.lost & 3) === 3 ? .4 : 1));
+        }
       }
       // расталкивают друг друга
       const gx = Math.floor(z.p[0] / 48), gy = Math.floor(z.p[1] / 48);

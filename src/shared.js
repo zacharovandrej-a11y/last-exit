@@ -437,11 +437,11 @@ const ZW = [ // bv/bl/bw/bc — вид пули: скорость, длина, �
 ];
 // зомби. ab — умения: 1 перепрыгивает заборы, 2 лезет в окна, 4 ломает стены/окна/заборы/машины
 const ZT = [
-  { n: 'ходок', hp: 42, sp: 44, r: 10, dmg: 10, sc: 1, wave: 1, xp: 1, ab: 0 },
-  { n: 'бегун', hp: 30, sp: 98, r: 9, dmg: 8, sc: .92, wave: 3, xp: 1, ab: 1 },
-  { n: 'толстяк', hp: 200, sp: 30, r: 16, dmg: 22, sc: 1.45, wave: 5, xp: 4, ab: 0 },
+  { n: 'налётчик', hp: 42, sp: 44, r: 10, dmg: 10, sc: 1, wave: 1, xp: 1, ab: 0 },
+  { n: 'бегун', hp: 30, sp: 98, r: 9, dmg: 8, sc: 1.02, wave: 1, xp: 1, ab: 1 },
+  { n: 'знаменосица', hp: 200, sp: 30, r: 16, dmg: 22, sc: 1.45, wave: 1, xp: 4, ab: 0 },
   { n: 'лазун', hp: 55, sp: 70, r: 9, dmg: 12, sc: .95, wave: 7, xp: 2, ab: 3 },
-  { n: 'громила', hp: 650, sp: 50, r: 20, dmg: 30, sc: 1.9, wave: 10, xp: 12, ab: 4 },
+  { n: 'громила', hp: 650, sp: 50, r: 20, dmg: 30, sc: 1.9, wave: 1, xp: 12, ab: 4 },
   { n: 'босс', hp: 3500, sp: 42, r: 30, dmg: 40, sc: 2.8, wave: 99, xp: 60, ab: 5, boss: 1 },
 ];
 const zAbil = (ty, w) => ZT[ty].ab & (w >= 5 ? 7 : 4) | (w >= 12 && ty === 0 ? 1 : 0); // бегуны прыгают через заборы с 5-й волны; ходоки — с 12-й
@@ -460,7 +460,21 @@ const ZPERK = [
 const zXpNeed = lv => Math.round(12 * Math.pow(lv, 1.45));
 const zWaveCount = (w, n, cyc = 0) => Math.round((6 + w * 4 + w * w * .22) * (1 + .6 * (n - 1)) * (1 + cyc * .5));
 const zHpMul = (w, n, cyc = 0) => (1 + (w - 1) * .06 + .15 * (n - 1)) * (1 + cyc * .8);
-function zPickType(w, rnd) { const r = rnd(); if (w >= 10 && r < .03 + w * .002) return 4; if (w >= 7 && r < .16) return 3; if (w >= 5 && r < .3) return 2; if (w >= 3 && r < .55) return 1; return 0; }
+const raiderBackKick = id => id % 2 === 0;
+function zPickType(w, rnd, index) {
+  const r = rnd();
+  if (w === 1 && index < 6) return [0, 1, 2, 4, 0, 0][index];
+  if (r < (w < 5 ? .045 : .08)) return 4;
+  if (r < .19) return 2;
+  if (r < .43) return 1;
+  return 0;
+}
+function raiderHealth(type, wave) {
+  const hp = ZT[type].hp;
+  if (type === 2) return Math.min(hp, 65 + (wave - 1) * 34);
+  if (type === 4) return Math.min(hp, 105 + (wave - 1) * 61);
+  return hp;
+}
 const zUnlocked = w => ZW.map((x, i) => x.wave <= w ? i : -1).filter(i => i >= 0);
 const ZSN_P = 12, ZSN_Z = 9;
 // бонусы с зомби (как в Crimsonland): k — вид, T — сколько секунд действует
