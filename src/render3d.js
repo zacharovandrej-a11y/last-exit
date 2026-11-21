@@ -814,10 +814,10 @@ void main(){
     const okAt = (p, r) => inMap(p, 60) && bldAt(Bl, p) < 0 && !nearObjs(objs, p, r + 30).some(o => !o.nc && !o.dead && o.type !== 'bush' && objPush(o, p, r));
     const junk = p => { const r = R(); if (r < .3) add_('paper', p, .4, 6 + R() * 4, .3, 7 + R() * 4); else if (r < .5) add_('bag', p, 3, 5, 4, 6); else if (r < .64) add_('tire', p, 1.6, 6, 3, 6, 0, R() < .3 ? 1.2 : 0); else if (r < .82) add_('plank', p, 1, 18 + R() * 10, 1.5, 4); else { add_('brick', p, 1.5, 6, 3, 3); add_('brick', add(p, [3, 4]), 1.5, 6, 3, 3); } };
     const pile = (c, n, rad) => { for (let i = 0; i < n; i++) { const q = add(c, [(R() - .5) * rad * 2, (R() - .5) * rad * 2]); if (!okAt(q, 4)) continue; const big = 1 - dist(q, c) / (rad * 1.5); if (R() < .7) { const sz = 3 + R() * 5 * Math.max(.4, big); add_('chunk', q, sz * .45 + big * 3, sz, sz * .7, sz); } else add_('brick', q, 1.5 + big * 3, 6, 3, 3, R() * 6.28, R() * .6); } dec.push([c[0], c[1], rad * 2.6, 'b2', 0x5a554c, .5, R() * 6.28, 1]); };
-    // дороги: трещины, ямы, заплатки, мазут, мусор у обочин
+    // дороги: ямы, заплатки, мазут, мусор у обочин
     for (const [a, b] of (streetPlan && streetPlan.roads) || []) { const d = norm(sub(b, a)), n = perp(d), L = dist(a, b), ang = Math.atan2(d[0], d[1]);
       for (let t = 20; t < L; t += 46) { const c = add(a, d, t), r = R(), q = add(c, n, (R() - .5) * 36);
-        if (r < .5) dec.push([q[0], q[1], 46 + R() * 50, 'crack', 0x161412, .78, R() * 6.28, 1]);
+        if (r < .5) { R(); R(); } // сохраняем позиции остального декора
         else if (r < .62) dec.push([q[0], q[1], 16 + R() * 18, 'hole', 0x6a6258, 1, R() * 6.28, 1]);
         else if (r < .74) dec.push([q[0], q[1], 30 + R() * 24, 'patch', 0x2e2d2a, .6, -ang + (R() - .5) * .2, .55 + R() * .4]);
         else if (r < .8) dec.push([q[0], q[1], 28 + R() * 36, 'b1', 0x0a0806, .5, R() * 6.28, .7]);

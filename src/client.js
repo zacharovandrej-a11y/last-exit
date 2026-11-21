@@ -99,6 +99,44 @@ function plPos(id) { if (id === myId) return meP; const s = lastSnap && lastSnap
 // ===== управление =====
 const keys = {}, mouse = { x: 0, y: 0, down: false, has: false }; let fireHeld = false, touchUI = false;
 const sticks = { L: null, R: null };
+const weaponStrip = $('weapons');
+let shownWeapons = [], shownWeapon = -1;
+weaponStrip.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') touchUI = true; });
+weaponStrip.addEventListener('click', e => {
+  const button = e.target.closest('button');
+  if (button && unl.includes(+button.value)) myW = +button.value;
+});
+weaponStrip.addEventListener('wheel', e => {
+  if (!e.deltaX && e.deltaY) {
+    e.preventDefault();
+    cycleW(e.deltaY > 0 ? 1 : -1);
+  }
+}, { passive: false });
+function updateWeaponStrip(visible) {
+  if (weaponStrip.hidden === visible) weaponStrip.hidden = !visible;
+  if (!visible) return;
+  if (shownWeapons !== unl) {
+    shownWeapons = unl;
+    shownWeapon = -1;
+    weaponStrip.replaceChildren(...unl.map(i => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.value = i;
+      button.textContent = ZW[i].n;
+      return button;
+    }));
+  }
+  if (shownWeapon === myW) return;
+  shownWeapon = myW;
+  for (const button of weaponStrip.children) {
+    const selected = +button.value === myW;
+    button.setAttribute('aria-pressed', selected);
+    if (selected && (button.offsetLeft < weaponStrip.scrollLeft ||
+        button.offsetLeft + button.offsetWidth > weaponStrip.scrollLeft + weaponStrip.clientWidth)) {
+      button.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  }
+}
 addEventListener('keydown', e => { keys[e.code] = true; if (e.code === 'KeyR') relStart(); if (e.code === 'KeyQ') cycleW(-1); if (e.code === 'KeyE') cycleW(1); if (/^Digit[1-9]$/.test(e.code)) { const i = +e.code.slice(5) - 1; if (unl.includes(i)) myW = i; } if (perkOpts && /^Key[ZXC]$/.test(e.code)) pickPerk('ZXC'.indexOf(e.code[3])); });
 addEventListener('keyup', e => { keys[e.code] = false; });
 const cv = $('c'), ctx = cv.getContext('2d');
@@ -279,6 +317,7 @@ function hud(now, dt, cur, meS, plist, zl) {
   if (cv.width !== Math.round(W_ * dpr) || cv.height !== Math.round(H_ * dpr)) { cv.width = Math.round(W_ * dpr); cv.height = Math.round(H_ * dpr); G3.resize(W_, H_); }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W_, H_); btns = [];
   const pl_ = inRoom && cur && cur.st !== 0 && !$('lobby').classList.contains('on'); cv.style.cursor = pl_ && !touchUI ? 'none' : '';
+  updateWeaponStrip(!!(pl_ && meS && meS.st < 2 && !overInfo && unl.length > 1));
   if (!pl_) return;
   if (hurtFlash > 0) { const g = ctx.createRadialGradient(W_ / 2, H_ / 2, Math.min(W_, H_) * .3, W_ / 2, H_ / 2, Math.max(W_, H_) * .7); g.addColorStop(0, 'rgba(160,0,0,0)'); g.addColorStop(1, 'rgba(160,0,0,' + hurtFlash * .6 + ')'); ctx.fillStyle = g; ctx.fillRect(0, 0, W_, H_); }
   // пепел и дымка заката (рисуется поверх мира, дёшево — 2D)
@@ -318,12 +357,11 @@ function hud(now, dt, cur, meS, plist, zl) {
     ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(x0, y0 + 20, bw, 6); ctx.fillStyle = '#ffd43b'; ctx.fillRect(x0, y0 + 20, bw * meS.xp, 6); txt('ур. ' + meS.lvl, x0 + bw + 8, y0 + 27, 13, '#ffd43b', 'left');
     const W = ZW[myW], wx = W_ - 14, wy = H_ - 20;
     txt(W.n + ' ' + '★'.repeat(Math.max(0, (wl[myW] || 1) - 1)), wx, wy - 22, 17, '#fff', 'right'); txt(relT > 0 ? 'перезарядка…' : now < buf.ammo ? '∞' : ammo[myW] + ' / ' + magOf(myW), wx, wy, 15, relT > 0 ? '#ffd43b' : '#ccc', 'right');
-    if (unl.length > 1) { const b = { x: W_ - 128, y: H_ - 104, w: 114, h: 34, f: () => cycleW(1) }; btns.push(b); ctx.fillStyle = 'rgba(0,0,0,.55)'; rr(b.x, b.y, b.w, b.h, 10); ctx.fill(); txt('🔫 сменить (' + unl.length + ')', b.x + b.w / 2, b.y + 22, 13, '#fff'); }
     if (meS.st === 1) txt('ТЫ УПАЛ! Ползи к напарнику — ' + meS.down + ' с', W_ / 2, H_ * .72, 22, '#ff6b6b', 'center', 900);
     if (meS.st === 2) txt('💀 Ты погиб. Вернёшься в начале следующей волны', W_ / 2, H_ * .72, 20, '#ff8787');
   }
   if (perkOpts) {
-    const cw = Math.min(200, (W_ - 40) / 3), ch = 74, y = H_ - ch - (touchUI ? 120 : 70), x0 = W_ / 2 - (cw * 3 + 20) / 2;
+    const cw = Math.min(200, (W_ - 40) / 3), ch = 74, y = H_ - ch - (touchUI || !weaponStrip.hidden ? 126 : 70), x0 = W_ / 2 - (cw * 3 + 20) / 2;
     txt('⭐ Уровень ' + perkLv + ' — выбери улучшение' + (touchUI ? '' : ' (Z / X / C)'), W_ / 2, y - 10, 15, '#ffd43b');
     perkOpts.forEach((pi, i) => { const P = ZPERK[pi], b = { x: x0 + i * (cw + 10), y, w: cw, h: ch, f: () => pickPerk(i) }; btns.push(b); ctx.fillStyle = 'rgba(40,10,10,.88)'; rr(b.x, b.y, b.w, b.h, 12); ctx.fill(); ctx.strokeStyle = '#ffd43b'; ctx.lineWidth = 2; ctx.stroke();
       txt(P.n, b.x + cw / 2, b.y + 28, 14, '#fff'); txt(P.d, b.x + cw / 2, b.y + 50, 11, '#e0c0c0', 'center', 600); });
