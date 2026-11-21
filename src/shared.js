@@ -293,10 +293,11 @@ function genWorld() {
         putA('sandbag', add(p, rot(a, 0, -34)), 76, 14, a); for (const sd of [-1, 1]) putA('sandbag', add(p, rot(a, sd * 44, -6)), 48, 14, a + 1.5708);
         if (r2() < .7) putA('jersey', add(p, rot(a, (r2() - .5) * 40, 58)), 58, 16, a + (r2() - .5) * .5); break; } }
     for (let k = 0; k < 26; k++) for (let t = 0; t < 30; t++) { const p = rndMap(r2, 200); if (!inMap(p, 100) || !free(p, 50)) continue; const a = r2() * 6.2832; putA('jersey', p, 58, 16, a); if (r2() < .5) putA('jersey', add(p, rot(a, 64, (r2() - .5) * 10)), 58, 16, a + (r2() - .5) * .4); break; } }
-  // Убираем бункер после расстановки карты, чтобы остальные здания и объекты сохранили координаты.
-  const bunkerId = 17;
-  const removedBunker = blds[bunkerId]?.kind === 'bunker' ? blds[bunkerId] : null;
+  // Убираем бункер №17 (мешал улицам) после расстановки карты — остальные здания и объекты сохраняют координаты.
+  // Его стены и мебель помечаем gone: ниже они удаляются при перенумерации, как лишняя мебель.
+  const bunkerId = 17, removedBunker = blds[bunkerId]?.kind === 'bunker' ? blds[bunkerId] : null;
   if (removedBunker) {
+    for (const id of [...removedBunker.walls, ...removedBunker.furn]) objs[id].gone = 1;
     blds.splice(bunkerId, 1);
     for (let id = bunkerId; id < blds.length; id++) blds[id].id = id;
     for (const o of objs) if (o.bid > bunkerId) o.bid--;
@@ -305,11 +306,6 @@ function genWorld() {
   // убираем «лишнюю» мебель и перенумеровываем
   const keep = objs.filter(o => !o.gone), idm = new Map(); objs.length = 0; keep.forEach((o, i) => { idm.set(o.id, i); o.id = i; objs.push(o); });
   for (const b of blds) { b.walls = b.walls.map(i => idm.get(i)); b.furn = b.furn.filter(i => idm.has(i)).map(i => idm.get(i)); if (b.altar !== undefined) b.altar = idm.get(b.altar); if (b.box !== undefined) b.box = idm.get(b.box); }
-  // Пустые слоты сохраняют номера объектов, на которые ссылаются сетевые сообщения.
-  if (removedBunker) for (const oldId of [...removedBunker.walls, ...removedBunker.furn]) {
-    const id = idm.get(oldId);
-    if (id !== undefined) objs[id] = { id, type: 'removed', p: objs[id].p, rad: 0, nc: 1 };
-  }
   objs.blds = blds; objs.churches = churches; gridBuild(objs);
   return objs;
 }
@@ -317,7 +313,7 @@ function genWorld() {
 const GC = 100;
 function gridBuild(objs) {
   const g = new Map();
-  for (const o of objs) { if (o.type === 'removed') continue; const r = o.rad; for (let cx = Math.floor((o.p[0] - r) / GC); cx <= Math.floor((o.p[0] + r) / GC); cx++) for (let cy = Math.floor((o.p[1] - r) / GC); cy <= Math.floor((o.p[1] + r) / GC); cy++) { const k = cx * 1000 + cy; let a = g.get(k); if (!a) g.set(k, a = []); a.push(o); } }
+  for (const o of objs) { const r = o.rad; for (let cx = Math.floor((o.p[0] - r) / GC); cx <= Math.floor((o.p[0] + r) / GC); cx++) for (let cy = Math.floor((o.p[1] - r) / GC); cy <= Math.floor((o.p[1] + r) / GC); cy++) { const k = cx * 1000 + cy; let a = g.get(k); if (!a) g.set(k, a = []); a.push(o); } }
   objs.grid = g; objs.stamp = 0;
 }
 function nearObjs(objs, p, r) {
