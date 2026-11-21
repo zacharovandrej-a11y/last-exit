@@ -144,25 +144,17 @@ const ZFX = (() => {
       }
     }
   }
-  // Двустороннее знамя с вымышленной эмблемой. Складки заданы в общей геометрии.
+  // Двусторонний радужный флаг. Складки заданы в общей геометрии.
   const bannerCanvas = document.createElement('canvas');
   bannerCanvas.width = 64;
   bannerCanvas.height = 48;
   const bannerInk = bannerCanvas.getContext('2d');
-  bannerInk.fillStyle = '#9d243a';
-  bannerInk.fillRect(0, 0, 64, 48);
-  bannerInk.fillStyle = '#edcf8c';
-  bannerInk.fillRect(2, 3, 60, 3);
-  bannerInk.fillRect(2, 42, 60, 3);
-  bannerInk.beginPath();
-  bannerInk.moveTo(32, 10);
-  bannerInk.lineTo(47, 24);
-  bannerInk.lineTo(32, 38);
-  bannerInk.lineTo(17, 24);
-  bannerInk.closePath();
-  bannerInk.fill();
-  bannerInk.fillStyle = '#492536';
-  bannerInk.fillRect(28, 17, 8, 14);
+  const rainbow = ['#e6373b', '#ff8b25', '#ffdf3e', '#319b53', '#2766d3', '#893bb5'];
+  const stripeHeight = bannerCanvas.height / rainbow.length;
+  rainbow.forEach((color, i) => {
+    bannerInk.fillStyle = color;
+    bannerInk.fillRect(0, i * stripeHeight, bannerCanvas.width, stripeHeight);
+  });
   const bannerGeo = new T.PlaneGeometry(1, 1, 6, 1);
   const bannerVertices = bannerGeo.attributes.position;
   for (let i = 0; i < bannerVertices.count; i++) {
