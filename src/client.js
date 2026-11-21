@@ -275,10 +275,11 @@ function loop(now) {
   const zl = [];
   if (S && S.b.st === 1) {
     for (const [id, zb] of S.b.z) { const za = S.a.z.get(id) || zb, p = lerp(za.p, zb.p, S.k);
-      let z = zst.get(id); if (!z) { z = Object.assign({ id, p, lp: p, walk: Math.random() * 6, yaw: Math.atan2(meP[0] - p[0], meP[1] - p[1]), flash: 0 }, ZFX.look(id, zb.ty)); zst.set(id, z); }
+      let z = zst.get(id); if (!z) { z = Object.assign({ id, p, lp: p, walk: Math.random() * 6, yaw: Math.atan2(meP[0] - p[0], meP[1] - p[1]), flash: 0 }, ZFX.look(id)); zst.set(id, z); }
       const d = dist(p, z.lp); z.walk += d * .12 / ZT[zb.ty].sc; if (d > .2) { const ty = Math.atan2(p[0] - z.lp[0], p[1] - z.lp[1]); let dy = ty - z.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); z.yaw += dy * .2; }
       z.lp = p; z.p = p; z.ty = zb.ty; z.lost = zb.lost; z.fl = zb.fl;
-      const facingBack = zb.ty === 1 && raiderBackKick(id) && !(zb.lost & 4) && (zb.fl & 1);
+      const facingBack = !(zb.lost & 4) && (zb.ty === 1 && raiderBackKick(id) && (zb.fl & 1) ||
+        zb.ty === 0 && streetWalksBackward(id) && !(zb.fl & 1));
       z.backTurn = Math.max(0, Math.min(1, (z.backTurn || 0) + (facingBack ? 5 : -5) * elapsed));
       z.hp = zb.hp; z.flash = Math.max(0, z.flash - dt * 6); z.kick = Math.max(0, (z.kick || 0) - dt * 7);
       if (zb.hp < .5 && Math.random() < dt * 2) ZFX.decal(p, 5 + Math.random() * 5, 'drop', 0x6e0000, .8); // раненый оставляет кровавый след

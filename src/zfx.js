@@ -167,9 +167,16 @@ const ZFX = (() => {
   banners.count = 0;
   banners.frustumCulled = false;
   scene.add(banners);
+  const supportRings = new T.InstancedMesh(new T.RingGeometry(.978, 1, 48).rotateX(-Math.PI / 2),
+    new T.MeshBasicMaterial({ color: 0xfcc068, transparent: true, opacity: .55, depthWrite: false }), ZN);
+  supportRings.frustumCulled = false;
+  supportRings.count = 0;
+  scene.add(supportRings);
+  let supportCount = 0;
   let bannerCount = 0;
   const bannerPivot = new T.Matrix4();
   function drawStandardBearer(z, sc, t, fall) {
+    const support = z.ty === RAIDER_SUPPORT;
     const crawl = z.lost & 4, stride = Math.sin(z.walk * .7);
     const attack = z.fl & 1 ? .5 + .5 * Math.sin(t * 12) : 0;
     const lean = .07 + attack * .23 - (z.kick || 0) * .35;
@@ -178,9 +185,9 @@ const ZFX = (() => {
     if (fall) base.multiply(tmp.makeRotationX(-fall * 1.45));
     else if (crawl) base.multiply(tmp.makeRotationX(1.33)).multiply(tmp.makeTranslation(0, -19, -8));
 
-    enemyPart(suit, suitCount++, enemyColor(0x713343, z, t), 0, 22 + bob, 0, 10, 13, 7, lean);
-    enemyPart(suit, suitCount++, enemyColor(0x8a3b52, z, t), 0, 24 + bob, -5.5, 11, 15, 4.8, lean - .13);
-    enemyPart(raiderMarks, markCount++, enemyColor(0xb8734d, z, t), 0, 29 + bob, 2, 11, 3, 6, lean);
+    enemyPart(suit, suitCount++, enemyColor(support ? 0x2f9296 : 0x713343, z, t), 0, 22 + bob, 0, 10, 13, 7, lean);
+    enemyPart(suit, suitCount++, enemyColor(support ? 0x42bbb1 : 0x8a3b52, z, t), 0, 24 + bob, -5.5, 11, 15, 4.8, lean - .13);
+    enemyPart(raiderMarks, markCount++, enemyColor(support ? 0xf4cd76 : 0xb8734d, z, t), 0, 29 + bob, 2, 11, 3, 6, lean);
     if (!(z.lost & 16)) {
       enemyPart(suit, suitCount++, enemyColor(0xbb8970, z, t), 0, 36 + bob, 2, 4.8, 5.4, 4.5, lean);
       enemyPart(suit, suitCount++, enemyColor(0x513241, z, t), 0, 38 + bob, .2, 5.3, 4.4, 4.8, lean);
@@ -190,13 +197,16 @@ const ZFX = (() => {
       enemyPart(suit, suitCount++, enemyColor(0x4b3540, z, t), -4.4, 8 + Math.max(0, stride) * 3, stride * 5, 3.8, 9, 3.8, stride * .22);
       enemyPart(suit, suitCount++, enemyColor(0x4b3540, z, t), 4.4, 8 + Math.max(0, -stride) * 3, -stride * 5, 3.8, 9, 3.8, -stride * .22);
     }
-    if (!(z.lost & 1)) enemyPart(suit, suitCount++, enemyColor(0x843952, z, t), -10, 23 + bob, 3 + attack * 5, 3.3, 8, 3.4, -stride * .24 - attack * .8);
-    if (!(z.lost & 2)) {
-      enemyPart(suit, suitCount++, enemyColor(0x843952, z, t), 10, 25 + bob, 6, 3.3, 7.5, 3.4, -.65);
-      // Древко и ткань вращаются вместе вокруг руки.
-      bannerPivot.makeTranslation(11, 23 + bob, 9);
+    const rightHand = !(z.lost & 2), leftHand = !(z.lost & 1);
+    const flagHand = rightHand ? 1 : support && leftHand ? -1 : 0;
+    const sleeve = support ? 0x2f9296 : 0x843952;
+    if (leftHand && flagHand !== -1) enemyPart(suit, suitCount++, enemyColor(sleeve, z, t), -10, 23 + bob, 3 + attack * 5, 3.3, 8, 3.4, -stride * .24 - attack * .8);
+    if (support || flagHand) {
+      if (flagHand) enemyPart(suit, suitCount++, enemyColor(sleeve, z, t), flagHand * 10, 25 + bob, 6, 3.3, 7.5, 3.4, -.65);
+      // Если знаменосец поддержки потерял обе руки, флаг остаётся в креплении за спиной.
+      bannerPivot.makeTranslation(flagHand * 11, 23 + bob + (support ? 4 : 0), flagHand ? 9 : -6);
       bannerPivot.multiply(tmp.makeRotationX(.14 + attack * .5));
-      bannerPivot.multiply(tmp.makeRotationZ(-.13 + stride * .08 + fall * .6));
+      bannerPivot.multiply(tmp.makeRotationZ(-.13 + stride * .08 + fall * .6 + (support && flagHand && !fall && !(z.fl & 8) ? Math.sin(t * 5) * .32 : 0)));
       base.multiply(bannerPivot);
       enemyPart(suit, suitCount++, enemyColor(0x8e614a, z, t), 0, 9, 0, 1.05, 23, 1.05);
       enemyPart(banners, bannerCount++, enemyColor(0xffffff, z, t), 0, 23, 0, 21, 15, 14);
@@ -279,12 +289,13 @@ const ZFX = (() => {
   let printCount = 0;
 
   function drawStreetRaider(z, sc, t, fall) {
-    const crawl = z.lost & 4, stride = Math.sin(z.walk * .85);
+    const crawl = z.lost & 4, turn = fall ? 0 : (z.backTurn || 0);
+    const stride = Math.sin(z.walk * .85) * (1 - turn * 2);
     const attack = z.fl & 1 ? .5 + .5 * Math.sin(t * 14) : 0;
     const air = z.fl & 4 ? 8 * Math.abs(Math.sin(t * 6)) : 0;
-    const lean = .13 + attack * .24 - (z.kick || 0) * .35;
+    const lean = .13 + attack * .24 + turn * .21 - (z.kick || 0) * .35;
     const bob = Math.abs(stride);
-    base.compose(V3.set(z.p[0], air, z.p[1]), Q.setFromEuler(E.set(0, z.yaw, 0)), S3.setScalar(sc));
+    base.compose(V3.set(z.p[0], air, z.p[1]), Q.setFromEuler(E.set(0, z.yaw + Math.PI * turn, 0)), S3.setScalar(sc));
     if (fall) base.multiply(tmp.makeRotationX(-fall * 1.48));
     else if (crawl) base.multiply(tmp.makeRotationX(1.35)).multiply(tmp.makeTranslation(0, -18, -8));
 
@@ -300,9 +311,9 @@ const ZFX = (() => {
     }
     enemyPart(suit, suitCount++, enemyColor(z.pants, z, t), 0, 20, 0, 6.4, 3.9, 4.6);
     if (!(z.lost & 16)) {
-      enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), 0, 38 + bob, 2.4, 4.15, 4.75, 4.25, lean);
-      enemyPart(suit, suitCount++, enemyColor(z.hair, z, t), -.65, 40.7 + bob, 2.15, 4.55, 3.1, 4.5, lean, .29);
-      enemyPart(raiderMarks, markCount++, enemyColor(0x523d39, z, t), 0, 38.7 + bob, 6.48, 2.7, .57, .44);
+      enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), turn, 38 + bob, 2.4, 4.15, 4.75, 4.25, lean, 0, turn * 1.65);
+      enemyPart(suit, suitCount++, enemyColor(z.hair, z, t), turn - .65, 40.7 + bob, 2.15, 4.55, 3.1, 4.5, lean, .29, turn * 1.65);
+      enemyPart(raiderMarks, markCount++, enemyColor(0x523d39, z, t), turn * 5, 38.7 + bob, 6.48 - turn * 4.4, 2.7, .57, .44, 0, 0, turn * 1.65);
     }
     for (const side of [-1, 1]) {
       const step = stride * side, lift = Math.max(0, step) * 2.5;
@@ -323,7 +334,7 @@ const ZFX = (() => {
   function draw(list, now) {
     let shadowCount = 0;
     const t = now / 1000;
-    suitCount = markCount = bannerCount = enforcerSkinCount = printCount = 0;
+    suitCount = markCount = bannerCount = enforcerSkinCount = printCount = supportCount = 0;
     for (const z of list) {
       if (shadowCount >= ZN) break;
       const Tz = ZT[z.ty], sc = Tz.sc, fall = z.fall || 0;
@@ -331,7 +342,13 @@ const ZFX = (() => {
         Q.setFromEuler(E.set(0, z.ty === RAIDER ? z.yaw : 0, 0)),
         S3.set(Tz.r * 1.1, 1, Tz.r * (z.ty === RAIDER ? 2 : 1.1))));
       if (z.ty === RAIDER) drawRaider(z, sc, t);
-      else if (z.ty === STANDARD_BEARER) drawStandardBearer(z, sc, t, fall);
+      else if (z.ty === STANDARD_BEARER || z.ty === RAIDER_SUPPORT) {
+        if (z.ty === RAIDER_SUPPORT && !fall) {
+          supportRings.setMatrixAt(supportCount++, M4.compose(V3.set(z.p[0], .9, z.p[1]),
+            Q.identity(), S3.set(SUPPORT_RADIUS, 1, SUPPORT_RADIUS)));
+        }
+        drawStandardBearer(z, sc, t, fall);
+      }
       else if (z.ty === ENFORCER || Tz.boss) drawEnforcer(z, sc, t, fall);
       else drawStreetRaider(z, sc, t, fall);
     }
@@ -341,6 +358,11 @@ const ZFX = (() => {
     banners.count = bannerCount;
     enforcerSkin.count = enforcerSkinCount;
     prints.count = printCount;
+    supportRings.count = supportCount;
+    if (supportCount) {
+      supportRings.instanceMatrix.updateRange.count = supportCount * 16;
+      supportRings.instanceMatrix.needsUpdate = true;
+    }
     for (const mesh of [suit, raiderMarks, banners, enforcerSkin, prints]) {
       if (!mesh.count) continue;
       mesh.instanceMatrix.updateRange.count = mesh.count * 16;
