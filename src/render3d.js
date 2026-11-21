@@ -166,6 +166,20 @@ vec4 wp_=modelMatrix*p_;vec3 wn_=normalize(mat3(modelMatrix)*normalize(nm_*norma
 
   // Материалы окружения имеют плавное освещение; персонажи сохраняют читаемый toon-силуэт.
   const worldMats = {}, windMats = {};
+  // бесшовная текстура листвы (оттенок даёт цвет экземпляра): тёмные промежутки + много листьев разной яркости
+  const leafTile = (() => { const n = 256, c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d'), r = mkRng(909);
+    g.fillStyle = '#4a4a40'; g.fillRect(0, 0, n, n);
+    for (let i = 0; i < 900; i++) { const x = r() * n, y = r() * n, a = r() * 6.28, l = 5 + r() * 7, b = 110 + r() * 145 | 0, w = r() < .15 ? 1.12 : 1;
+      for (const dx of [-n, 0, n]) for (const dy of [-n, 0, n]) { if (x + dx < -20 || x + dx > n + 20 || y + dy < -20 || y + dy > n + 20) continue;
+        g.save(); g.translate(x + dx, y + dy); g.rotate(a); g.fillStyle = `rgb(${Math.min(255, b * w) | 0},${b},${b * .86 | 0})`; g.beginPath(); g.moveTo(-l, 0); g.quadraticCurveTo(-l * .2, -l * .48, l, 0); g.quadraticCurveTo(-l * .2, l * .48, -l, 0); g.fill(); g.restore(); } }
+    const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; return t; })();
+  const foliageMats = {};
+  const foliageMat = (opt = {}) => { const k = JSON.stringify(opt); if (foliageMats[k]) return foliageMats[k];
+    const m = windMat(Object.assign({}, opt, { map: leafTile })), prev = m.onBeforeCompile, pk = m.customProgramCacheKey;
+    m.onBeforeCompile = sh => { prev(sh); sh.vertexShader = 'varying vec3 vFN;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n#ifdef USE_INSTANCING\nvFN=normalize(mat3(modelMatrix*instanceMatrix)*objectNormal);\n#else\nvFN=normalize(mat3(modelMatrix)*objectNormal);\n#endif');
+      sh.fragmentShader = 'varying vec3 vFN;\n' + sh.fragmentShader.replace('#include <map_fragment>', `vec3 bw_=pow(abs(normalize(vFN)),vec3(4.));bw_/=(bw_.x+bw_.y+bw_.z);
+        vec4 tl_=texture2D(map,vWP.zy/22.)*bw_.x+texture2D(map,vWP.xz/22.)*bw_.y+texture2D(map,vWP.xy/22.)*bw_.z; diffuseColor.rgb*=mapTexelToLinear(tl_).rgb*1.35;`); };
+    m.customProgramCacheKey = () => (pk ? pk.call(m) : '') + '|foliage'; return foliageMats[k] = m; };
   // листва качается на ветру: смещение вершин в шейдере, сильнее у верхушки кроны (тени не качаются — это дёшево)
   const windMat = (opt = {}) => { const k = JSON.stringify(opt); if (windMats[k]) return windMats[k];
     const m = charrable((GROUNDED ? o => new T.MeshLambertMaterial(o) : MAT)(Object.assign({ color: 0xffffff, map: grunge }, opt))), prev = m.onBeforeCompile, pk = m.customProgramCacheKey;
@@ -385,19 +399,30 @@ void main(){
   geo.bushCards = [0, 1, 2].map(v => leafShell(1601 + v * 11, 9, 8, 15, 20, 9, 5));
   // сплошная крона (без висящих плоскостей): ядро + много мелких «шапок» листвы, слитых в одну геометрию;
   // нормали смешаны с направлением от центра кроны — мягкий объёмный свет; низ и середина темнее (цвет вершин)
-  function solidCrown(seed, cy, ry, rxz, lobes, lr) { const r = mkRng(seed), L = [], src = new T.IcosahedronGeometry(1, 1);
-    const lobe = (cx, y, cz, rad, v) => { const g = src.clone(), P = g.attributes.position;
+  function solidCrown(seed, cy, ry, rxz, lobes, lr, fringe) { const r = mkRng(seed), L = [], src = new T.IcosahedronGeometry(1, 1), src0 = new T.IcosahedronGeometry(1, 0);
+    const lobe = (cx, y, cz, rad, v, small) => { const g = (small ? src0 : src).clone(), P = g.attributes.position;
       for (let i = 0; i < P.count; i++) { const x = P.getX(i), yy = P.getY(i), z = P.getZ(i), k = .82 + .3 * hash3(Math.round(x * 90), Math.round(yy * 90), Math.round(z * 90), v); P.setXYZ(i, x * k, yy * k * .85, z * k); }
       return [g, RX(cx, y, cz, rad, rad, rad, 0, r() * 6.28)]; };
     L.push(lobe(0, cy, 0, Math.min(rxz, ry) * .9, seed));
     for (let i = 0; i < lobes; i++) { const a = r() * 6.28, el = -.25 + Math.acos(1 - r() * 1.7) / Math.PI * 1.85, d = [Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el)], rad = lr * (.75 + r() * .5);
-      L.push(lobe(d[0] * (rxz - rad * .55), cy + d[1] * (ry - rad * .5), d[2] * (rxz - rad * .55), rad, seed + i)); }
+      L.push(lobe(d[0] * (rxz - rad * .55), cy + d[1] * (ry - rad * .5), d[2] * (rxz - rad * .55), rad, seed + i, i >= 10)); }
     const g = mergeG(L.map(([g, m]) => [g, m, 0xffffff])), P = g.attributes.position, N = g.attributes.normal, C = g.attributes.color;
     for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), rv = new T.Vector3(x / rxz, (y - cy) / ry + .2, z / rxz).normalize(), n = new T.Vector3(N.getX(i), N.getY(i), N.getZ(i)).multiplyScalar(.4).add(rv.multiplyScalar(.6)).normalize(); N.setXYZ(i, n.x, n.y, n.z);
       const h = Math.min(1, Math.max(0, (y - (cy - ry)) / (2 * ry))), out = Math.min(1, Math.hypot(x / rxz, (y - cy) / ry)), ao = .42 + .3 * h + .3 * out * out; C.setXYZ(i, ao, ao * 1.01, ao * .95); }
     g.userData.foliage = 1; return g; }
-  geo.crownSolid = [[13, 16, 60], [10, 24, 70], [18, 11, 54]].map((cr, v) => solidCrown(501 + v * 7, (34 + cr[2]) / 2 + 2, (cr[2] - 34) / 2 + 6, cr[0] + 8, 16, 7));
-  geo.bushSolid = [0, 1, 2].map(v => solidCrown(701 + v * 5, 9, 8, 15, 8, 5));
+  // мелкая бахрома из листьев прямо на поверхности кроны: рваный край вместо гладкого шара (под ней — непрозрачная листва, просветов на землю нет)
+  function fringe(seed, cy, ry, rxz, n, s0) { const r = mkRng(seed), L = [], quad = new T.PlaneGeometry(1, 1);
+    for (let i = 0; i < n; i++) { const a = r() * 6.28, el = -.3 + Math.acos(1 - r() * 1.7) / Math.PI * 1.85, d = new T.Vector3(Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el)), sz = s0 * (.75 + r() * .5);
+      const pos = new T.Vector3(d.x * (rxz + 1.5), cy + d.y * (ry + 1.5), d.z * (rxz + 1.5)), q = new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 0, 1), new T.Vector3(d.x, d.y + .6, d.z).normalize()).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 0, 1), r() * 6.28));
+      L.push([quad, new T.Matrix4().compose(pos, q, new T.Vector3(sz, sz, 1)), 0xffffff]); }
+    const g = mergeG(L), P = g.attributes.position, N = g.attributes.normal, C = g.attributes.color;
+    for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), nv = new T.Vector3(x / rxz, (y - cy) / ry + .2, z / rxz).normalize(); N.setXYZ(i, nv.x, nv.y, nv.z); const h = Math.min(1, Math.max(0, (y - (cy - ry)) / (2 * ry))), ao = .6 + .4 * h; C.setXYZ(i, ao, ao, ao * .96); }
+    g.userData.cards = 1; return g; }
+  const CROWNP = [[13, 16, 60], [10, 24, 70], [18, 11, 54]].map(cr => [(34 + cr[2]) / 2 + 2, (cr[2] - 34) / 2 + 6, cr[0] + 8]);
+  geo.crownSolid = CROWNP.map(([cy, ry, rxz], v) => solidCrown(501 + v * 7, cy, ry, rxz, 34, 5));
+  geo.crownFringe = CROWNP.map(([cy, ry, rxz], v) => fringe(551 + v * 7, cy, ry, rxz, 46, 9));
+  geo.bushSolid = [0, 1, 2].map(v => solidCrown(701 + v * 5, 9, 8, 15, 14, 4));
+  geo.bushFringe = [0, 1, 2].map(v => fringe(751 + v * 5, 9, 8, 15, 18, 7));
   // у каждого дерева свой оттенок: в основном зелёные, часть желтеет, редкие — рыжие (конец лета)
   const LEAFC = [0x8c9c5c, 0x80965a, 0x98a462, 0x7e8e50, 0x8a9a56, 0xb0a24e, 0xa89846, 0xb8763c];
   const leafOf = id => { const r = rh(id, 41); return LEAFC[r < .72 ? Math.floor(rh(id, 42) * 5) : r < .92 ? 5 + Math.floor(rh(id, 43) * 2) : 7]; };
@@ -415,12 +440,12 @@ void main(){
       [geo.box, 0x40352a, M(0, 24, h / 2 + .6, 38, 48, 1.2)], [geo.box, 0xb8aea0, M(14, 24, h / 2 + 1.4, 2, 3, 1.5)]],
     tree: (w, h, o) => {
       const k = w / 44 * 1.15, v = o.id % 3, tall = [1, 1.12, .9][v];
-      return [[geo.treeWood[v], 0x5a4432, M(0, 0, 0, k, k * tall, k, o.id * .7)], [geo.crownSolid[v], leafOf(o.id), M(0, 0, 0, k, k * tall, k, o.id * .7)]];
+      return [[geo.treeWood[v], 0x5a4432, M(0, 0, 0, k, k * tall, k, o.id * .7)], [geo.crownSolid[v], leafOf(o.id), M(0, 0, 0, k, k * tall, k, o.id * .7)], [geo.crownFringe[v], leafOf(o.id), M(0, 0, 0, k, k * tall, k, o.id * .7)]];
     },
     pine: (w) => { const k = w / 40; return [[geo.cyl6, 0x4a3626, M(0, 8 * k, 0, 2.6 * k, 16 * k, 2.6 * k)], [geo.cone7, 'pine', M(0, 26 * k, 0, 21 * k, 30 * k, 21 * k)], [geo.cone7, 'pine', M(0, 44 * k, 0, 16 * k, 26 * k, 16 * k, .5)], [geo.cone7, 'pine', M(0, 60 * k, 0, 10 * k, 22 * k, 10 * k, 1)], [geo.cone7, 'pine', M(0, 66 * k, 0, 5 * k, 10 * k, 5 * k)]]; },
     rock: (w) => { const k = w / 36; return [[geo.dod, 'rock', M(0, 5 * k, 0, 18 * k, 12 * k, 15 * k, 0, .2)], [geo.dod, 'rock', M(9 * k, 3 * k, 6 * k, 9 * k, 7 * k, 8 * k, 1)]]; },
     hay: (w) => { const k = w / 30; return [[geo.lay, 0xbfa25a, M(0, 14 * k, 0, 21 * k, 14 * k, 14 * k)]]; },
-    cactus: (w, h, o) => [[geo.bushSolid[(o ? o.id : 0) % 3], leafOf((o ? o.id : 0) + 3), M(0, 0, 0, w / 34, w / 34 * 1.1, w / 34, o ? o.id : 0)]], // в Европе нет кактусов — на их месте кусты
+    cactus: (w, h, o) => [[geo.bushSolid[(o ? o.id : 0) % 3], leafOf((o ? o.id : 0) + 3), M(0, 0, 0, w / 34, w / 34 * 1.1, w / 34, o ? o.id : 0)], [geo.bushFringe[(o ? o.id : 0) % 3], leafOf((o ? o.id : 0) + 3), M(0, 0, 0, w / 34, w / 34 * 1.1, w / 34, o ? o.id : 0)]], // в Европе нет кактусов — на их месте кусты
     cactusOld: (w) => { const k = w / 26; return [[geo.cyl6, 0x55703a, M(0, 22 * k, 0, 5 * k, 44 * k, 5 * k)], [geo.cyl6, 0x4f6a35, M(7 * k, 20 * k, 0, 3 * k, 6 * k, 3 * k, 0, 1.57)], [geo.cyl6, 0x4f6a35, M(10 * k, 28 * k, 0, 3 * k, 16 * k, 3 * k)],
       [geo.cyl6, 0x4f6a35, M(-6 * k, 16 * k, 0, 3 * k, 5 * k, 3 * k, 0, 1.57)], [geo.cyl6, 0x4f6a35, M(-8.5 * k, 22 * k, 0, 3 * k, 12 * k, 3 * k)]]; },
     snowman: (w) => { const k = w / 24; return [[geo.dod, 0x76746e, M(0, 5 * k, 0, 12 * k, 9 * k, 11 * k)], [geo.dod, 0x5e6a3e, M(0, 8 * k, 0, 11 * k, 6 * k, 10 * k, .4)]]; }, // валун со мхом (сезон один — без снега)
@@ -459,7 +484,7 @@ void main(){
     fence: (w) => [[geo.box, 0x6b5238, M(0, 10, 0, w, 2, 2)], [geo.box, 0x6b5238, M(0, 18, 0, w, 2, 2)], ...[-.5, -.25, 0, .25, .5].map(k => [geo.box, 0x5a4430, M(w * k * .96, 11, 0, 3, 22, 3)])],
     bush: (w, h, o) => {
       const k = w / 34, spread = o.id % 2 ? 1 : .84;
-      return [[geo.bushSolid[o.id % 3], leafOf(o.id + 7), M(0, 0, 0, k * spread, k, k, o.id * .9)]];
+      return [[geo.bushSolid[o.id % 3], leafOf(o.id + 7), M(0, 0, 0, k * spread, k, k, o.id * .9)], [geo.bushFringe[o.id % 3], leafOf(o.id + 7), M(0, 0, 0, k * spread, k, k, o.id * .9)]];
     },
     wall: (w, h) => [[geo.box, 0x8d8d86, M(0, 11, 0, w, 22, h)], [geo.box, 0x76766f, M(0, 22.5, 0, w * 1.02, 2, h * 1.3)]],
     tent: (w, h) => [[geo.roof, 0x5a5a3a, M(0, 0, 0, w, 30, h)], [geo.box, 0x2e2e20, M(w / 2 + .3, 8, 0, .8, 14, 8)]],
@@ -519,7 +544,7 @@ void main(){
       const options = surface === 'crate' && crateTex ? { map: crateTex }
         : surface === 'foliage' ? { map: leafPattern, vertexColors: !!g.attributes.color }
         : surface === 'bark' ? { map: barkPattern, vertexColors: !!g.attributes.color } : g.attributes.color ? { vertexColors: true } : {};
-      const mesh = new T.InstancedMesh(g, g.userData.cards ? windMat({ map: leafCardTex, alphaTest: .5, side: T.DoubleSide, vertexColors: true }) : (surface === 'foliage' ? windMat : worldMat)(options), items.length);
+      const mesh = new T.InstancedMesh(g, g.userData.cards ? windMat({ map: leafCardTex, alphaTest: .5, side: T.DoubleSide, vertexColors: true }) : g.userData.foliage ? foliageMat({ vertexColors: true }) : (surface === 'foliage' ? windMat : worldMat)(options), items.length);
       mesh.frustumCulled = false;
       mesh.castShadow = !g.userData.cards;
       mesh.receiveShadow = GROUNDED && surface === 'foliage';
