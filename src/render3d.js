@@ -13,7 +13,7 @@ function planStreets(objs) {
     return !nearObjs(objs, p, r).some(o => !o.nc && objPush(o, p, r));
   };
   const segment = (a, b, r, road = true) => {
-    const n = Math.ceil(dist(a, b) / 12);
+    const n = Math.ceil(dist(a, b) / 6);
     for (let i = 0; i <= n; i++) if (!clear(lerp(a, b, i / Math.max(1, n)), r, road)) return false;
     return true;
   };
