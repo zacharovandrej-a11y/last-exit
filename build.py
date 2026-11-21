@@ -9,5 +9,9 @@ html = rd('src', 'index.html').replace('/*SHARED*/', shared).replace('/*CLIENT*/
 icons = {n: base64.b64encode(open(p('assets', 'icon-%d.png' % n), 'rb').read()).decode() for n in (192, 512)}
 w = rd('src', 'server.js').replace('/*SHARED*/', shared).replace('__THREE__', json.dumps(rd('assets', 'three.min.js')))
 w = w.replace('__ICON192__', icons[192]).replace('__ICON512__', icons[512]).replace('__INDEX_HTML__', json.dumps(html, ensure_ascii=False))
+# зомби-кооп «ОРДА» (/z): своя страница и свой Durable Object ZWorld
+zsh = rd('src', 'zombie', 'zshared.js')
+zhtml = rd('src', 'zombie', 'zindex.html').replace('/*SHARED*/', shared + '\n' + zsh).replace('/*CLIENT*/', rd('src', 'zombie', 'zclient.js'))
+w = w.replace('__ZINDEX_HTML__', json.dumps(zhtml, ensure_ascii=False)) + '\n' + zsh + '\n' + rd('src', 'zombie', 'zserver.js')
 open(p('worker.js'), 'w', encoding='utf-8').write(w)
 print('worker.js', len(w.encode()), 'bytes')

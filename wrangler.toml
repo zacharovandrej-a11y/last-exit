@@ -11,3 +11,11 @@ class_name = "World"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["World"]
+
+[[durable_objects.bindings]]
+name = "ZWORLD"
+class_name = "ZWorld"
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["ZWorld"]

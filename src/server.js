@@ -1,6 +1,7 @@
 // ===== СЕКТЫ (бывший LAST EXIT) — сервер (Cloudflare Worker + Durable Object) =====
 /*SHARED*/
 const INDEX_HTML = __INDEX_HTML__;
+const ZINDEX_HTML = __ZINDEX_HTML__; // зомби-кооп «ОРДА» (прототип) — /z
 const THREE_JS = __THREE__;
 const ICONS = { 192: '__ICON192__', 512: '__ICON512__' };
 const b64bin = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
@@ -12,6 +13,11 @@ export default {
       if (req.headers.get('Upgrade') !== 'websocket') return new Response('websocket only', { status: 426 });
       return env.WORLD.get(env.WORLD.idFromName('world-1')).fetch(req);
     }
+    if (url.pathname === '/zws') {
+      if (req.headers.get('Upgrade') !== 'websocket') return new Response('websocket only', { status: 426 });
+      return env.ZWORLD.get(env.ZWORLD.idFromName('zombie-1')).fetch(req);
+    }
+    if (url.pathname === '/z' || url.pathname === '/z/') return new Response(ZINDEX_HTML, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' } });
     if (url.pathname === '/' || url.pathname === '/index.html')
       return new Response(INDEX_HTML, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' } });
     if (url.pathname === '/manifest.webmanifest') return new Response(JSON.stringify({
