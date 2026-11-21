@@ -46,18 +46,21 @@ const ZFX = (() => {
   function flame(from, d, end) { for (let i = 0; i < 2; i++) sprite(add(from, d, Math.random() * end), 18, 6, 22, .35, Math.random() < .5 ? 0xff8a20 : 0xffd040, [d[0] * 120, 20, d[1] * 120]); }
   function boom(c, r = 100) { G3.boom(c, r); decal(c, r * 1.2, 'scorch', 0x16100c, .85); spray(c, 10, [1, 0], 30, 160, 2.4); }
   // ===== зомби =====
-  const ZN = 400, PART = ['legL', 'legR', 'torso', 'head', 'armL', 'armR', 'eyes', 'jaw', 'stain'], PG = {
+  const ZN = 400, PART = ['legL', 'legR', 'torso', 'head', 'armL', 'armR', 'eyes', 'jaw', 'stain', 'hair', 'brow', 'nose', 'ears', 'wound'], PG = {
     legL: [new T.BoxGeometry(5.2, 16, 5.4).translate(0, -8, 0), [-3.3, 16, 0]], legR: [new T.BoxGeometry(5.2, 16, 5.4).translate(0, -8, 0), [3.3, 16, 0]],
     torso: [new T.BoxGeometry(13.5, 16, 8.5).translate(0, 8, 0), [0, 15, 0]], head: [new T.BoxGeometry(8.6, 9, 8.6).translate(0, 4.5, 0), [0, 30, 2]],
     armL: [new T.BoxGeometry(4.2, 15, 4.2).translate(0, -7, 0), [-8.8, 29, 0]], armR: [new T.BoxGeometry(4.2, 15, 4.2).translate(0, -7, 0), [8.8, 29, 0]],
-    eyes: [new T.BoxGeometry(7.4, 2.2, .8).translate(0, 5.4, 4.8), [0, 30, 2]], stain: [new T.BoxGeometry(9, 8, .8).translate(1, 7, 4.4), [0, 15, 0]], jaw: [new T.BoxGeometry(7, 2.6, 2).translate(0, 1.2, 4.4), [0, 30, 2]] };
+    eyes: [new T.BoxGeometry(7.4, 2.2, .8).translate(0, 5.4, 4.8), [0, 30, 2]], stain: [new T.BoxGeometry(9, 8, .8).translate(1, 7, 4.4), [0, 15, 0]], jaw: [new T.BoxGeometry(7, 2.6, 2).translate(0, 1.2, 4.4), [0, 30, 2]],
+    hair: [new T.BoxGeometry(9.2, 2.4, 9.4).translate(0, 9.4, -.5), [0, 30, 2]], brow: [new T.BoxGeometry(8.2, 1.5, 1.6).translate(0, 7.1, 4.5), [0, 30, 2]], nose: [new T.BoxGeometry(1.6, 2.4, 1.6).translate(0, 4, 5), [0, 30, 2]],
+    ears: [new T.BoxGeometry(10.4, 3, 1.8).translate(0, 4.8, 0), [0, 30, 2]], wound: [new T.BoxGeometry(.7, 3.6, 3.8).translate(4.4, 5.4, 1), [0, 30, 2]] }; // голова: волосы клочьями, надбровья, нос, уши, рана
   const ZM = {}; for (const k of PART) { const m = new T.InstancedMesh(PG[k][0], k === 'eyes' ? new T.MeshBasicMaterial({ color: 0xffffff }) : MAT(0xffffff), ZN); m.frustumCulled = false; m.castShadow = k === 'torso'; m.setColorAt(0, new T.Color()); m.count = 0; scene.add(m); ZM[k] = m; }
   const zShadow = new T.InstancedMesh(new T.CircleGeometry(1, 12).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0, transparent: true, opacity: .28, depthWrite: false }), ZN); zShadow.frustumCulled = false; scene.add(zShadow);
-  const base = new T.Matrix4(), loc = new T.Matrix4(), tmp = new T.Matrix4(), C = new T.Color(), WHITE = new T.Color(1, 1, 1), FIRE = new T.Color(1, .45, .1);
+  const base = new T.Matrix4(), loc = new T.Matrix4(), tmp = new T.Matrix4(), C = new T.Color(), WHITE = new T.Color(1, 1, 1), FIRE = new T.Color(1, .45, .1), ICE = new T.Color(.6, .85, 1);
+  const HAIR = [0x2a1e16, 0x4a3424, 0x1a1a1a, 0x6a5a40, 0x8a8a84, 0x5a2a14];
   // одежда — как у горожан, только грязная и в крови
   const SHIRT = [0x6a2c2c, 0x2c4468, 0x46602e, 0x5e523a, 0x523a5e, 0x7e735a, 0x2c2c2c, 0x6a5020, 0x385252, 0x8a8478], PANTS = [0x23283a, 0x3a2e20, 0x2c3a48, 0x1e1e1e, 0x46382a], SKIN = [0x5d7350, 0x67765a, 0x536649, 0x6f7058, 0x5f6a55, 0x77806a];
   const SPEC = { 2: [0x6a5a48, 0x3a3020], 4: [0x2f2f36, 0x22222a], 5: [0x3a1a1a, 0x201010] }; // толстяк, громила, босс — своя одежда
-  function look(id, ty) { const h = n => ((id * 9301 + n * 49297) % 233280) / 233280; const sp = SPEC[ty]; return { skin: SKIN[Math.floor(h(1) * SKIN.length)], shirt: sp ? sp[0] : SHIRT[Math.floor(h(2) * SHIRT.length)], pants: sp ? sp[1] : PANTS[Math.floor(h(3) * PANTS.length)], seed: h(4) * 6 }; }
+  function look(id, ty) { const h = n => ((id * 9301 + n * 49297) % 233280) / 233280; const sp = SPEC[ty]; return { skin: SKIN[Math.floor(h(1) * SKIN.length)], shirt: sp ? sp[0] : SHIRT[Math.floor(h(2) * SHIRT.length)], pants: sp ? sp[1] : PANTS[Math.floor(h(3) * PANTS.length)], seed: h(4) * 6, hair: HAIR[Math.floor(h(5) * HAIR.length)], bald: h(6) < .3 || ty === 4, wnd: h(7) < .55 }; }
   function draw(list, now) {
     let n = 0; const t = now / 1000;
     for (const z of list) {
@@ -71,12 +74,12 @@ const ZFX = (() => {
         if (k === 'legL' || k === 'legR') { rx = (k === 'legL' ? sw : -sw) * .6 * (crawl ? .2 : 1) * (fall ? 0 : 1) + (fall ? .3 * fall : 0); hide = crawl; }
         else if (k === 'armL') { rx = fall ? -1.2 - fall : -1.45 + (att ? Math.sin(t * 14) * .5 : Math.sin(ph * .5) * .12) + air * -.4; rz = -.1; hide = z.lost & 1; }
         else if (k === 'armR') { rx = fall ? -1.4 - fall : -1.45 + (att ? Math.cos(t * 14) * .5 : Math.cos(ph * .5) * .12) + air * -.4; rz = .1; hide = z.lost & 2; }
-        else if (k === 'torso' || k === 'stain') { rx = .3 + (att ? .15 : 0) + ZT[z.ty].sc * .03; rz = Math.sin(ph * .5) * .08; }
-        else { rx = .25 + (att && k === 'jaw' ? Math.abs(Math.sin(t * 12)) * .4 : 0); rz = Math.sin(t * 2 + (z.seed || 0)) * .25; hide = z.lost & 16; }
+        else if (k === 'torso' || k === 'stain') { rx = .3 + (att ? .15 : 0) + ZT[z.ty].sc * .03 - (z.kick || 0) * .6; rz = Math.sin(ph * .5) * .08; }
+        else { rx = .25 - (z.kick || 0) * .7 + (att && k === 'jaw' ? Math.abs(Math.sin(t * 12)) * .4 : 0); rz = Math.sin(t * 2 + (z.seed || 0)) * .25; hide = (z.lost & 16) || (k === 'hair' && z.bald) || (k === 'wound' && !z.wnd); }
         if (hide) loc.copy(ZERO); else { loc.makeTranslation(j[0], j[1], j[2]); loc.multiply(tmp.makeRotationFromEuler(E.set(rx, 0, rz))); }
         m.setMatrixAt(n, tmp.multiplyMatrices(base, loc));
-        if (k === 'eyes') C.setHex(z.ty === 5 ? 0xff2020 : z.ty === 4 ? 0xff6a20 : 0xffe060); else if (k === 'stain') C.setHex(0x4a0606); else C.setHex(k === 'head' || k === 'armL' || k === 'armR' || k === 'jaw' ? (k === 'jaw' ? 0x3a0c0c : z.skin) : k === 'torso' ? z.shirt : z.pants);
-        if (burn) C.lerp(FIRE, .35 + .2 * Math.sin(t * 20 + (z.seed || 0))); if (flash > 0) C.lerp(WHITE, flash); if (fall > .8 && k !== 'eyes') C.multiplyScalar(.85);
+        if (k === 'eyes') C.setHex(z.ty === 5 ? 0xff2020 : z.ty === 4 ? 0xff6a20 : 0xffe060); else if (k === 'stain' || k === 'wound') C.setHex(k === 'wound' ? 0x6a0808 : 0x4a0606); else if (k === 'hair') C.setHex(z.hair || 0x2a1e16); else if (k === 'brow' || k === 'nose' || k === 'ears') { C.setHex(z.skin); C.multiplyScalar(k === 'brow' ? .62 : .88); } else C.setHex(k === 'head' || k === 'armL' || k === 'armR' || k === 'jaw' ? (k === 'jaw' ? 0x3a0c0c : z.skin) : k === 'torso' ? z.shirt : z.pants);
+        if (burn) C.lerp(FIRE, .35 + .2 * Math.sin(t * 20 + (z.seed || 0))); if (z.fl & 8 && k !== 'eyes') C.lerp(ICE, .6); if (flash > 0) C.lerp(WHITE, flash); if (fall > .8 && k !== 'eyes') C.multiplyScalar(.85);
         m.setColorAt(n, C);
       }
       zShadow.setMatrixAt(n, M4.compose(V3.set(z.p[0], .6, z.p[1]), Q.identity(), S3.set(Tz.r * 1.1, 1, Tz.r * 1.1)));
@@ -94,7 +97,7 @@ const ZFX = (() => {
     for (let i = 0; i < 2 + g; i++) bloodAt(add(p, d, 15 + Math.random() * 40 * (g * .4 + .6)), 10 + Math.random() * 16, .9);
     if (g >= 5) { for (let i = 0; i < 14; i++) gib(p, 18 * sc, d, [3 + Math.random() * 5, 3 + Math.random() * 5, 3 + Math.random() * 5].map(v => v * sc), Math.random() < .4 ? L.skin : Math.random() < .5 ? L.shirt : 0x7a0a0a, 230); bloodAt(p, 70 * sc, 1); return; }
     if (g >= 3) { if (!(lost & 1) && Math.random() < .6) { gib(p, 26 * sc, d, [4 * sc, 14 * sc, 4 * sc], L.skin, 160); lost |= 1; } if (!(lost & 2) && Math.random() < .6) { gib(p, 26 * sc, d, [4 * sc, 14 * sc, 4 * sc], L.skin, 160); lost |= 2; } if (Math.random() < .55) { gib(p, 32 * sc, d, [9 * sc, 9 * sc, 9 * sc], L.skin, 200); lost |= 16; } }
-    dying.push({ p: [...p], d, yaw: z ? z.yaw : Math.atan2(-d[0], -d[1]), ty, lost, t: 0, skin: L.skin, shirt: L.shirt, pants: L.pants, seed: 1 });
+    dying.push({ p: [...p], d, yaw: z ? z.yaw : Math.atan2(-d[0], -d[1]), ty, lost, t: 0, skin: L.skin, shirt: L.shirt, pants: L.pants, hair: L.hair, bald: L.bald, wnd: L.wnd, seed: 1, kb: 4 + g * 7 });
   }
   // ===== кровавые следы ног =====
   const feet = {};
@@ -121,7 +124,7 @@ const ZFX = (() => {
     const all = zl.slice();
     for (let i = dying.length - 1; i >= 0; i--) { const z = dying[i]; z.t += dt;
       if (z.t > 2.4) { decal(add(z.p, z.d, 14 * ZT[z.ty].sc), 34 * ZT[z.ty].sc, 'body', 0x3a1812, .95, -z.yaw + Math.PI); bloodAt(z.p, 26 * ZT[z.ty].sc, .7); dying.splice(i, 1); continue; }
-      const k = Math.min(1, z.t / .35); all.push({ p: add(z.p, z.d, k * 10), ty: z.ty, lost: z.lost, yaw: z.yaw, walk: 0, fl: 0, skin: z.skin, shirt: z.shirt, pants: z.pants, seed: 1, flash: 0, fall: Math.max(.01, k) }); }
+      const k = Math.min(1, z.t / .35); all.push({ p: add(z.p, z.d, k * 10 + Math.min(1, z.t / .25) * (z.kb || 0)), ty: z.ty, lost: z.lost, yaw: z.yaw, walk: 0, fl: 0, skin: z.skin, shirt: z.shirt, pants: z.pants, hair: z.hair, bald: z.bald, wnd: z.wnd, seed: 1, flash: 0, fall: Math.max(.01, k) }); }
     draw(all, now);
     for (const s of sps) { if (!s.visible) continue; const u = s.userData; u.t += dt; if (u.t > u.life) { s.visible = false; continue; } const k = u.t / u.life; s.scale.setScalar(u.s0 + (u.s1 - u.s0) * k); s.material.opacity = 1 - k; s.position.x += u.v[0] * dt; s.position.y += u.v[1] * dt; s.position.z += u.v[2] * dt; }
   }

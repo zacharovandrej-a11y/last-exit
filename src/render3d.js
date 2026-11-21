@@ -305,10 +305,10 @@ void main(){
       if (k === 'sofa') return [[geo.box, 0x5a3a3a, M(0, 5, 0, w, 10, h)], [geo.box, 0x4a2e2e, M(0, 12, -h * .35, w, 14, h * .3)], [geo.box, 0x4a2e2e, M(w * .45, 9, 0, w * .1, 10, h)], [geo.box, 0x4a2e2e, M(-w * .45, 9, 0, w * .1, 10, h)]];
       if (k === 'dbox') return [[geo.box, 0x6b4a2e, M(0, 9, 0, w, 18, h)], [geo.box, 0x4a3220, M(0, 18.6, 0, w * 1.05, 1.5, h * 1.05)], [geo.box, 0x111111, M(0, 19.5, 0, w * .5, .6, 2)], [geo.box, 0xd4a017, M(w * .51, 12, 0, .6, 4, 4)]];
       if (k === 'bench') return [[geo.box, 0x6b4a2e, M(0, 8, 0, w, 2.5, h)], [geo.box, 0x5a3c24, M(-w * .42, 14, 0, 2, 12, h)], [geo.box, 0x4a3220, M(0, 4, h * .42, w * .8, 8, 2)], [geo.box, 0x4a3220, M(0, 4, -h * .42, w * .8, 8, 2)]];
-      if (k === 'altar0') return [[geo.box, 0xf2efe6, M(0, 11, 0, w, 22, h)], [geo.box, 0xff7eb0, M(0, 22.5, 0, w * .9, 1.5, h * .5)], [geo.box, 0xff7eb0, M(-1, 26, -6, 12, 4, 20)], [geo.dome, 0xff9ec4, M(-1, 26, -16, 6, 5, 6)], [geo.box, 0xffffff, M(-1, 29, -4, 12, 2, 4)], [geo.box, 0x6b4a2e, M(-2, 24, 12, 8, 3, 10)]];
-      if (k === 'altar1') return [[geo.box, 0x2a2630, M(0, 10, 0, w, 20, h)], [geo.box, 0x7a1020, M(0, 20.5, 0, w * 1.02, 1.5, h * .8)], ...[-16, -6, 6, 16].map(z => [geo.cyl6, 0xe8dcc0, M(-4, 25, z, 1.4, 8, 1.4)]), ...[-16, -6, 6, 16].map(z => [geo.cone7, 0xffb347, M(-4, 30.5, z, 1.2, 3, 1.2)]), [geo.sph, 0x8a8a90, M(2, 25, 0, 5, 4, 4)], [geo.cone7, 0xd8a040, M(-3, 25, 0, 1.4, 4, 1.4, 0, 1.57)], [geo.box, 0xa259ff, M(9, 30, 0, 1.5, 20, 30)]];
-      if (k === 'altar2') return [[geo.box, 0x5a4a3a, M(0, 12, 0, w, 2.5, h)], [geo.box, 0x4a3c2e, M(0, 6, 0, w * .8, 12, h * .9)], [geo.box, 0xa8784a, M(8, 32, 0, 2, 30, h * 1.1)], ...[[-12, 38], [8, 40], [14, 28], [-6, 26], [0, 34]].map(([z, y]) => [geo.box, 0xf2efe6, M(6.6, y, z, .5, 6, 7)]), [geo.box, 0xd02020, M(6.2, 34, 0, .4, .8, 28, 0, 0)], [geo.box, 0xd02020, M(6.2, 33, 2, .4, 14, .8, .0, 0)], [geo.dome, 0xd8dde2, M(-3, 14, 10, 5, 6, 5)]];
-      if (k === 'altar3') return [[geo.box, 0x2a4a8a, M(0, 9, 0, w * .7, 18, h * .4)], [geo.box, 0x3d8bff, M(0, 19, 0, w * .8, 2, h * .5)], [geo.box, 0x55595e, M(8, 30, -14, 2, 40, 2)], [geo.box, 0x55595e, M(8, 30, 14, 2, 40, 2)], [geo.box, 0xffd43b, M(8, 42, 0, 1.5, 24, h)], [geo.box, 0x3d8bff, M(7, 42, 0, .5, 18, h * .85)], [geo.box, 0xffffff, M(6.6, 44, 0, .4, 3, h * .6)]];
+      if (k === 'altar0') return [[geo.box, 0x9aa0a6, M(0, 7, 0, w, 3, h)], [geo.box, 0xf2f2ee, M(0, 11, 0, w * .95, 5, h * .95)], [geo.box, 0x7a1a1a, M(-2, 14, 3, w * .9, 1.5, h * .6)], [geo.box, 0xffffff, M(0, 14.5, -h * .36, w * .7, 3, 9)], [geo.box, 0x6a7078, M(0, 3, 0, w * .9, 6, 2)], [geo.box, 0x5a0808, M(3, 15, -4, 7, .6, 9)]]; // больничная койка в крови
+      if (k === 'altar1') return [[geo.box, 0x5a5660, M(0, 8, 0, w, 16, h)], [geo.box, 0x6e6a76, M(0, 17, 0, w * 1.08, 3, h * 1.04)], [geo.box, 0x3a363e, M(0, 19, -h * .1, w * .5, 2, h * .5)], ...[-16, 16].map(z => [geo.cyl6, 0xe8dcc0, M(6, 22, z, 1.4, 6, 1.4)])]; // каменный саркофаг со свечами
+      if (k === 'altar2') return [[geo.box, 0x4a4a42, M(0, 10, 0, w, 20, h)], [geo.box, 0x2a2a26, M(-2, 24, 0, w * .7, 8, h * .6)], [geo.box, 0x7a8a6a, M(-2, 24, h * .2, w * .5, 4, 2)], [geo.cyl6, 0x8a9096, M(-4, 36, -h * .3, .8, 22, .8)], [geo.box, 0xd02020, M(2, 30, 0, 1, 1, 1)]]; // рация военных
+      if (k === 'altar3') return [[geo.box, 0x55595e, M(8, 30, -14, 2, 40, 2)], [geo.box, 0x55595e, M(8, 30, 14, 2, 40, 2)], [geo.box, 0xe8ddbd, M(8, 42, 0, 1.5, 24, h)], [geo.box, 0xb03030, M(7, 44, 4, .5, 2, h * .5)], [geo.box, 0x355f8a, M(7, 40, -6, .5, 8, 10)], [geo.box, 0x2a2a2a, M(0, 6, 0, w * .6, 12, h * .5)]]; // карта эвакуации
       return [[geo.box, 0x6e6a62, M(0, 15, 0, w, 30, h)], [geo.box, 0xa8543a, M(-w * .2, 21, 0, w * .35, 6, h * .8)], [geo.box, 0x5a7a8a, M(w * .22, 21, 0, w * .3, 6, h * .8)], [geo.box, 0xc9a85a, M(0, 9, 0, w * .8, 6, h * .8)]]; },
     barrel: (w) => [[geo.cyl10, 0x4a5a3a, M(0, 12, 0, w / 2, 24, w / 2)], [geo.cyl10, 0x2e3a26, M(0, 8, 0, w / 2 + .3, 1.5, w / 2 + .3)], [geo.cyl10, 0x2e3a26, M(0, 17, 0, w / 2 + .3, 1.5, w / 2 + .3)]],
     fence: (w) => [[geo.box, 0x6b5238, M(0, 10, 0, w, 2, 2)], [geo.box, 0x6b5238, M(0, 18, 0, w, 2, 2)], ...[-.5, -.25, 0, .25, .5].map(k => [geo.box, 0x5a4430, M(w * k * .96, 11, 0, 3, 22, 3)])],
@@ -438,7 +438,7 @@ void main(){
     const W = b.w, H = b.h, top = K.wallHeight || WALLH;
     if (K.church === 0) { // «Зал Вечного Тапка»: аккуратный низкий зал, газон, кусты, стойка с литературой, гигантский тапок на крыше
       const Q = (g, c, m, role = 'roof', tx = 'stucco') => pcs.push([g, tx, 48, c, m, role]);
-      const cream = 0xcabea7, stone = 0x9b9382, teal = 0x315855, pink = 0xdb8daa, gold = 0xb89044;
+      const cream = 0xd8d4c8, stone = 0x9b9382, teal = 0x315855, pink = 0xc8343a, gold = 0xb0b4b8;
       const rh = Math.min(W, H) * .2;
       // Ухоженный двор и светлая терраса: тихий фон вместо пёстрой травы под входом.
       const gu = ground.material.uniforms; gu.hallC.value.set(...b.p); gu.hallU.value.set(...b.u); gu.hallHalf.value.set(W / 2 + 90, H / 2 + 90);
@@ -471,12 +471,8 @@ void main(){
       }
       { const q = out(28); Q(geo.box, cream, M(q[0], 82, q[1], ax ? 72 : 170, 16, ax ? 170 : 72));
         Q(geo.roof, teal, M(q[0], 87, q[1], ax ? 82 : 178, 23, ax ? 178 : 82)); }
-      // Чёткий силуэт тапка: закруглённая подошва, стелька и настоящая дуга ремешка.
-      Q(geo.cyl10, gold, M(0, top + rh + 5, 0, 71, 10, 35));
-      Q(geo.slipperSole, 0xc56a8c, M(0, top + rh + 10, 0, 1, 1, 1, -.12));
-      Q(geo.slipperSole, 0xf5c6cd, M(0, top + rh + 15, 0, .92, .5, .85, -.12));
-      Q(geo.slipperStrap, pink, M(18, top + rh + 18, 0, 1, 1, 1, -.12));
-      Q(geo.box, gold, M(18, top + rh + 41, 0, 8, 4, 12, -.12));
+      // Красный крест на крыше — больницу видно издалека
+      Q(geo.box, 0xf2f0ea, M(0, top + rh + 4, 0, 64, 8, 64)); Q(geo.box, 0xd42a2a, M(0, top + rh + 9, 0, 50, 3, 16)); Q(geo.box, 0xd42a2a, M(0, top + rh + 9, 0, 16, 3, 50));
       // Клумбы низкие, не закрывают людей; повторяющиеся детали инстансятся.
       for (const sd of [-1, 1]) { const q = out(115, sd * 110);
         Q(geo.box, stone, M(q[0], 3, q[1], 60, 6, 42), 'prop');
@@ -496,11 +492,11 @@ void main(){
         Q(geo.box, pink, M(q[0] + fx * 11.5, 17, q[1] + fz * 7.5, ax ? 1 : 16, 12, ax ? 16 : 1), 'prop'); }
       // Лицевая доска закреплена под балкой и выступает за свес крыши: текст не перекрывается.
       { const q = out(67); Q(geo.box, cream, M(q[0], 73, q[1], ax ? 6 : 144, 18, ax ? 144 : 6)); }
-      sign(b.id, wpt(out(70.5)), 73, 132, 13, [['ЗАЛ ВЕЧНОГО ТАПКА', 9]], '#e6d4b5', '#395d5b', '#b99d6d', n);
+      sign(b.id, wpt(out(70.5)), 73, 132, 13, [['ГОРОДСКАЯ БОЛЬНИЦА', 9]], '#f2f0ea', '#c8343a', '#9aa0a6', n);
       // Отдельный щит стоит на двух ножках, а не висит в воздухе.
       { const q = out(120, -158); Q(geo.box, stone, M(q[0], 30, q[1], ax ? 3 : 62, 31, ax ? 62 : 3), 'prop');
         for (const side of [-1, 1]) Q(geo.box, teal, M(q[0] + (ax ? 0 : side * 23), 10, q[1] + (ax ? side * 23 : 0), 3, 20, 3), 'prop'); }
-      sign(b.id, wpt(out(122, -158)), 30, 58, 27, [['ВАС УЖЕ ЛЮБЯТ', 6], ['осталось подписать', 4]], '#fff2df', '#a84d71', '#d4b474', n);
+      sign(b.id, wpt(out(122, -158)), 30, 58, 27, [['МЕСТ НЕТ', 7], ['укушенных не принимаем', 3.6]], '#fff', '#b02020', '#9aa0a6', n);
     } else if (K.church === 1) { // «Обитель» Тёмного Ордена: крутая чёрная крыша, шпиль со сферой, каменные голуби на углах, свечи у входа
       const Q = (g, c, m, role = 'roof', tx = 'stucco') => pcs.push([g, tx, 48, c, m, role]);
       const stone = 0x77717f, edge = 0xaaa1ad, roof = 0x302d40, brass = 0xaf945d;
@@ -531,7 +527,7 @@ void main(){
       for (const side of [-1, 1]) { const q = out(5, side * 45);
         Q(geo.box, edge, M(q[0], 38, q[1], ax ? 13 : 10, 76, ax ? 10 : 13), 'top'); }
       { const q = out(6); Q(geo.box, stone, M(q[0], 77, q[1], ax ? 14 : 108, 14, ax ? 108 : 14)); }
-      sign(b.id, wpt(out(13.5)), 77, 100, 12, [['ОБИТЕЛЬ ТЬМЫ', 10]], '#55505f', '#e3d7ba', '#a18c61', n);
+      sign(b.id, wpt(out(13.5)), 77, 100, 12, [['ЧАСОВНЯ', 10]], '#55505f', '#e3d7ba', '#a18c61', n);
       // Голуби на карнизах вместо религиозных символов.
       for (const side of [-1, 1]) { const x = -W / 2 + 12, z = side * (H / 2 - 10);
         Q(geo.box, edge, M(x, top + 2, z, 22, 5, 22));
@@ -575,10 +571,10 @@ void main(){
         Q(geo.box, dark, M(q[0], 30, q[1], ax ? 19 : 12, 60, ax ? 12 : 19), 'top');
         Q(geo.box, ochre, M(q[0] + fx * 10, 31, q[1] + fz * 10, ax ? 2 : 5, 52, ax ? 5 : 2), 'top'); }
       { const q = out(7); Q(geo.box, dark, M(q[0], 65, q[1], ax ? 22 : 116, 12, ax ? 116 : 22)); }
-      sign(b.id, wpt(out(18.5)), 65, 108, 10, [['ОНИ СЛЕДЯТ!', 10]], '#b5a16a', '#30382f', '#56604e', n);
+      sign(b.id, wpt(out(18.5)), 65, 108, 10, [['КАРАНТИН', 10]], '#d8b83a', '#1e1e1e', '#56604e', n);
       { const q = out(68, 100); Q(geo.box, dark, M(q[0], 29, q[1], ax ? 4 : 64, 29, ax ? 64 : 4), 'prop');
         for (const side of [-1, 1]) Q(geo.box, concrete, M(q[0] + (ax ? 0 : side * 24), 9, q[1] + (ax ? side * 24 : 0), 4, 18, 4), 'prop'); }
-      sign(b.id, wpt(out(70.5, 100)), 29, 60, 25, [['ПРИЁМ СИГНАЛА', 6], ['шапку не снимать', 4.5]], '#b5bba7', '#394432', '#687357', n);
+      sign(b.id, wpt(out(70.5, 100)), 29, 60, 25, [['ВОЕННЫЙ ПОСТ', 6], ['связи нет с 3-го дня', 4.2]], '#b5bba7', '#394432', '#687357', n);
     } else { // «собор» Святого Плаката: белое здание, шпиль из билбордов
       const Q = (g, c, m, role = 'roof', tx = 'stucco') => pcs.push([g, tx, 48, c, m, role]);
       const ivory = 0xc9c1ac, blue = 0x396899, red = 0xb85e52, gold = 0xc3a85e, stone = 0x9a9689;
@@ -601,13 +597,13 @@ void main(){
           Q(geo.box, stone, M(side * (W / 2 + 43), 3, z, 17, 6, 17), 'top');
         }
         const face = mul(b.u, side), wp = wpt([side * (W / 2 + 55.5), 0]);
-        sign(b.id, wp, 84, 172, 11, [['ДВОРЕЦ СВЯТОГО ПЛАКАТА', 8]], '#315678', '#f5e8ca', '#b49d69', face);
+        sign(b.id, wp, 84, 172, 11, [['ПУНКТ ЭВАКУАЦИИ', 8]], '#315678', '#f5e8ca', '#b49d69', face);
       }
       // Афиши в закреплённых витринах вдоль боковых стен, с собственной графической иерархией.
       const posters = [
-        ['СОБРАНИЕ', 'согласных заранее', '#a94f48'],
-        ['СЛАВА ПЛАКАТУ!', 'прочитал — передай', '#355f8a'],
-        ['СКОРО ПРАЗДНИК', 'дата уточняется', '#8b783e']
+        ['ЭВАКУАЦИЯ', 'сбор у дворца в 18:00', '#a94f48'],
+        ['НЕ ОТКРЫВАЙТЕ', 'окна и двери', '#355f8a'],
+        ['ВЫХОД ЕСТЬ', 'последний автобус', '#8b783e']
       ];
       for (const side of [-1, 1]) for (let i = 0; i < posters.length; i++) {
         const x = (i - 1) * 110, z = side * (H / 2 + 5), face = mul(b.v, side), p = posters[i];
@@ -620,7 +616,7 @@ void main(){
       Q(geo.box, red, M(W * .36 + 5.5, top + 54, 0, 1, 9, 76));
       Q(geo.box, gold, M(W * .36 + 5.5, top + 32, 0, 1, 22, 76));
       for (const side of [-1, 1]) Q(geo.box, stone, M(W * .36, top + 5, side * 32, 12, 10, 12));
-      sign(b.id, wpt([W * .36 + 6.2, 0]), top + 43, 84, 54, [['СЛАВА', 14], ['ПЛАКАТУ!', 11]], '#dfc274', '#315678', '#b8ad91', b.u);
+      sign(b.id, wpt([W * .36 + 6.2, 0]), top + 43, 84, 54, [['LAST', 14], ['EXIT', 14]], '#dfc274', '#7a1010', '#b8ad91', b.u);
       // Мощение только под галереей и проходом, а не цветной прямоугольник поверх газона.
       for (const side of [-1, 1]) Q(geo.box, stone, M(side * (W / 2 + 28), .8, 0, 66, .5, H + 36), 'floor', 'paving');
       for (const side of [-1, 1]) { const q = out(80, side * 105);
@@ -1020,6 +1016,16 @@ void main(){
     B.position.set(0, 0, 0); B.rotation.set(0, 0, 0); u.head.rotation.set(0, 0, 0);
     u.vest.visible = !!opt.armor; u.shadow.visible = !opt.alt;
     if (u.civ && !u.sectLook) sectAcc(c, opt.sect ?? -1);
+    if (opt.down) { // упал: лежит на животе и ползёт — руки по очереди тянутся вперёд, ноги толкаются, голова приподнята
+      const k = Math.min(1, (opt.deadT || 0) / .35), e = 1 - Math.pow(1 - k, 3), cr = Math.min(1, spd / 30), ph2 = walk * .55, s2 = Math.sin(ph2), c2 = Math.cos(ph2);
+      B.rotation.x = 1.42 * e; B.position.y = 4.5 * e + Math.max(0, s2) * .8 * cr; B.position.z = -22 * e; B.rotation.z = s2 * .08 * cr; B.rotation.y = s2 * .06 * cr;
+      const reachL = -2.5 - .55 * s2 * cr, reachR = -2.5 + .55 * s2 * cr;
+      u.armL.rotation.set(-.6 * (1 - e) + reachL * e, 0, -.35 * e); u.elL.rotation.set(-(.35 + .7 * Math.max(0, -c2) * cr) * e, 0, 0);
+      u.armR.rotation.set(-.4 * (1 - e) + reachR * e, 0, .35 * e); u.elR.rotation.set(-(.35 + .7 * Math.max(0, c2) * cr) * e, 0, 0);
+      u.legL.rotation.x = (.1 + s2 * .22 * cr) * e; u.legR.rotation.x = (.1 - s2 * .22 * cr) * e; u.kneeL.rotation.x = (.5 + Math.max(0, s2) * .6 * cr) * e; u.kneeR.rotation.x = (.5 + Math.max(0, -s2) * .6 * cr) * e;
+      u.head.rotation.x = -1.0 * e + (cr ? 0 : Math.sin(now * 3) * .08);
+      const pulse = .25 + .25 * Math.sin(now * 7); u.mats.shirt.emissive.setRGB(pulse * .5, 0, 0); u.mats.skin.emissive.setRGB(pulse * .3, 0, 0); u.gunHold.position.set(2.6, 32.5, 8); u.gunHold.rotation.set(0, 0, 0); return;
+    }
     if (opt.dead) { // смерть: подкашиваются колени, падает от выстрела, отскок, руки разлетаются
       const t = opt.deadT || 0, f = opt.fall || [-sy, -cy], lf = f[0] * sy + f[1] * cy, lr = f[0] * cy - f[1] * sy;
       const kb = Math.min(1, t / .16), k = Math.max(0, Math.min(1, (t - .1) / .36)), e = 1 - Math.pow(1 - k, 3);
@@ -1061,7 +1067,7 @@ void main(){
     }
     // отдача и вздрагивание от попадания (откидывает назад)
     if (opt.hit && !u.wasHit) u.fl = 1; u.wasHit = !!opt.hit; u.fl = Math.max(0, u.fl - dt * 5);
-    u.rec = opt.fire ? 1 : Math.max(0, u.rec - dt * 14);
+    u.rec = Math.max(u.kick || 0, opt.fire ? .5 : 0, u.rec - dt * 14); u.kick = 0;
     const fl = u.fl * u.fl; B.rotation.x -= fl * .45 + u.rec * .05; u.head.rotation.x = -fl * .5; c.position.x -= sy * fl * 5; c.position.z -= cy * fl * 5;
     const em = fl * .7; u.mats.shirt.emissive.setRGB(em, em * .15, em * .1); u.mats.skin.emissive.setRGB(em, em * .15, em * .1);
   }
@@ -1074,6 +1080,12 @@ void main(){
       m(geo.sph, 0x8a8f9a, 0, 4.5, 0, 3, 3, 4.6); m(geo.sph, 0x6a7080, 0, 7.6, 3.6, 1.9, 1.9, 2); m(geo.cone7, 0xe0a030, 0, 7.4, 5.8, .6, 1.4, .6).rotation.x = 1.57; m(geo.box, 0x5a6070, 0, 4.8, -4.6, 2.6, .8, 3); m(geo.sph, 0x4a8a6a, 0, 6.2, 2.4, 2.2, 1.2, 1.4);
       if (STYLE === 'toon') [...item.children].forEach(o => addOutline(o, OUT_C));
       g.userData.item = item; g.userData.bird = 1; g.position.set(it.p[0], 0, it.p[1]); g.rotation.y = it.id * 2.3; return g; }
+    if (it.k === 7) { // бонус зомби-коопа: светящийся шар с иконкой и кольцо
+      const B = ZB[it.x] || ZB[0], g = new T.Group(), item = new T.Group(); g.add(item); item.position.y = 14;
+      const ring = new T.Mesh(ringGeo, new T.MeshBasicMaterial({ color: new T.Color(B.c), transparent: true, opacity: .85, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide })); ring.rotation.x = -Math.PI / 2; ring.position.y = 1; ring.scale.setScalar(1.3); g.add(ring);
+      const glow = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: new T.Color(B.c), blending: T.AdditiveBlending, depthWrite: false, transparent: true })); glow.scale.setScalar(46); item.add(glow);
+      const ic = new T.Sprite(new T.SpriteMaterial({ map: iconTex(B.i, B.c), depthWrite: false, transparent: true })); ic.scale.setScalar(28); item.add(ic);
+      g.userData.item = item; g.userData.bonus = 1; g.userData.ring = ring; g.position.set(it.p[0], 0, it.p[1]); return g; }
     const g = new T.Group(), col = it.k === 0 ? RARITY[it.r] : it.k === 1 ? AMMO_COL[it.x] : it.k === 2 ? '#ff6b6b' : it.k === 4 ? SECTS[it.x].col : it.k === 5 ? '#69db7c' : '#4dabf7';
     const ring = new T.Mesh(ringGeo, new T.MeshBasicMaterial({ color: new T.Color(col), transparent: true, opacity: .7, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide })); ring.rotation.x = -Math.PI / 2; ring.position.y = 1; g.add(ring);
     const item = new T.Group(); item.position.y = 9; g.add(item);
@@ -1086,19 +1098,40 @@ void main(){
     g.userData.item = item; g.position.set(it.p[0], 0, it.p[1]);
     return g;
   }
+  const iconCache = {};
+  function iconTex(ch, col) { return iconCache[ch] || (iconCache[ch] = cvTex(64, 64, g => { g.fillStyle = 'rgba(10,10,10,.65)'; g.beginPath(); g.arc(32, 32, 27, 0, 7); g.fill(); g.lineWidth = 4; g.strokeStyle = col; g.stroke(); g.font = '900 34px system-ui,"Segoe UI Emoji","Apple Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.fillText(ch, 32, 35); })); }
   function syncLoot(loot, now) {
     for (const [id, g] of lootG) if (!loot.has(id)) { scene.remove(g); lootG.delete(id); }
-    for (const it of loot.values()) { let g = lootG.get(it.id); if (!g) { g = lootMesh(it); lootG.set(it.id, g); scene.add(g); } const i = g.userData.item; if (g.userData.bird) { const ph = (now / 1000 + it.id * .37) % 2.4; i.rotation.x = ph < .3 ? Math.sin(ph / .3 * Math.PI) * .7 : 0; i.position.y = 0; continue; } i.rotation.y = now / 700 + it.id; i.position.y = 9 + Math.sin(now / 300 + it.id) * 2; }
+    for (const it of loot.values()) { let g = lootG.get(it.id); if (!g) { g = lootMesh(it); lootG.set(it.id, g); scene.add(g); } const i = g.userData.item; if (g.userData.bonus) { i.position.y = 14 + Math.sin(now / 250 + it.id) * 3; const k = it.exp ? Math.max(0, (it.exp - now) / 1000) : 99; g.visible = k > 5 || Math.sin(now / 90) > -.2; g.userData.ring.rotation.z = now / 600; continue; } if (g.userData.bird) { const ph = (now / 1000 + it.id * .37) % 2.4; i.rotation.x = ph < .3 ? Math.sin(ph / .3 * Math.PI) * .7 : 0; i.position.y = 0; continue; } i.rotation.y = now / 700 + it.id; i.position.y = 9 + Math.sin(now / 300 + it.id) * 2; }
   }
   // ===== трассеры, огонь =====
-  const tracerPool = []; for (let i = 0; i < 40; i++) { const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(new Float32Array(2 * 3), 3)); const l = new T.Line(g, new T.LineBasicMaterial({ color: 0xffe066, transparent: true, blending: T.AdditiveBlending })); l.visible = false; l.frustumCulled = false; scene.add(l); tracerPool.push(l); }
   function cvTex(w, h, f) { const c = document.createElement('canvas'); c.width = w; c.height = h; f(c.getContext('2d'), w, h); return new T.CanvasTexture(c); }
+  // пули в полёте (как в Crimsonland): светящийся штрих — яркая голова, хвост тает; ядро + ореол; следы снайперки/рельсы
+  const streakTex = cvTex(128, 32, (g, w, h) => { const gx = g.createLinearGradient(0, 0, w, 0); gx.addColorStop(0, 'rgba(255,255,255,0)'); gx.addColorStop(.75, 'rgba(255,255,255,.75)'); gx.addColorStop(.95, 'rgba(255,255,255,1)'); gx.addColorStop(1, 'rgba(255,255,255,.2)'); g.fillStyle = gx; g.fillRect(0, 0, w, h);
+    g.globalCompositeOperation = 'destination-in'; const gy = g.createLinearGradient(0, 0, 0, h); gy.addColorStop(0, 'rgba(0,0,0,0)'); gy.addColorStop(.5, 'rgba(0,0,0,1)'); gy.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gy; g.fillRect(0, 0, w, h); });
+  const beamTex = cvTex(16, 32, (g, w, h) => { const gy = g.createLinearGradient(0, 0, 0, h); gy.addColorStop(0, 'rgba(255,255,255,0)'); gy.addColorStop(.5, 'rgba(255,255,255,1)'); gy.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gy; g.fillRect(0, 0, w, h); });
+  const quadGeo = new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  const streakMesh = (tex, n) => { const m = new T.InstancedMesh(quadGeo, new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false }), n); m.frustumCulled = false; m.renderOrder = 6; m.setColorAt(0, new T.Color()); m.count = 0; scene.add(m); return m; };
+  const BN = 260, bCore = streakMesh(streakTex, BN), bGlow = streakMesh(streakTex, BN), bTrail = streakMesh(beamTex, 40);
+  const bShadow = new T.InstancedMesh(quadGeo, new T.MeshBasicMaterial({ map: streakTex, color: 0x000000, transparent: true, opacity: .4, depthWrite: false, fog: false }), BN); bShadow.frustumCulled = false; bShadow.renderOrder = 2; bShadow.count = 0; scene.add(bShadow); // тень пули на земле — штрих читается на светлом асфальте
+  const _bm = new T.Matrix4(), _bq = new T.Quaternion(), _bv = new T.Vector3(), _bs = new T.Vector3(), _be = new T.Euler(), _bc = new T.Color(), _bw = new T.Color(1, 1, 1);
+  function putStreak(m, i, a, b, h, w, col, k = 1) { const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz); if (l < .01) { m.setMatrixAt(i, _bm.makeScale(0, 0, 0)); return; }
+    m.setMatrixAt(i, _bm.compose(_bv.set((a[0] + b[0]) / 2, h, (a[1] + b[1]) / 2), _bq.setFromEuler(_be.set(0, -Math.atan2(dz, dx), 0)), _bs.set(l, 1, w))); m.setColorAt(i, _bc.copy(col).multiplyScalar(k)); }
+  function drawBullets(list, trails) {
+    let n = 0;
+    for (const b of list) { if (n >= BN) break; const head = Math.min(b.s, b.end), tail = Math.max(0, Math.min(b.end, b.s - b.bl)); if (head - tail < .5) continue;
+      const A = add(b.from, b.d, tail), Bp = add(b.from, b.d, head); _bc.setHex(b.bc || 0xffe066); const col = _bc.clone();
+      putStreak(bShadow, n, A, Bp, 1.4, (b.bw || 2.4) * 1.6, col, 1); putStreak(bGlow, n, A, Bp, 23, (b.bw || 2.4) * 4, col, .7); putStreak(bCore, n, A, Bp, 23.2, (b.bw || 2.4) * 1.3, col.lerp(_bw, .5), 1); n++; }
+    bCore.count = bGlow.count = bShadow.count = n; bCore.instanceMatrix.needsUpdate = bGlow.instanceMatrix.needsUpdate = bShadow.instanceMatrix.needsUpdate = true; if (n) bCore.instanceColor.needsUpdate = bGlow.instanceColor.needsUpdate = true;
+    let m = 0; for (const t of trails) { if (m >= 40) break; const k = Math.max(0, 1 - t.t / t.life); _bc.setHex(t.c); putStreak(bTrail, m++, t.a, t.b, 22.8, t.w * (1 + t.t * 2), _bc.clone(), k * k * t.k); }
+    bTrail.count = m; bTrail.instanceMatrix.needsUpdate = true; if (m) bTrail.instanceColor.needsUpdate = true;
+  }
   const flameTex = cvTex(64, 96, (g, w, h) => { const gr = g.createRadialGradient(w / 2, h * .7, 2, w / 2, h * .6, w * .55); gr.addColorStop(0, '#fff3bf'); gr.addColorStop(.35, '#ffd43b'); gr.addColorStop(.7, '#ff6b1a'); gr.addColorStop(1, 'rgba(255,60,0,0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(w / 2, 4); g.quadraticCurveTo(w, h * .6, w / 2, h - 2); g.quadraticCurveTo(0, h * .6, w / 2, 4); g.fill(); });
   const glowTex = cvTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.3, 'rgba(255,220,120,.8)'); gr.addColorStop(1, 'rgba(255,120,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
   const smokeTex = cvTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(70,65,65,.55)'); gr.addColorStop(1, 'rgba(70,65,65,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
   const flames = []; for (let i = 0; i < 90; i++) { const s = new T.Sprite(new T.SpriteMaterial({ map: flameTex, blending: T.AdditiveBlending, depthWrite: false, transparent: true })); s.center.set(.5, .05); s.visible = false; scene.add(s); flames.push(s); }
   const smokes = []; for (let i = 0; i < 40; i++) { const s = new T.Sprite(new T.SpriteMaterial({ map: smokeTex, depthWrite: false, transparent: true })); s.visible = false; s.userData = { t: 9 }; scene.add(s); smokes.push(s); }
-  const flashes = []; for (let i = 0; i < 20; i++) { const s = new T.Sprite(new T.SpriteMaterial({ map: glowTex, blending: T.AdditiveBlending, depthWrite: false, transparent: true })); s.visible = false; s.userData = { t: 9 }; scene.add(s); flashes.push(s); }
+  const flashes = []; for (let i = 0; i < 36; i++) { const s = new T.Sprite(new T.SpriteMaterial({ map: glowTex, blending: T.AdditiveBlending, depthWrite: false, transparent: true })); s.visible = false; s.userData = { t: 9 }; scene.add(s); flashes.push(s); }
   let flashI = 0; function flashAt(v, size) { const s = flashes[flashI++ % flashes.length]; s.position.copy(v); s.scale.setScalar(size); s.userData.t = 0; s.userData.size = size; s.visible = true; }
   // ===== транспорт =====
   function plane() { const g = new T.Group(); const m = (gg, c, x, y, z, sx, sy, sz) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); g.add(o); return o; };
@@ -1120,7 +1153,7 @@ void main(){
     const m = pools[poolI++ % pools.length], sc = (big ? 34 : 14) + Math.random() * 10; m.position.set(p[0] + (Math.random() - .5) * 8, .9 + (poolI % 60) * .002, p[1] + (Math.random() - .5) * 8); m.scale.set(sc, 1, sc); m.rotation.y = Math.random() * 6; m.userData.t = 0; m.material.opacity = .85; m.visible = true;
   }
   // гильзы
-  const shells = []; const shellGeo = new T.BoxGeometry(1.2, 1.2, 2.6); for (let i = 0; i < 40; i++) { const m = new T.Mesh(shellGeo, lam(0xd4a020)); m.visible = false; m.userData = { t: 9, v: new T.Vector3() }; scene.add(m); shells.push(m); }
+  const shells = []; const shellGeo = new T.BoxGeometry(1.2, 1.2, 2.6); for (let i = 0; i < 70; i++) { const m = new T.Mesh(shellGeo, lam(0xd4a020)); m.visible = false; m.userData = { t: 9, v: new T.Vector3() }; scene.add(m); shells.push(m); }
   let shellI = 0; function shellAt(v, right) { const m = shells[shellI++ % shells.length]; m.position.copy(v); m.userData.v.set(right.x * 60 + (Math.random() - .5) * 20, 50 + Math.random() * 30, right.z * 60 + (Math.random() - .5) * 20); m.userData.t = 0; m.visible = true; }
   let zoomCur = 1;
   const transport = plane(); transport.scale.setScalar(1.3); transport.traverse(o => { if (o.isMesh) o.castShadow = true; }); scene.add(transport);
@@ -1177,7 +1210,6 @@ void main(){
       seen.add(e.id); let c = chars[e.id];
       if (!c || c.userData.ch !== e.ch) { if (c) scene.remove(c); c = chars[e.id] = makeChar(e.ch); c.userData.ch = e.ch; scene.add(c); }
       c.visible = true; setGun(c, e.wb); poseChar(c, e.p, e.aim, e.walk, e);
-      if (e.fire && !c.userData.fired) { const tip = c.userData.gunNode.localToWorld(new T.Vector3(0, 0, c.userData.muz)); flashAt(tip, 34); const rt = new T.Vector3(1, 0, 0).applyQuaternion(c.quaternion); shellAt(c.userData.gunNode.localToWorld(new T.Vector3(0, 2, 2)), rt); } c.userData.fired = e.fire;
       // парашют
       if (e.alt) { if (!c.userData.chute) { const ch = new T.Group(); for (let i = 0; i < 6; i++) { const seg = new T.Mesh(new T.SphereGeometry(24, 6, 4, i * Math.PI / 3, Math.PI / 3, 0, Math.PI / 2), lam(i % 2 ? 0xd8d4c8 : CAMO[e.ch % 10][0])); ch.add(seg); } ch.position.y = 64; c.add(ch); c.userData.chute = ch; } c.userData.chute.visible = true; }
       else if (c.userData.chute) c.userData.chute.visible = false;
@@ -1185,14 +1217,9 @@ void main(){
     for (const id in chars) if (!seen.has(+id)) chars[id].visible = false;
     syncLoot(loot, now);
     // трассеры
-    let ti = 0;
-    for (const t of tracers) {
-      if (ti >= tracerPool.length) break; const l = tracerPool[ti++]; const a = l.geometry.attributes.position;
-      a.setXYZ(0, t.from[0], 24, t.from[1]); a.setXYZ(1, t.end[0], 24, t.end[1]);
-      a.needsUpdate = true; l.material.opacity = Math.max(0, 1 - t.t / .12); l.material.color.set((t.wb & 15) === 4 ? 0xffffff : 0xffe066); l.visible = true;
-      if (t.t < dt * 1.5) { if (t.wb & 128) bloodAt(t.end); else { flashAt(at(t.end, 24), 10); puffAt(at(t.end, 22)); hitNear(objs, t.end); } }
-    }
-    for (; ti < tracerPool.length; ti++) tracerPool[ti].visible = false;
+    drawBullets(tracers || [], st.trails || []);
+    if (st.shots) for (const [id, big] of st.shots) { const c = chars[id]; if (!c || !c.visible) continue; const u = c.userData, tip = u.gunNode.localToWorld(new T.Vector3(0, 0, u.muz)); flashAt(tip, (22 + Math.random() * 14) * big); u.kick = 1;
+      if (big > 0) { const rt = new T.Vector3(1, 0, 0).applyQuaternion(c.quaternion); shellAt(u.gunNode.localToWorld(new T.Vector3(0, 2, 2)), rt); } }
     for (const s of sprays) { if (!s.visible) continue; const u = s.userData; u.t += dt; if (u.t > .5 || s.position.y < 1) { s.visible = false; continue; } u.v.y -= 260 * dt; s.position.addScaledVector(u.v, dt); }
     for (const m of pools) { if (!m.visible) continue; m.userData.t += dt; if (m.userData.t > 25) m.material.opacity = Math.max(0, .85 - (m.userData.t - 25) / 5); if (m.userData.t > 30) m.visible = false; }
     for (const m of shells) { if (!m.visible) continue; const u = m.userData; u.t += dt; if (u.t > 3) { m.visible = false; continue; } if (m.position.y > 1) { u.v.y -= 300 * dt; m.position.addScaledVector(u.v, dt); m.rotation.x += dt * 15; m.rotation.y += dt * 9; } else { m.position.y = 1; u.v.set(0, 0, 0); } }
@@ -1218,5 +1245,5 @@ void main(){
     if (st.extra) st.extra(dt, now);
     renderer.render(scene, camera);
   }
-  return { scene, camera, MAT, smashWall, flash: (p, h, s) => flashAt(at(p, h), s), puff: (p, h) => puffAt(at(p, h)), frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt, altarBroken, breakGlass, reviveObj, boom, objState, debris: (p, h, n, col, sp, sz) => debrisAt(at(p, h), n, col, sp, sz) };
+  return { scene, camera, MAT, smashWall, flash: (p, h, s) => flashAt(at(p, h), s), puff: (p, h) => puffAt(at(p, h)), hitNear: (objs, p) => hitNear(objs, p), chars, frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt, altarBroken, breakGlass, reviveObj, boom, objState, debris: (p, h, n, col, sp, sz) => debrisAt(at(p, h), n, col, sp, sz) };
 })();

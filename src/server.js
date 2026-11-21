@@ -61,12 +61,12 @@ export class World {
     this.st = 'wait'; this.phase = 0; this.wave = 0; this.cyc = 0; this.toSpawn = 0; this.spAcc = 0; this.spRate = 1; this.timerT = 0; this.kills = 0;
     // место старта — на улице у рынка
     this.spawnC = ZSPAWN; for (let r = 0, done = false; r < 600 && !done; r += 20) for (let k = 0; k < 16 && !done; k++) { const q = add(ZSPAWN, [Math.cos(k / 16 * 6.283) * r, Math.sin(k / 16 * 6.283) * r]); if (bldAt(this.objs.blds, q) < 0 && nearObjs(this.objs, q, 60).every(o => o.nc || !objPush(o, q, 50))) { this.spawnC = q; done = true; } }
-    this.zs = new Map(); this.zid = 1; this.items = new Map(); this.iid = 1; this.shots = []; this.later = []; this.repT = 0;
+    this.frzT = 0; this.zs = new Map(); this.zid = 1; this.items = new Map(); this.iid = 1; this.shots = []; this.later = []; this.repT = 0;
   }
   async fetch(req) {
     const url = new URL(req.url); this.code = this.code || cleanCode(url.searchParams.get('r'));
     const { 0: cli, 1: ws } = new WebSocketPair(); ws.accept();
-    const c = { ws, name: String(url.searchParams.get('n') || 'Игрок').slice(0, 12) || 'Игрок', p: null };
+    const c = { ws, name: String(url.searchParams.get('n') || 'Игрок').slice(0, 12) || 'Игрок', skin: Math.max(0, Math.min(9, parseInt(url.searchParams.get('k')) || 0)), p: null };
     if (this.players.length >= ZMAXP) { this.send(c, { t: 'err', s: 'Комната заполнена' }); ws.close(1013, 'full'); return new Response(null, { status: 101, webSocket: cli }); }
     this.clients.add(c);
     ws.addEventListener('message', e => { try { this.onMsg(c, e.data); } catch (err) { } });
@@ -88,7 +88,7 @@ export class World {
   spawnAt(i) { const a = i * 1.57 + .8; return collide(this.objs, add(this.spawnC, [Math.cos(a) * 30, Math.sin(a) * 30])); }
   join(c) {
     let id = 0; while (this.players.some(p => p.id === id)) id++;
-    const p = { c, id, name: c.name, p: this.spawnAt(id), aim: [1, 0], hp: 100, maxHp: 100, st: 0, downT: 0, revT: 0, inv: this.t + 3, w: 0, fire: 0, lvl: 1, xp: 0, pend: 0, opts: null, pk: {}, wl: ZW.map(() => 1), kills: 0, regA: 0, lastT: 0, bi: -1 };
+    const p = { c, id, name: c.name, skin: c.skin, p: this.spawnAt(id), rageT: 0, spdT: 0, ammoT: 0, aim: [1, 0], hp: 100, maxHp: 100, st: 0, downT: 0, revT: 0, inv: this.t + 3, w: 0, fire: 0, lvl: 1, xp: 0, pend: 0, opts: null, pk: {}, wl: ZW.map(() => 1), kills: 0, regA: 0, lastT: 0, bi: -1 };
     c.p = p; this.players.push(p); this.players.sort((a, b) => a.id - b.id);
     if (this.st === 'play') { // вход посреди боя: рядом с командой, уровень почти как у команды, всё открытое оружие
       const mates = this.players.filter(q => q !== p && q.st === 0), m = mates[Math.floor(this.rnd() * mates.length)];
@@ -99,7 +99,7 @@ export class World {
     }
     this.send(c, { t: 'room', sp: p.p, code: this.code, you: p.id, st: this.st, wave: this.wave, unl: zUnlocked(Math.max(1, this.wave)),
       dead: this.objs.filter(o => o.dead).map(o => o.id), gl: this.objs.filter(o => o.broken).map(o => o.id), ob: this.objs.filter(o => o.smoke || o.burnt).map(o => [o.id, o.burnt ? 2 : 1]),
-      it: [...this.items.values()].map(it => [it.id, Math.round(it.p[0]), Math.round(it.p[1])]) });
+      it: [...this.items.values()].map(it => [it.id, Math.round(it.p[0]), Math.round(it.p[1]), it.k]), frz: Math.max(0, this.frzT - this.t) });
     this.roster(); if (p.pend > 0) this.offerPerk(p);
     this.msg('👋 ' + p.name + ' в игре'); this.report();
   }
@@ -108,7 +108,7 @@ export class World {
     if (!this.players.length) { this.report(true); this.st = 'wait'; this.zs.clear(); this.wave = 0; return; }
     this.roster(); this.msg('🚪 ' + c.name + ' вышел'); this.report();
   }
-  roster() { this.sendAll({ t: 'ros', pl: this.players.map(p => [p.id, p.name]), st: this.st }); }
+  roster() { this.sendAll({ t: 'ros', pl: this.players.map(p => [p.id, p.name, p.skin]), st: this.st }); }
   onMsg(c, data) {
     if (typeof data !== 'string') return; let m; try { m = JSON.parse(data); } catch (e) { return; }
     const p = c.p; if (!p) return;
@@ -117,8 +117,8 @@ export class World {
     if (m.t === 'in') this.input(p, m);
   }
   startGame() {
-    this.st = 'play'; this.phase = 0; this.wave = 0; this.cyc = 0; this.kills = 0; this.zs.clear(); this.items.clear(); this.timerT = this.t + 4;
-    this.players.forEach((p, i) => { Object.assign(p, { p: this.spawnAt(p.id), hp: 100, maxHp: 100, st: 0, downT: 0, revT: 0, inv: this.t + 3, w: 0, lvl: 1, xp: 0, pend: 0, opts: null, pk: {}, wl: ZW.map(() => 1), kills: 0 }); this.send(p.c, { t: 'pk', pk: p.pk, wl: p.wl, maxHp: p.maxHp }); this.send(p.c, { t: 'start', sp: p.p }); }); this.roster(); this.report();
+    this.st = 'play'; this.phase = 0; this.wave = 0; this.cyc = 0; this.kills = 0; this.frzT = 0; this.zs.clear(); this.items.clear(); this.timerT = this.t + 4;
+    this.players.forEach((p, i) => { Object.assign(p, { p: this.spawnAt(p.id), hp: 100, maxHp: 100, st: 0, downT: 0, revT: 0, inv: this.t + 3, w: 0, lvl: 1, xp: 0, pend: 0, opts: null, pk: {}, wl: ZW.map(() => 1), kills: 0, rageT: 0, spdT: 0, ammoT: 0 }); this.send(p.c, { t: 'pk', pk: p.pk, wl: p.wl, maxHp: p.maxHp }); this.send(p.c, { t: 'start', sp: p.p }); }); this.roster(); this.report();
   }
   // ===== волны =====
   startWave() {
@@ -155,7 +155,7 @@ export class World {
   input(p, m) {
     const now = this.t, el = Math.min(.5, now - (p.lastT || now)) || DT; p.lastT = now;
     if (Array.isArray(m.p) && p.st !== 2) {
-      const q = collide(this.objs, [+m.p[0] || 0, +m.p[1] || 0]), d = dist(q, p.p), lim = SPEED * 1.7 * (p.st === 1 ? .4 : 1) * (1 + (p.pk.spd || 0) * .08) * el + 14;
+      const q = collide(this.objs, [+m.p[0] || 0, +m.p[1] || 0]), d = dist(q, p.p), lim = SPEED * 1.7 * (p.st === 1 ? .4 : 1) * (1 + (p.pk.spd || 0) * .08) * (now < p.spdT + .5 ? 1.4 : 1) * el + 14;
       p.p = d <= lim ? q : add(p.p, norm(sub(q, p.p)), lim); p.bi = bldAt(this.objs.blds, p.p);
     }
     if (Array.isArray(m.a)) p.aim = norm([+m.a[0] || 1, +m.a[1] || 0]);
@@ -167,6 +167,7 @@ export class World {
       const z = this.zs.get(h[0] | 0); if (!z) continue;
       const dmg = Math.min(maxD, Math.max(0, +h[1] || 0)); if (dist(z.p, p.p) > W.range + (W.boom || 0) + 120) continue;
       z.hp -= dmg; z.lastDir = norm(sub(z.p, p.p));
+      if (W.kb && !ZT[z.ty].boss) { const sc = ZT[z.ty].sc, k = W.kb * Math.min(1.5, dmg / W.dmg) / (sc * sc); z.kbv = add(z.kbv || [0, 0], z.lastDir, k); if (len(z.kbv) > 45) z.kbv = mul(norm(z.kbv), 45); z.stag = Math.min(.35, (z.stag || 0) + .08 + k * .01); } // отбрасывание и запинка, как в Crimsonland
       if (W.fire) { z.burn = 3; z.burnBy = p; }
       const g = W.gore;
       if (g >= 2 && dmg > z.mhp * .12 && this.rnd() < .1 * g) z.lost |= 1 << Math.floor(this.rnd() * (g >= 3 ? 3 : 2));
@@ -183,7 +184,7 @@ export class World {
     this.sendAll({ t: 'k', z: z.id, x: Math.round(z.p[0]), y: Math.round(z.p[1]), d: (z.lastDir || [1, 0]).map(v => Math.round(v * 100) / 100), g: Math.min(6, gore | 0), ty: z.ty, lost: z.lost, by: by ? by.id : -1 });
     if (by) { by.kills++; this.giveXp(by, T.xp); if (by.pk.vamp) by.hp = Math.min(by.maxHp, by.hp + by.pk.vamp); }
     for (const q of this.players) if (q !== by && q.st === 0) this.giveXp(q, T.xp * .35);
-    if (this.rnd() < (z.ty >= 2 ? .25 : .022)) { const it = { id: this.iid++, p: [...z.p] }; this.items.set(it.id, it); this.sendAll({ t: 'it', id: it.id, x: Math.round(it.p[0]), y: Math.round(it.p[1]) }); }
+    if (this.rnd() < (z.ty >= 2 ? .3 : .045)) { const it = { id: this.iid++, p: [...z.p], k: zPickBonus(this.rnd), T: this.t + 30 }; this.items.set(it.id, it); this.sendAll({ t: 'it', id: it.id, x: Math.round(it.p[0]), y: Math.round(it.p[1]), k: it.k }); }
   }
   giveXp(p, x) { p.xp += x; while (p.xp >= zXpNeed(p.lvl)) { p.xp -= zXpNeed(p.lvl); p.lvl++; p.pend++; } if (p.pend > 0 && !p.opts) this.offerPerk(p); }
   offerPerk(p) { const a = ZPERK.map((_, i) => i); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(this.rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } p.opts = a.slice(0, 3); this.send(p.c, { t: 'lvl', lv: p.lvl, o: p.opts }); }
@@ -210,6 +211,18 @@ export class World {
   hurt(p, dmg) {
     if (p.st === 0) { p.hp -= dmg; if (p.hp <= 0) { p.hp = 0; p.st = 1; p.downT = ZDOWN; p.revT = 0; this.msg('🆘 ' + p.name + ' упал! Ползи к напарнику', '#ff6b6b'); } }
     else if (p.st === 1) p.downT -= dmg * .12;
+  }
+  // бонус подобран: аптечка, ярость, скорость, ядерка, заморозка, щит, бесконечные патроны
+  bonus(p, it) {
+    const B = ZB[it.k], t = this.t; let T = B.T || 0;
+    if (it.k === 0) p.hp = Math.min(p.maxHp, p.hp + 40);
+    else if (it.k === 1) p.rageT = t + T;
+    else if (it.k === 2) p.spdT = t + T;
+    else if (it.k === 3) this.explode(p.p, p, 330, 900);
+    else if (it.k === 4) { this.frzT = t + T; }
+    else if (it.k === 5) p.inv = Math.max(p.inv, t + T);
+    else if (it.k === 6) p.ammoT = t + T;
+    this.sendAll({ t: 'itx', id: it.id, by: p.id, k: it.k, T, x: Math.round(it.p[0]), y: Math.round(it.p[1]) });
   }
   gameOver() {
     this.st = 'over'; this.phase = 0;
@@ -286,11 +299,12 @@ export class World {
     if (this.later.length) { const now_ = this.later.filter(l => l[0] <= t); this.later = this.later.filter(l => l[0] > t); for (const [, o, by] of now_) this.objHurt(o, by); }
     if (this.tick % (5 * TICK) === 0) for (const o of this.objs) { if (!o.fixT || t < o.fixT) continue; if (this.players.some(p => dist(p.p, o.p) < o.rad + PR + 4)) continue;
       o.fixT = 0; o.hp = OT[o.type].hp; if (o.dead) { o.dead = false; this.sendAll({ t: 'rv', id: o.id }); } if (o.burnt || o.smoke) { o.burnt = o.smoke = 0; this.sendAll({ t: 'ob', id: o.id, s: 0 }); } }
+    if (this.tick % TICK === 0) for (const it of this.items.values()) if (t > it.T) { this.items.delete(it.id); this.sendAll({ t: 'itx', id: it.id, by: -1 }); }
     // игроки: упавший ползёт и ждёт помощи
     for (const p of this.players) {
       p.bi = bldAt(this.objs.blds, p.p);
       if (p.st === 0) { if (p.pk.regen) { p.regA += p.pk.regen * dt; if (p.regA >= 1) { p.hp = Math.min(p.maxHp, p.hp + Math.floor(p.regA)); p.regA %= 1; } }
-        for (const it of this.items.values()) if (dist(it.p, p.p) < 24) { this.items.delete(it.id); p.hp = Math.min(p.maxHp, p.hp + 40); this.sendAll({ t: 'itx', id: it.id, by: p.id }); } }
+        for (const it of this.items.values()) if (dist(it.p, p.p) < 26) { this.items.delete(it.id); this.bonus(p, it); } }
       else if (p.st === 1) {
         p.downT -= dt;
         const helper = this.players.find(q => q !== p && q.st === 0 && dist(q.p, p.p) < PR * 2 + 26);
@@ -307,6 +321,9 @@ export class World {
     for (const z of this.zs.values()) {
       if (z.burn > 0) { z.burn -= dt; z.hp -= 14 * dt; if (z.hp <= 0) { this.killZ(z, z.burnBy, 1); continue; } }
       z.air = Math.max(0, z.air - dt); z.block = null;
+      if (z.kbv) { const m = mul(z.kbv, Math.min(1, dt * 14)); z.p = this.zCollide(z, add(z.p, m)); z.kbv = sub(z.kbv, m); if (len(z.kbv) < .5) z.kbv = null; } // отлетает от пуль
+      z.stag = Math.max(0, (z.stag || 0) - dt);
+      if (t < this.frzT) { z.atk = 0; continue; } // заморозка: стоят как статуи
       if (!z.tg || z.tg.st === 2 || !this.players.includes(z.tg) || this.tick % 15 === z.id % 15) { let bd = 1e9; z.tg = null; for (const p of targets) { const d = dist(p.p, z.p) * (p.st === 1 ? 1.3 : 1); if (d < bd) { bd = d; z.tg = p; } } }
       const T = z.tg; z.atk = 0; if (!T) continue;
       if (this.tick % 4 === z.id % 4) z.bi = bldAt(B, z.p);
@@ -314,7 +331,7 @@ export class World {
       if (d > reach) {
         const goal = d < 60 && (z.bi === T.bi) ? T.p : this.zGoal(z, T.p, T.bi);
         let dir = norm(sub(goal, z.p)); if (z.stuck > 0) { dir = norm(add(dir, perp(dir), z.side * 1.4)); z.stuck--; }
-        const sp = z.sp * (z.lost & 4 ? .35 : 1) * (z.burn > 0 ? 1.2 : 1) * (z.air > 0 ? .6 : 1), want = add(z.p, dir, sp * dt);
+        const sp = z.sp * (z.lost & 4 ? .35 : 1) * (z.burn > 0 ? 1.2 : 1) * (z.air > 0 ? .6 : 1) * (z.stag > 0 ? .3 : 1), want = add(z.p, dir, sp * dt);
         const np = this.zCollide(z, want);
         if (dist(np, z.p) < sp * dt * .25) {
           if ((z.ab & 4) && z.block && SMASH.has(z.block.type) && z.block.hp > 0) { z.smT -= dt; if (z.smT <= 0) { z.smT = .7; z.atk = 1; z.block.hp -= 70 * ZT[z.ty].sc; this.sendAll({ t: 'smh', id: z.block.id, x: Math.round(z.p[0]), y: Math.round(z.p[1]) }); this.objHurt(z.block, null); } }
@@ -349,7 +366,7 @@ export class World {
     }
     for (const z of zs) {
       v.setUint16(o, z.id, true); v.setInt16(o + 2, Math.round(z.p[0] * 10), true); v.setInt16(o + 4, Math.round(z.p[1] * 10), true);
-      v.setUint8(o + 6, z.ty | (z.lost << 3)); v.setUint8(o + 7, Math.round(Math.max(0, z.hp / z.mhp) * 255)); v.setUint8(o + 8, z.atk | (z.burn > 0 ? 2 : 0) | (z.air > 0 ? 4 : 0)); o += ZSN_Z;
+      v.setUint8(o + 6, z.ty | (z.lost << 3)); v.setUint8(o + 7, Math.round(Math.max(0, z.hp / z.mhp) * 255)); v.setUint8(o + 8, z.atk | (z.burn > 0 ? 2 : 0) | (z.air > 0 ? 4 : 0) | (this.t < this.frzT ? 8 : 0)); o += ZSN_Z;
     }
     for (const p of this.players) this.send(p.c, buf);
   }

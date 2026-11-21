@@ -24,11 +24,12 @@ button.alt{background:#2a1212;border:2px solid #ff3b3b;box-shadow:none}
 #code{font-size:30px;font-weight:900;letter-spacing:6px;color:#ffd43b}
 .hint{font-size:13px;color:#b98a8a;text-align:center;max-width:520px}
 #err{color:#ffb3b3;min-height:1.2em;font-size:14px}
+#skin{width:90px;height:90px;position:static;display:block}button.sk{padding:8px 12px;font-size:18px}
 </style></head><body>
 <canvas id="g"></canvas><canvas id="c"></canvas>
 <div id="start" class="scr on">
   <h1>LAST EXIT</h1><div class="sub">Город захвачен зомби. Отбивайтесь вместе — до 4 игроков</div>
-  <div class="row"><input id="name" maxlength="12" placeholder="Имя" autocomplete="off"></div>
+  <div class="row"><button id="skp" class="alt sk">◀</button><canvas id="skin" width="90" height="90"></canvas><button id="skn" class="alt sk">▶</button><input id="name" maxlength="12" placeholder="Имя" autocomplete="off"></div>
   <div class="row"><button id="quick">▶ Быстрая игра</button><button id="create" class="alt">＋ Своя комната</button></div>
   <div id="err"></div>
   <div class="hint">Идущие игры — можно зайти посреди боя, оружие команды откроется сразу:</div>
