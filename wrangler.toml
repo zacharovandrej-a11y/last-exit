@@ -13,9 +13,14 @@ tag = "v1"
 new_sqlite_classes = ["World"]
 
 [[durable_objects.bindings]]
-name = "ZWORLD"
-class_name = "ZWorld"
+name = "LOBBY"
+class_name = "Lobby"
 
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["ZWorld"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["Lobby"]
+deleted_classes = ["ZWorld"]

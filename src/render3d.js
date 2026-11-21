@@ -411,6 +411,8 @@ void main(){
   };
   const FLOOR = { wood: ['fwood', 0x9a7350], tile: ['tile', 0xb8b4aa], concrete: ['floorc', 0x99968e], dirt: ['dirt', 0x8a7556] };
   const ROOFC = [0x7e3a2c, 0x4a4f57, 0x6b4a3a, 0x5b4636, 0x8a4a34];
+  const wallParts = {}, wallGone = new Set(); // проломленные стены
+  function smashWall(id, objs) { wallGone.add(id); for (const [mesh, i] of wallParts[id] || []) { mesh.setMatrixAt(i, zero); mesh.instanceMatrix.needsUpdate = true; } killObj(id); const o = objs && objs[id]; if (o) { debrisAt(at(o.p, 20), 18, o.type === 'bw' ? 0x8a7a6a : 0x6b4a2e, 120, 4); debrisAt(at(o.p, 30), 8, 0x5a5048, 90, 2.5); if (glassIdx[id]) breakGlass(id, objs); } }
   const bInst = {}, bParts = []; let insideB = -1; const deco = {}; const glassPlan = [], glassIdx = []; let glassMesh = null;
   // Вывеска: по умолчанию к камере, с facing — закреплена в плоскости фасада.
   function sign(bid, wp, y, w, h, lines, bg, fg, frame, facing = null) {
@@ -631,6 +633,7 @@ void main(){
   function buildBuildings(objs) {
     ground.material.uniforms.hallC.value.set(1e6, 1e6);
     ground.material.uniforms.orderC.value.set(1e6, 1e6);
+    for (const k in wallParts) delete wallParts[k];
     for (const k in bInst) { scene.remove(bInst[k].mesh); if (bInst[k].mesh.userData.outline) scene.remove(bInst[k].mesh.userData.outline); delete bInst[k]; }
     bParts.length = 0; insideB = -1; glassPlan.length = 0; if (glassMesh) { scene.remove(glassMesh); glassMesh = null; } glassIdx.length = 0; for (const k in deco) { deco[k].forEach(m => scene.remove(m)); delete deco[k]; }
     const plan = {}, Y = new T.Vector3(0, 1, 0), ONE = new T.Vector3(1, 1, 1);
@@ -643,6 +646,7 @@ void main(){
         const o = objs[id], L = o.len, sx = o.hor ? L : WALLT, sz = o.hor ? WALLT : L, X = o.lx, Z = o.ly;
         if (b.kind === 'house' && (o.hor ? Math.abs(Z) > b.h / 2 - WALLT : Math.abs(X) > b.w / 2 - WALLT))
           pcs.push([geo.box, 'concrete', 48, 0x837d72, M(X, 3.5, Z, sx + (o.hor ? 0 : 2), 7, sz + (o.hor ? 2 : 0)), 'wall', M(X, 3.5, Z, sx, 7, sz)]);
+        const pc0 = pcs.length;
         if (o.win) { // окно: подоконник, перемычка, рама; посередине пусто — видно и стреляют
           const top = winTop;
           pcs.push([geo.box, wm, 48, wc, M(X, sill / 2, Z, sx, sill, sz), 'wall', M(X, 7, Z, sx, 14, sz)]);
@@ -650,6 +654,7 @@ void main(){
           if (!K.slit) { const fx = o.hor ? sx : WALLT + 1, fz = o.hor ? WALLT + 1 : sz; pcs.push([geo.box, 'plaster', 48, 0xe8e4da, M(X, sill + 1, Z, fx + 2, 2, fz + 2), 'win']); pcs.push([geo.box, 'plaster', 48, 0xe8e4da, M(X, top - 1, Z, fx + 2, 2, fz + 2), 'win']);
             pcs.push([geo.box, 'plaster', 48, 0xd8d4ca, M(X, (sill + top) / 2, Z, o.hor ? 1.6 : WALLT * .4, top - sill, o.hor ? WALLT * .4 : 1.6), 'win']); }
         } else pcs.push([geo.box, wm, 48, wc, M(X, wallH / 2, Z, sx, wallH, sz), 'wall', M(X, 7, Z, sx, 14, sz)]);
+        for (let k = pc0; k < pcs.length; k++) pcs[k][7] = id; // какой стене принадлежит кусок — чтобы громила мог её проломить
       }
       // перемычки над дверями (наружными и внутренними)
       const dw = (K.door || DOOR) + 2;
@@ -682,14 +687,14 @@ void main(){
       if (K.church !== undefined) churchDeco(b, K, pcs, objs);
       bParts[b.id] = [];
       if (!K.slit) for (const id of b.walls) { const o = objs[id]; if (!o.win) continue; glassPlan.push([o.id, b.id, base.clone().multiply(M(o.lx, (sill + winTop) / 2, o.ly, o.hor ? o.len : 1.2, winTop - sill, o.hor ? 1.2 : o.len))]); }
-      for (const [g, tx, sc, col, lm, role, low] of pcs) { const key = g.uuid + '|' + tx + '|' + sc + '|' + (role === 'floor' ? 'f' : 'w'); (plan[key] = plan[key] || { g, tx, sc, items: [] }).items.push([b.id, col, base.clone().multiply(lm), role, low ? base.clone().multiply(low) : null]); }
+      for (const [g, tx, sc, col, lm, role, low, wid] of pcs) { const key = g.uuid + '|' + tx + '|' + sc + '|' + (role === 'floor' ? 'f' : 'w'); (plan[key] = plan[key] || { g, tx, sc, items: [] }).items.push([b.id, col, base.clone().multiply(lm), role, low ? base.clone().multiply(low) : null, wid]); }
     }
     if (glassPlan.length) { glassMesh = new T.InstancedMesh(geo.box, GROUNDED ? new T.MeshPhongMaterial({ color: 0x9cb2bd, specular: 0x9cabb0, shininess: 55, transparent: true, opacity: .28, depthWrite: false }) : new T.MeshLambertMaterial({ color: 0xbfe4ff, transparent: true, opacity: .32, depthWrite: false }), glassPlan.length); glassMesh.frustumCulled = false;
       glassPlan.forEach(([oid, bid, m], i) => { glassIdx[oid] = [i, m, bid]; glassMesh.setMatrixAt(i, objs[oid].broken ? zero : m); }); scene.add(glassMesh); }
     for (const key in plan) {
       const { g, tx, sc, items } = plan[key];
       const mesh = new T.InstancedMesh(g, texMat(tx, sc), items.length); mesh.frustumCulled = false; mesh.castShadow = !key.endsWith('f'); mesh.receiveShadow = true;
-      items.forEach(([bid, col, m, role, low], i) => { mesh.setMatrixAt(i, m); mesh.setColorAt(i, new T.Color(col)); bParts[bid].push([mesh, i, m, role, low]); });
+      items.forEach(([bid, col, m, role, low, wid], i) => { mesh.setMatrixAt(i, wallGone.has(wid) ? zero : m); mesh.setColorAt(i, new T.Color(col)); bParts[bid].push([mesh, i, m, role, low, wid]); if (wid !== undefined) (wallParts[wid] = wallParts[wid] || []).push([mesh, i]); });
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       scene.add(mesh); bInst[key] = { mesh }; if (OUTLINE_ALL && !key.endsWith('f')) addOutline(mesh, OUT_B);
     }
@@ -714,7 +719,7 @@ void main(){
   // игрок внутри здания: крыша исчезает, стены опускаются — видно, что внутри
   function setInside(bid) {
     if (bid === insideB) return;
-    const set = (id, open) => { for (const [mesh, i, m, role, low] of bParts[id] || []) { mesh.setMatrixAt(i, !open || role === 'floor' || role === 'prop' ? m : low || zero); mesh.instanceMatrix.needsUpdate = true; } };
+    const set = (id, open) => { for (const [mesh, i, m, role, low, wid] of bParts[id] || []) { mesh.setMatrixAt(i, wallGone.has(wid) ? zero : !open || role === 'floor' || role === 'prop' ? m : low || zero); mesh.instanceMatrix.needsUpdate = true; } };
     if (insideB >= 0) set(insideB, false); insideB = bid; if (bid >= 0) set(bid, true);
     for (const k in deco) for (const m of deco[k]) m.visible = +k !== bid;
     if (glassMesh) { for (const oid in glassIdx) { const [i, m, b] = glassIdx[oid]; glassMesh.setMatrixAt(i, b === bid || glassBroken.has(+oid) ? zero : m); } glassMesh.instanceMatrix.needsUpdate = true; }
@@ -821,6 +826,8 @@ void main(){
     else if (w === 6) { b(METAL, 0, 0, 2, 2.4, 3, 10); tube(METAL, 0, .4, 14, .7, 14); tube(0x111111, 0, 3, 3, 1.1, 7); b(WOOD, 0, -.5, -6.5, 2.4, 4, 9); b(WOOD, 0, -.6, 9, 2.6, 2.6, 7); b(METAL, 0, -4, 3.5, 1.8, 5, 2.4, .2); } // винтовка
     else if (w === 7) { b(POLY, 0, 0, 3, 3, 4, 12); tube(METAL, 0, .6, 15, .9, 12); b(0x3d4a2a, 2.4, -3, 4, 3.4, 5, 6); b(POLY, 0, -.3, -6, 2.4, 3.8, 8); b(METAL, 0, -4, 13, .6, 7, .6, .5); b(POLY, 0, 2.6, 6, 2, 1.4, 6); } // пулемёт
     else if (w === 8) { b(METAL, 0, 1.4, 5, 1.6, 1.6, 8); tube(0x3a3a3a, 0, .6, 1.5, 1.6, 3.2); b(WOOD, 0, -2.4, -.5, 1.8, 5, 2.4, -.35); } // револьвер
+    else if (w === 10) { tube(0x3d4a2a, 0, 0, 8, 2.6, 18); b(0x2a2a2a, 0, -1, -2, 3, 4, 8); b(0x2a2a2a, 0, -4, 3, 2, 6, 2.6, .3); b(0x111111, 0, 3, 4, 1.4, 2, 4); } // гранатомёт
+    else if (w === 11) { tube(0x555a60, 0, 1, 12, 1.2, 16); b(0xc0392b, 0, -4, 3, 4.5, 7, 7); b(0x2a2a2a, 0, -1, -3, 2.4, 3.6, 7); b(0xffa040, 0, 1, 20.5, 1.6, 1.6, 1); } // огнемёт
     else if (w === 9) { b(0x1e1e1e, 0, 0, 3, 2.4, 3.2, 9); b(0x1e1e1e, 0, 0, 10, 2.6, 2.6, 6); tube(METAL, 0, .4, 15, .6, 6); b(0x1e1e1e, 0, -3.8, 4, 1.8, 5, 2.6, .25); b(0x1e1e1e, 0, 0, -4.5, 2, 3, 6); b(0x111111, 0, 2.6, 3, 1.4, 2, 2.6); b(0xff3030, 0, 3.8, 3, .5, .5, .5); } // карабин
     if (rar > 0) b(new T.Color(RARITY[rar]).getHex(), 0, 0, band, 2.7, 3.2, 1.2); // полоска редкости
     return g;
@@ -1208,7 +1215,8 @@ void main(){
     // транспорт
     transport.visible = phase === 1 && matchT < DROP_T + 4;
     if (transport.visible) { const sp = add(shipS, shipD, SHIP_V * matchT); transport.position.set(sp[0], 250, sp[1]); transport.rotation.set(0, Math.atan2(shipD[0], shipD[1]), 0); }
+    if (st.extra) st.extra(dt, now);
     renderer.render(scene, camera);
   }
-  return { frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt, altarBroken, breakGlass, reviveObj, boom, objState, debris: (p, h, n, col, sp, sz) => debrisAt(at(p, h), n, col, sp, sz) };
+  return { scene, camera, MAT, smashWall, flash: (p, h, s) => flashAt(at(p, h), s), puff: (p, h) => puffAt(at(p, h)), frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt, altarBroken, breakGlass, reviveObj, boom, objState, debris: (p, h, n, col, sp, sz) => debrisAt(at(p, h), n, col, sp, sz) };
 })();
