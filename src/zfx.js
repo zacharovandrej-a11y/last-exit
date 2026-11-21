@@ -301,7 +301,10 @@ const ZFX = (() => {
 
     if (z.open || z.crop) enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), 0, 26 + bob, 1, 5.8, 7, 4.4, lean);
     if (z.open) {
-      for (const side of [-1, 1]) enemyPart(suit, suitCount++, enemyColor(z.shirt, z, t), side * 3.7, 29 + bob, .3, 3.6, 8, 4.7, lean, side * .08);
+      for (const side of [-1, 1]) {
+        enemyPart(suit, suitCount++, enemyColor(z.shirt, z, t), side * 3.7, 29 + bob, .3, 3.6, 8, 4.7, lean, side * .08);
+        enemyPart(suit, suitCount++, enemyColor(0xf4d9c2, z, t), side * 2.4, 34.3 + bob, 4.35, 1.05, 2.6, .85, lean + .24, -side * .52);
+      }
     } else {
       enemyPart(suit, suitCount++, enemyColor(z.shirt, z, t), 0, 29.5 + bob, 1.3, 6.8, z.crop ? 5.2 : 8.4, 4.55, lean);
       if (z.unicorn) {
@@ -313,12 +316,16 @@ const ZFX = (() => {
     if (!(z.lost & 16)) {
       enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), turn, 38 + bob, 2.4, 4.15, 4.75, 4.25, lean, 0, turn * 1.65);
       enemyPart(suit, suitCount++, enemyColor(z.hair, z, t), turn - .65, 40.7 + bob, 2.15, 4.55, 3.1, 4.5, lean, .29, turn * 1.65);
+      enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.hair, z, t).lerp(WHITE, .18),
+        turn + .7, 42.2 + bob, 2.05, 2.15, 2.05, 4.25, lean - .19, -.38, turn * 1.65);
       enemyPart(raiderMarks, markCount++, enemyColor(0x523d39, z, t), turn * 5, 38.7 + bob, 6.48 - turn * 4.4, 2.7, .57, .44, 0, 0, turn * 1.65);
     }
     for (const side of [-1, 1]) {
       const step = stride * side, lift = Math.max(0, step) * 2.5;
       if (!crawl) {
         enemyPart(suit, suitCount++, enemyColor(z.pants, z, t), side * 3.4, 15.5 + lift, step * 4, 3.3, z.shorts ? 5 : 7, 3.4, step * .4);
+        if (z.shorts) enemyPart(suit, suitCount++, enemyColor(0x9ab4c9, z, t),
+          side * 3.45, 12.35 + lift, step * 4.5, 3.07, 1.55, 3.15, step * .4);
         const shin = z.shorts ? enforcerSkin : suit;
         const shinIndex = z.shorts ? enforcerSkinCount++ : suitCount++;
         enemyPart(shin, shinIndex, enemyColor(z.shorts ? z.skin : z.pants, z, t), side * 3.85, 7.6 + lift, step * 5.4, 2.4, 5.7, 2.5, -step * .13);
