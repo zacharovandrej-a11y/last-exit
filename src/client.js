@@ -122,7 +122,13 @@ function updateWeaponStrip(visible) {
       const button = document.createElement('button');
       button.type = 'button';
       button.value = i;
-      button.textContent = ZW[i].n;
+      button.setAttribute('aria-label', ZW[i].n);
+      button.title = ZW[i].n;
+      const image = document.createElement('img');
+      image.src = G3.weaponImage(i);
+      image.alt = '';
+      image.draggable = false;
+      button.append(image);
       return button;
     }));
   }

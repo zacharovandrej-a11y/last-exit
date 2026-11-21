@@ -893,6 +893,80 @@ void main(){
     if (rar > 0) b(new T.Color(RARITY[rar]).getHex(), 0, 0, band, 2.7, 3.2, 1.2); // полоска редкости
     return g;
   }
+  // Один снимок на пушку. Лента показывает обычные картинки, без 3D-рендера при свайпе.
+  const weaponImages = new Map(), weaponImageMaterials = new Map();
+  let weaponImageScene, weaponImageCamera, weaponImageTarget;
+  function weaponImage(id) {
+    if (weaponImages.has(id)) return weaponImages.get(id);
+    const width = 128, height = 64;
+    if (!weaponImageTarget) {
+      weaponImageTarget = new T.WebGLRenderTarget(width, height, { depthBuffer: true });
+      weaponImageScene = new T.Scene();
+      weaponImageScene.add(new T.HemisphereLight(0xfff5e5, 0xc6cde0, 1.0));
+      const key = new T.DirectionalLight(0xffffff, 1.25);
+      key.position.set(-4, 6, 3);
+      weaponImageScene.add(key);
+      weaponImageCamera = new T.OrthographicCamera(-1, 1, 1, -1, .1, 250);
+    }
+    const gun = gunMesh(ZW[id].m, 0);
+    // Некоторые пушки используют общую модель в бою. На маленькой карточке выделяем их главную примету.
+    if (id === 5) gun.scale.z = .58;
+    if (id === 10 || id === 11 || id === 12 || id === 13) {
+      const color = { 10: 0x888d93, 11: 0x718488, 12: 0x40d8e8, 13: 0xc080fb }[id];
+      const collar = new T.Mesh(geo.cyl10, lam(color));
+      collar.position.set(0, .4, id === 13 ? 17 : 13);
+      collar.rotation.x = Math.PI / 2;
+      collar.scale.set(id === 10 ? 2.3 : 1.65, id === 10 ? 13 : 7, id === 10 ? 2.3 : 1.65);
+      gun.add(collar);
+    }
+    gun.traverse(part => {
+      if (!part.isMesh) return;
+      const color = part.material.color.getHex();
+      if (!weaponImageMaterials.has(color)) {
+        const paint = new T.Color(color).lerp(new T.Color(0xc2b9aa), .28);
+        weaponImageMaterials.set(color, new T.MeshLambertMaterial({ color: paint }));
+      }
+      part.material = weaponImageMaterials.get(color);
+    });
+    const bounds = new T.Box3().setFromObject(gun), center = bounds.getCenter(new T.Vector3());
+    const size = bounds.getSize(new T.Vector3());
+    const half = Math.max(9, Math.max(size.z, size.y * 2) * .60);
+    weaponImageCamera.left = -half;
+    weaponImageCamera.right = half;
+    weaponImageCamera.top = half / 2;
+    weaponImageCamera.bottom = -half / 2;
+    weaponImageCamera.position.copy(center).add(new T.Vector3(-85, 25, 14));
+    weaponImageCamera.lookAt(center);
+    weaponImageCamera.updateProjectionMatrix();
+
+    const currentTarget = renderer.getRenderTarget();
+    const clear = renderer.getClearColor(new T.Color()), alpha = renderer.getClearAlpha();
+    const pixels = new Uint8Array(width * height * 4);
+    weaponImageScene.add(gun);
+    try {
+      renderer.setRenderTarget(weaponImageTarget);
+      renderer.setClearColor(0, 0);
+      renderer.clear();
+      renderer.render(weaponImageScene, weaponImageCamera);
+      renderer.readRenderTargetPixels(weaponImageTarget, 0, 0, width, height, pixels);
+    } finally {
+      weaponImageScene.remove(gun);
+      renderer.setRenderTarget(currentTarget);
+      renderer.setClearColor(clear, alpha);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const paint = canvas.getContext('2d'), image = paint.createImageData(width, height);
+    for (let y = 0; y < height; y++) {
+      const row = (height - 1 - y) * width * 4;
+      image.data.set(pixels.subarray(row, row + width * 4), y * width * 4);
+    }
+    paint.putImageData(image, 0, 0);
+    const url = canvas.toDataURL();
+    weaponImages.set(id, url);
+    return url;
+  }
   // головные уборы
   function hat(ch) {
     const g = new T.Group(); const m = (gg, c, x, y, z, sx, sy, sz, rx = 0, rz = 0) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.set(rx, 0, rz); g.add(o); return o; };
@@ -960,7 +1034,7 @@ void main(){
   function makeChar(ch) {
     const g = new T.Group(), body = new T.Group(); g.add(body);
     const cv = ch >= CH_SECT ? CIV_S[(ch - CH_SECT) % 4] : ch >= 100 ? CIV[(ch - 100) % CIV.length] : null;
-    const refined = ch === CH_SECT;
+    const refined = ch === CH_SECT, rounded = refined || !cv;
     if (STYLE !== 'real') g.scale.setScalar(1.15); // в ярких стилях люди крупнее
     const cm = camo(ch), mats = cv ? { shirt: charrable(MAT({ color: cv.shirt })), skin: charrable(MAT({ color: cv.skin })), pants: charrable(MAT({ color: cv.pants })) } : { shirt: charrable(MAT({ color: 0xffffff, map: cm })), skin: charrable(MAT({ color: SKIN[ch % 10] })), pants: charrable(MAT({ color: 0xe8e8e8, map: cm })) };
     if (refined) {
@@ -970,11 +1044,11 @@ void main(){
     const part = (gg, mat, x, y, z, sx, sy, sz, par = body) => { const o = new T.Mesh(gg, mat); o.position.set(x, y, z); o.scale.set(sx, sy, sz); par.add(o); return o; };
     const boot = lam(refined ? 0xc78e9d : cv && cv.boots || 0x2e241b), gear = lam(0x3b3d30), belt = lam(cv ? 0x2a2420 : 0x26261f);
     // ноги: бедро + голень (колено гнётся)
-    const leg = s => { const hip = new T.Group(); hip.position.set(s * 3.1, 24, 0); body.add(hip); part(refined ? geo.humanLimb : geo.box, mats.pants, 0, -6, 0, 5, 12, 5.6, hip);
-      const knee = new T.Group(); knee.position.y = -12; hip.add(knee); part(refined ? geo.humanLimb : geo.box, mats.pants, 0, -5.5, 0, 4.6, 11, 5.2, knee); part(refined ? geo.slipperShoe : geo.box, boot, 0, -11, 1.2, 5, 3.4, 8, knee); return [hip, knee]; };
+    const leg = s => { const hip = new T.Group(); hip.position.set(s * 3.1, 24, 0); body.add(hip); part(rounded ? geo.humanLimb : geo.box, mats.pants, 0, -6, 0, 5, 12, 5.6, hip);
+      const knee = new T.Group(); knee.position.y = -12; hip.add(knee); part(rounded ? geo.humanLimb : geo.box, mats.pants, 0, -5.5, 0, 4.6, 11, 5.2, knee); part(refined ? geo.slipperShoe : geo.box, boot, 0, -11, 1.2, 5, 3.4, 8, knee); return [hip, knee]; };
     const [legL, kneeL] = leg(-1), [legR, kneeR] = leg(1);
     part(geo.box, belt, 0, 25, 0, 13.6, 2.4, 7.6);
-    const torso = part(refined ? geo.tailoredTorso : geo.box, mats.shirt, 0, 33, 0, cv && cv.wide ? 16 : 13, 15, cv && cv.wide ? 8.5 : 7);
+    const torso = part(rounded ? geo.tailoredTorso : geo.box, mats.shirt, 0, 33, 0, cv && cv.wide ? 16 : 13, 15, cv && cv.wide ? 8.5 : 7);
     if (!cv) { part(geo.box, gear, 0, 33.5, 3.8, 9, 7, 1); for (const s of [-1, 1]) part(geo.box, gear, s * 3.8, 33.5, 0, 1.4, 15.2, 7.4); } // разгрузка — только у бойцов
     else {
       if (cv.skirt) part(geo.box, lam(cv.skirt), 0, cv.long ? 14 : 20, 0, 14, cv.long ? 24 : 12, 9); // юбка / плащ / ряса
@@ -993,13 +1067,13 @@ void main(){
     part(geo.box, mats.skin, 0, 41.5, 0, 3.4, 2.4, 3.4); // шея
     const head = new T.Group(); head.position.set(0, 46.5, 0); body.add(head);
     part(geo.sph, mats.skin, 0, 0, .3, 4.1, 4.9, 4.5, head);
-    if (!refined) part(geo.box, lam(0x1a1a1a), 0, .7, 4.1, 4.8, .9, .6, head);
+    if (!rounded) part(geo.box, lam(0x1a1a1a), 0, .7, 4.1, 4.8, .9, .6, head);
     else {
       const face = part(geo.facePlane, new T.MeshLambertMaterial({ map: faceTex, transparent: true, depthWrite: false, alphaTest: .1 }), 0, .1, 4.83, 5.2, 5.2, 1, head); face.userData.noMerge = face.userData.noOutline = face.userData.noShadow = true;
       part(geo.faceDetail, mats.skin, 0, -.2, 4.7, .75, 1.1, 1, head);
       for (const side of [-1, 1]) part(geo.faceDetail, mats.skin, side * 4, -.3, .1, .7, 1.2, .7, head);
     }
-    if (STYLE !== 'real') head.scale.setScalar(refined ? 1.06 : 1.25);
+    if (STYLE !== 'real') head.scale.setScalar(refined ? 1.06 : rounded ? 1.14 : 1.25);
     if (!cv) head.add(hat(ch));
     else { const hm = (gg, c, x, y, z, sx, sy, sz, rx = 0) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.x = rx; head.add(o); };
       ({ scarf: () => { hm(geo.dome, 0xd8a23a, 0, .6, -.2, 4.8, 4.6, 5); hm(geo.box, 0xd8a23a, 0, -4.4, 2.6, 2.4, 2, 1.6); },
@@ -1015,8 +1089,8 @@ void main(){
         hardhat: () => { hm(geo.dome, 0xffc61a, 0, 1.6, 0, 5.2, 4.4, 5.4); hm(geo.cyl10, 0xffc61a, 0, 1.4, .4, 6.4, .6, 6.6); },
         buzz: () => hm(geo.dome, 0x2a2018, 0, 1.6, -.2, 4.4, 2.4, 4.6) })[cv.hat](); }
     // руки: плечо + предплечье, держат оружие двумя руками
-    const arm = s => { const sh = new T.Group(); sh.position.set(s * 8.2, 39, 0); body.add(sh); part(refined ? geo.humanLimb : geo.box, mats.shirt, 0, -4.8, 0, 3.8, 9.6, 3.8, sh);
-      const el = new T.Group(); el.position.y = -9.4; sh.add(el); part(refined ? geo.humanLimb : geo.box, mats.shirt, 0, -4.2, 0, 3.4, 8.4, 3.4, el); part(refined ? geo.faceDetail : geo.box, refined ? mats.skin : lam(0x2a2a24), 0, -9.2, 0, refined ? 1.5 : 3, refined ? 2 : 2.6, refined ? 1.4 : 3, el); return [sh, el]; };
+    const arm = s => { const sh = new T.Group(); sh.position.set(s * 8.2, 39, 0); body.add(sh); part(rounded ? geo.humanLimb : geo.box, mats.shirt, 0, -4.8, 0, 3.8, 9.6, 3.8, sh);
+      const el = new T.Group(); el.position.y = -9.4; sh.add(el); part(rounded ? geo.humanLimb : geo.box, mats.shirt, 0, -4.2, 0, 3.4, 8.4, 3.4, el); part(refined ? geo.faceDetail : geo.box, refined ? mats.skin : lam(0x2a2a24), 0, -9.2, 0, refined ? 1.5 : 3, refined ? 2 : 2.6, refined ? 1.4 : 3, el); return [sh, el]; };
     const [armL, elL] = arm(-1), [armR, elR] = arm(1);
     armR.rotation.set(-.35, 0, .12); elR.rotation.x = -1.25;
     armL.rotation.set(-1.0, 0, -.45); elL.rotation.set(-.5, 0, .35);
@@ -1310,5 +1384,5 @@ void main(){
     if (st.extra) st.extra(dt, now);
     renderer.render(scene, camera);
   }
-  return { ruin: () => ({ decals: ruinDecals, v: ruinV, fires: fireSpots, plumes: plumeSrc }), scene, camera, MAT, smashWall, flash: (p, h, s) => flashAt(at(p, h), s), puff: (p, h) => puffAt(at(p, h)), hitNear: (objs, p) => hitNear(objs, p), chars, frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt, altarBroken, breakGlass, reviveObj, boom, objState, debris: (p, h, n, col, sp, sz) => debrisAt(at(p, h), n, col, sp, sz) };
+  return { weaponImage, ruin: () => ({ decals: ruinDecals, v: ruinV, fires: fireSpots, plumes: plumeSrc }), scene, camera, MAT, smashWall, flash: (p, h, s) => flashAt(at(p, h), s), puff: (p, h) => puffAt(at(p, h)), hitNear: (objs, p) => hitNear(objs, p), chars, frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt, altarBroken, breakGlass, reviveObj, boom, objState, debris: (p, h, n, col, sp, sz) => debrisAt(at(p, h), n, col, sp, sz) };
 })();

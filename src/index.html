@@ -10,7 +10,8 @@ canvas#g,canvas#c{display:block;position:fixed;inset:0;width:100vw;height:100vh}
 #c{touch-action:none}
 #weapons{position:fixed;left:50%;bottom:calc(54px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(318px,calc(100vw - 32px));display:flex;gap:4px;overflow-x:auto;overscroll-behavior-x:contain;touch-action:pan-x;scroll-snap-type:x mandatory;scrollbar-width:thin}
 #weapons[hidden]{display:none}
-#weapons button{box-sizing:border-box;flex:0 0 calc((100% - 8px) / 3);scroll-snap-align:start;min-width:0;min-height:44px;padding:4px;font-size:12px;line-height:1.1;overflow-wrap:anywhere;border:1px solid #9b7a6d;border-radius:8px;background:rgba(29,16,12,.92);box-shadow:none}
+#weapons button{box-sizing:border-box;flex:0 0 calc((100% - 8px) / 3);scroll-snap-align:start;min-width:0;height:48px;padding:2px;display:grid;place-items:center;border:1px solid #9b7a6d;border-radius:8px;background:rgba(29,16,12,.92);box-shadow:none}
+#weapons img{width:100%;height:42px;object-fit:contain;pointer-events:none;filter:drop-shadow(0 1px 1px #000b)}
 #weapons button[aria-pressed="true"]{color:#ffd43b;border-color:#ffd43b;background:#3e2b16}
 .scr{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:radial-gradient(circle at 50% 120%,#6b0d0d 0,#2a0808 30%,#0c0404 65%);overflow:auto;padding:12px;box-sizing:border-box}
 .scr.on{display:flex}
