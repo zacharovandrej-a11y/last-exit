@@ -332,9 +332,7 @@ function hud(now, dt, cur, meS, plist, zl) {
   if (hurtFlash > 0) { const g = ctx.createRadialGradient(W_ / 2, H_ / 2, Math.min(W_, H_) * .3, W_ / 2, H_ / 2, Math.max(W_, H_) * .7); g.addColorStop(0, 'rgba(160,0,0,0)'); g.addColorStop(1, 'rgba(160,0,0,' + hurtFlash * .6 + ')'); ctx.fillStyle = g; ctx.fillRect(0, 0, W_, H_); }
   // пепел и дымка заката (рисуется поверх мира, дёшево — 2D)
   { const hz = ctx.createLinearGradient(0, 0, W_ * .3, H_); hz.addColorStop(0, 'rgba(255,120,40,.1)'); hz.addColorStop(.5, 'rgba(255,120,40,0)'); hz.addColorStop(1, 'rgba(40,10,0,.12)'); ctx.fillStyle = hz; ctx.fillRect(0, 0, W_, H_);
-    if (!ash.length) for (let i = 0; i < 46; i++) ash.push({ x: Math.random() * W_, y: Math.random() * H_, v: 12 + Math.random() * 22, s: 1 + Math.random() * 2.2, ph: Math.random() * 6, e: Math.random() < .12 });
-    for (const f of ash) { f.y += f.v * dt; f.x += (Math.sin(now / 900 + f.ph) * 10 - 8) * dt; if (f.y > H_ + 5) { f.y = -5; f.x = Math.random() * W_ * 1.2; } if (f.x < -5) f.x = W_ + 5;
-      ctx.fillStyle = f.e ? 'rgba(255,150,60,' + (.5 + .4 * Math.sin(now / 120 + f.ph)) + ')' : 'rgba(200,190,180,.55)'; ctx.fillRect(f.x, f.y, f.s, f.s); } }
+  } // падающий пепел убран: на экране он читался как снег
   if (now < buf.frz) { ctx.fillStyle = 'rgba(120,190,255,' + (.08 + .04 * Math.sin(now / 200)) + ')'; ctx.fillRect(0, 0, W_, H_); }
   // лазерный прицел и перекрестие (как в Crimsonland)
   if (meS && meS.st === 0) { const W = ZW[myW], [px, py] = G3.project(meP, 24);

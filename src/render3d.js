@@ -184,7 +184,7 @@ vec4 wp_=modelMatrix*p_;vec3 wn_=normalize(mat3(modelMatrix)*normalize(nm_*norma
   const crateTex = typeof ART === 'object' && ART.crate ? loader.load(ART.crate) : null;
   const gsize = HALF * 2 + 4000, gg = new T.PlaneGeometry(gsize, gsize, 1, 1); gg.rotateX(-Math.PI / 2);
   const ground = new T.Mesh(gg, new T.ShaderMaterial({
-    uniforms: Object.assign(T.UniformsUtils.clone(T.UniformsLib.lights), { grass: { value: grassTex }, hasGrass: { value: grassTex ? 1 : 0 }, bc: { value: BIOMES.map(b => new T.Vector2(b.c[0], b.c[1])) }, bcol: { value: BIOMES.map(b => new T.Color(b.n === 'snow' ? '#7a6a48' : b.col)) }, brad: { value: BIOMES.map(b => b.r) }, hallC: { value: new T.Vector2(1e6, 1e6) }, hallU: { value: new T.Vector2(1, 0) }, hallHalf: { value: new T.Vector2() }, orderC: { value: new T.Vector2(1e6, 1e6) } }, U),
+    uniforms: Object.assign(T.UniformsUtils.clone(T.UniformsLib.lights), { grass: { value: grassTex }, hasGrass: { value: grassTex ? 1 : 0 }, bc: { value: BIOMES.map(b => new T.Vector2(b.c[0], b.c[1])) }, bcol: { value: BIOMES.map(b => new T.Color(b.n === 'snow' ? '#7a6a48' : b.n === 'desert' ? '#8e8a52' : b.col)) }, brad: { value: BIOMES.map(b => b.r) }, hallC: { value: new T.Vector2(1e6, 1e6) }, hallU: { value: new T.Vector2(1, 0) }, hallHalf: { value: new T.Vector2() }, orderC: { value: new T.Vector2(1e6, 1e6) } }, U),
     lights: true,
     vertexShader: '#include <common>\n#include <shadowmap_pars_vertex>\nvarying vec2 vP;void main(){vec3 transformedNormal=normalMatrix*vec3(0.,1.,0.);vec4 worldPosition=modelMatrix*vec4(position,1.);vP=worldPosition.xz;gl_Position=projectionMatrix*viewMatrix*worldPosition;\n#include <shadowmap_vertex>\n}',
     fragmentShader: `
@@ -420,7 +420,8 @@ void main(){
     pine: (w) => { const k = w / 40; return [[geo.cyl6, 0x4a3626, M(0, 8 * k, 0, 2.6 * k, 16 * k, 2.6 * k)], [geo.cone7, 'pine', M(0, 26 * k, 0, 21 * k, 30 * k, 21 * k)], [geo.cone7, 'pine', M(0, 44 * k, 0, 16 * k, 26 * k, 16 * k, .5)], [geo.cone7, 'pine', M(0, 60 * k, 0, 10 * k, 22 * k, 10 * k, 1)], [geo.cone7, 'pine', M(0, 66 * k, 0, 5 * k, 10 * k, 5 * k)]]; },
     rock: (w) => { const k = w / 36; return [[geo.dod, 'rock', M(0, 5 * k, 0, 18 * k, 12 * k, 15 * k, 0, .2)], [geo.dod, 'rock', M(9 * k, 3 * k, 6 * k, 9 * k, 7 * k, 8 * k, 1)]]; },
     hay: (w) => { const k = w / 30; return [[geo.lay, 0xbfa25a, M(0, 14 * k, 0, 21 * k, 14 * k, 14 * k)]]; },
-    cactus: (w) => { const k = w / 26; return [[geo.cyl6, 0x55703a, M(0, 22 * k, 0, 5 * k, 44 * k, 5 * k)], [geo.cyl6, 0x4f6a35, M(7 * k, 20 * k, 0, 3 * k, 6 * k, 3 * k, 0, 1.57)], [geo.cyl6, 0x4f6a35, M(10 * k, 28 * k, 0, 3 * k, 16 * k, 3 * k)],
+    cactus: (w, h, o) => [[geo.bushSolid[(o ? o.id : 0) % 3], leafOf((o ? o.id : 0) + 3), M(0, 0, 0, w / 34, w / 34 * 1.1, w / 34, o ? o.id : 0)]], // в Европе нет кактусов — на их месте кусты
+    cactusOld: (w) => { const k = w / 26; return [[geo.cyl6, 0x55703a, M(0, 22 * k, 0, 5 * k, 44 * k, 5 * k)], [geo.cyl6, 0x4f6a35, M(7 * k, 20 * k, 0, 3 * k, 6 * k, 3 * k, 0, 1.57)], [geo.cyl6, 0x4f6a35, M(10 * k, 28 * k, 0, 3 * k, 16 * k, 3 * k)],
       [geo.cyl6, 0x4f6a35, M(-6 * k, 16 * k, 0, 3 * k, 5 * k, 3 * k, 0, 1.57)], [geo.cyl6, 0x4f6a35, M(-8.5 * k, 22 * k, 0, 3 * k, 12 * k, 3 * k)]]; },
     snowman: (w) => { const k = w / 24; return [[geo.dod, 0x76746e, M(0, 5 * k, 0, 12 * k, 9 * k, 11 * k)], [geo.dod, 0x5e6a3e, M(0, 8 * k, 0, 11 * k, 6 * k, 10 * k, .4)]]; }, // валун со мхом (сезон один — без снега)
     igloo: (w) => [[geo.box, 0x6b4a2e, M(0, 13, 0, w * .7, 26, w * .7)], [geo.roof, 0x3e3328, M(0, 26, 0, w * .8, 18, w * .82)], [geo.box, 0x2e261e, M(0, 35, 0, w * .76, 1.5, w * .5)], [geo.box, 0x3a2a1c, M(0, 9, w * .35 + .6, 9, 18, 1.2)], [geo.box, 0x2e3a40, M(w * .2, 15, w * .35 + .6, 7, 6, 1.2)]], // бревенчатый домик
@@ -647,7 +648,7 @@ void main(){
     civic: { tex: 'stucco', cols: [0xc8c2b2] },
     plaster: { tex: 'plaster', cols: [0xe0d6c2, 0xd8cfbe, 0xcdbfa6, 0xd9c9b0] }, plaster2: { tex: 'plaster', cols: [0xc9c2b4, 0xbcb4a6, 0xd6cfc0, 0xb8a990] },
     brick: { tex: 'brick', cols: [0xb8705a, 0xa86450, 0xc08068] }, concrete: { tex: 'concrete', cols: [0xbdb8ae, 0xaaa69e, 0x9c988f] },
-    wood: { tex: 'wood', cols: [0x8a5a3a, 0x7a3a2c, 0x6e5238] }, metal: { tex: 'metal', cols: [0x8a8f86, 0x7a8478, 0x9a9488] }, adobe: { tex: 'adobe', cols: [0xd9b88a, 0xcfa878, 0xe0c49a] },
+    wood: { tex: 'wood', cols: [0x8a5a3a, 0x7a3a2c, 0x6e5238] }, metal: { tex: 'metal', cols: [0x8a8f86, 0x7a8478, 0x9a9488] }, adobe: { tex: 'stucco', cols: [0xd8d0c0, 0xcac2b0, 0xe0d8c8] }, // Европа: оштукатуренные сельские дома вместо глинобитных
     hallbrick: { tex: 'brick', cols: [0xe0c49a] }, stone: { tex: 'concrete', cols: [0x5a5660] }, white: { tex: 'plaster', cols: [0xf4f2ec] },
   };
   const FLOOR = { wood: ['fwood', 0x9a7350], tile: ['tile', 0xb8b4aa], concrete: ['floorc', 0x99968e], dirt: ['dirt', 0x8a7556] };
@@ -1051,7 +1052,7 @@ void main(){
     for (const o of objs) { if (tufts.length >= cap * .55) break; if (o.type !== 'tree' && o.type !== 'bush' && o.type !== 'deadtree') continue;
       for (let k = 0; k < 3; k++) { const a = rh(o.id, 30 + k) * 6.28, q = add(o.p, [Math.cos(a), Math.sin(a)], o.w * (.35 + rh(o.id, 33 + k) * .4)); if (clear(q) && !onPave(q)) tufts.push([M(q[0], .12, q[1], 1.7, 1 + rh(o.id, 36 + k) * .6, 1.7, a), colors[(o.id + k) % colors.length]]); } }
     // поле: разбросанные пучки на траве (не в городе, на рынке, базе, в снегу и пустыне)
-    { const r2 = mkRng(555), noGrass = BIOMES.filter(b => b.n !== 'farm' && b.n !== 'snow');
+    { const r2 = mkRng(555), noGrass = BIOMES.filter(b => b.n !== 'farm' && b.n !== 'snow' && b.n !== 'desert');
       for (let i = 0; i < cap * 3 && tufts.length < cap; i++) { const q = rndMap(r2, 80); if (noGrass.some(b => dist(q, b.c) < b.r * .95)) continue; if (!clear(q)) continue;
         const n = 2 + Math.floor(r2() * 4); for (let k = 0; k < n && tufts.length < cap; k++) { const qq = add(q, [(r2() - .5) * 26, (r2() - .5) * 26]); tufts.push([M(qq[0], .12, qq[1], 1.5 + r2() * .9, .9 + r2() * .8, 1.5 + r2() * .9, r2() * 6.28), colors[Math.floor(r2() * colors.length)]]); } } }
     if (!tufts.length) return;
