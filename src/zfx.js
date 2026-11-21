@@ -69,7 +69,7 @@ const ZFX = (() => {
   const SPEC = { 2: [0x6a5a48, 0x3a3020], 4: [0x2f2f36, 0x22222a], 5: [0x3a1a1a, 0x201010] }; // толстяк, громила, босс — своя одежда
   function look(id, ty) { const h = n => ((id * 9301 + n * 49297) % 233280) / 233280; const sp = SPEC[ty]; return { skin: SKIN[Math.floor(h(1) * SKIN.length)], shirt: sp ? sp[0] : SHIRT[Math.floor(h(2) * SHIRT.length)], pants: sp ? sp[1] : PANTS[Math.floor(h(3) * PANTS.length)], seed: h(4) * 6, hair: HAIR[Math.floor(h(5) * HAIR.length)], bald: h(6) < .3 || ty === 4, wnd: h(7) < .55 }; }
   // Бегун: округлый костюм и маска, два пакета инстансов на всех налётчиков.
-  const RAIDER = 1;
+  const RAIDER = 1, STANDARD_BEARER = 2;
   const raiderGeo = new T.SphereGeometry(1, 8, 6);
   const suit = new T.InstancedMesh(raiderGeo, new T.MeshPhongMaterial({
     color: 0xffffff, emissive: 0x252130, specular: 0x515669, shininess: 30
@@ -83,7 +83,7 @@ const ZFX = (() => {
   }
   const limb = new T.Vector3(), limbUp = new T.Vector3(0, 1, 0);
   let suitCount = 0, markCount = 0;
-  function raiderPart(mesh, i, color, x, y, z, sx, sy, sz, rx = 0) {
+  function enemyPart(mesh, i, color, x, y, z, sx, sy, sz, rx = 0) {
     loc.compose(V3.set(x, y, z), Q.setFromEuler(E.set(rx, 0, 0)), S3.set(sx, sy, sz));
     mesh.setMatrixAt(i, tmp.multiplyMatrices(base, loc));
     mesh.setColorAt(i, color);
@@ -96,7 +96,7 @@ const ZFX = (() => {
     suit.setMatrixAt(suitCount, tmp.multiplyMatrices(base, loc));
     suit.setColorAt(suitCount++, C);
   }
-  function raiderColor(hex, z, t) {
+  function enemyColor(hex, z, t) {
     C.setHex(hex);
     if (z.fl & 2) C.lerp(FIRE, .35 + .2 * Math.sin(t * 20 + (z.seed || 0)));
     if (z.fl & 8) C.lerp(ICE, .6);
@@ -115,15 +115,15 @@ const ZFX = (() => {
       base.multiply(tmp.makeRotationZ(fall * Math.PI / 2));
       base.multiply(tmp.makeTranslation(0, -height, 0));
     }
-    raiderPart(suit, suitCount++, raiderColor(0x625472, z, t), 0, height, 2, 7, 5.6, 14, -.12 + recoil);
-    raiderPart(suit, suitCount++, raiderColor(0x51465b, z, t), 0, height + .5, -10, 6, 4.8, 6);
-    raiderPart(raiderMarks, markCount++, raiderColor(0xe88757, z, t), 0, height + 5.2, 6, 5.3, 1.4, 6.5);
+    enemyPart(suit, suitCount++, enemyColor(0x625472, z, t), 0, height, 2, 7, 5.6, 14, -.12 + recoil);
+    enemyPart(suit, suitCount++, enemyColor(0x51465b, z, t), 0, height + .5, -10, 6, 4.8, 6);
+    enemyPart(raiderMarks, markCount++, enemyColor(0xe88757, z, t), 0, height + 5.2, 6, 5.3, 1.4, 6.5);
     if (!(z.lost & 16)) {
       const headZ = 16 + lunge * 3;
-      raiderPart(suit, suitCount++, raiderColor(0x625770, z, t), 0, height + 1, headZ, 4.8, 5.8, 5.4, recoil);
-      raiderPart(raiderMarks, markCount++, raiderColor(0xf2af68, z, t), 0, height + 2.5, headZ + 4.7, 3.9, 1.35, 1.2);
+      enemyPart(suit, suitCount++, enemyColor(0x625770, z, t), 0, height + 1, headZ, 4.8, 5.8, 5.4, recoil);
+      enemyPart(raiderMarks, markCount++, enemyColor(0xf2af68, z, t), 0, height + 2.5, headZ + 4.7, 3.9, 1.35, 1.2);
     }
-    raiderColor(0x594e64, z, t);
+    enemyColor(0x594e64, z, t);
     for (const side of [-1, 1]) {
       for (const front of [true, false]) {
         if (front ? z.lost & (side < 0 ? 1 : 2) : noLegs) continue;
@@ -143,15 +143,83 @@ const ZFX = (() => {
       }
     }
   }
+  // Двустороннее знамя с вымышленной эмблемой. Складки заданы в общей геометрии.
+  const bannerCanvas = document.createElement('canvas');
+  bannerCanvas.width = 64;
+  bannerCanvas.height = 48;
+  const bannerInk = bannerCanvas.getContext('2d');
+  bannerInk.fillStyle = '#9d243a';
+  bannerInk.fillRect(0, 0, 64, 48);
+  bannerInk.fillStyle = '#edcf8c';
+  bannerInk.fillRect(2, 3, 60, 3);
+  bannerInk.fillRect(2, 42, 60, 3);
+  bannerInk.beginPath();
+  bannerInk.moveTo(32, 10);
+  bannerInk.lineTo(47, 24);
+  bannerInk.lineTo(32, 38);
+  bannerInk.lineTo(17, 24);
+  bannerInk.closePath();
+  bannerInk.fill();
+  bannerInk.fillStyle = '#492536';
+  bannerInk.fillRect(28, 17, 8, 14);
+  const bannerGeo = new T.PlaneGeometry(1, 1, 6, 1);
+  const bannerVertices = bannerGeo.attributes.position;
+  for (let i = 0; i < bannerVertices.count; i++) {
+    const x = bannerVertices.getX(i) + .5;
+    bannerVertices.setXYZ(i, x, bannerVertices.getY(i) - .1 * x, Math.sin(x * 9) * .09 * x);
+  }
+  const banners = new T.InstancedMesh(bannerGeo, new T.MeshBasicMaterial({
+    map: new T.CanvasTexture(bannerCanvas), side: T.DoubleSide
+  }), ZN);
+  banners.count = 0;
+  banners.frustumCulled = false;
+  banners.setColorAt(0, WHITE);
+  scene.add(banners);
+  let bannerCount = 0;
+  const bannerPivot = new T.Matrix4();
+  function drawStandardBearer(z, sc, t, fall) {
+    const crawl = z.lost & 4, stride = Math.sin(z.walk * .7);
+    const attack = z.fl & 1 ? .5 + .5 * Math.sin(t * 12) : 0;
+    const lean = .07 + attack * .23 - (z.kick || 0) * .35;
+    const bob = Math.abs(stride) * 1.2;
+    base.compose(V3.set(z.p[0], 0, z.p[1]), Q.setFromEuler(E.set(0, z.yaw, 0)), S3.setScalar(sc));
+    if (fall) base.multiply(tmp.makeRotationX(-fall * 1.45));
+    else if (crawl) base.multiply(tmp.makeRotationX(1.33)).multiply(tmp.makeTranslation(0, -19, -8));
+
+    enemyPart(suit, suitCount++, enemyColor(0x713343, z, t), 0, 22 + bob, 0, 10, 13, 7, lean);
+    enemyPart(suit, suitCount++, enemyColor(0x8a3b52, z, t), 0, 24 + bob, -5.5, 11, 15, 4.8, lean - .13);
+    enemyPart(raiderMarks, markCount++, enemyColor(0xb8734d, z, t), 0, 29 + bob, 2, 11, 3, 6, lean);
+    if (!(z.lost & 16)) {
+      enemyPart(suit, suitCount++, enemyColor(0xbb8970, z, t), 0, 36 + bob, 2, 4.8, 5.4, 4.5, lean);
+      enemyPart(suit, suitCount++, enemyColor(0x513241, z, t), 0, 38 + bob, .2, 5.3, 4.4, 4.8, lean);
+      enemyPart(suit, suitCount++, enemyColor(0x513241, z, t), 0, 40 + bob, -3.5, 3.1, 2.8, 3.1);
+    }
+    if (!crawl) {
+      enemyPart(suit, suitCount++, enemyColor(0x4b3540, z, t), -4.4, 8 + Math.max(0, stride) * 3, stride * 5, 3.8, 9, 3.8, stride * .22);
+      enemyPart(suit, suitCount++, enemyColor(0x4b3540, z, t), 4.4, 8 + Math.max(0, -stride) * 3, -stride * 5, 3.8, 9, 3.8, -stride * .22);
+    }
+    if (!(z.lost & 1)) enemyPart(suit, suitCount++, enemyColor(0x843952, z, t), -10, 23 + bob, 3 + attack * 5, 3.3, 8, 3.4, -stride * .24 - attack * .8);
+    if (!(z.lost & 2)) {
+      enemyPart(suit, suitCount++, enemyColor(0x843952, z, t), 10, 25 + bob, 6, 3.3, 7.5, 3.4, -.65);
+      // Древко и ткань вращаются вместе вокруг руки.
+      bannerPivot.makeTranslation(11, 23 + bob, 9);
+      bannerPivot.multiply(tmp.makeRotationX(.14 + attack * .5));
+      bannerPivot.multiply(tmp.makeRotationZ(-.13 + stride * .08 + fall * .6));
+      base.multiply(bannerPivot);
+      enemyPart(suit, suitCount++, enemyColor(0x8e614a, z, t), 0, 9, 0, 1.05, 23, 1.05);
+      enemyPart(banners, bannerCount++, enemyColor(0xffffff, z, t), 0, 23, 0, 21, 15, 14);
+    }
+  }
   function draw(list, now) {
     let n = 0, shadowCount = 0; const t = now / 1000;
-    suitCount = markCount = 0;
+    suitCount = markCount = bannerCount = 0;
     for (const z of list) {
       if (shadowCount >= ZN) break; const Tz = ZT[z.ty], sc = Tz.sc, crawl = z.lost & 4, ph = z.walk, sw = Math.sin(ph), att = z.fl & 1, air = z.fl & 4 ? 1 : 0, fall = z.fall || 0;
       zShadow.setMatrixAt(shadowCount++, M4.compose(V3.set(z.p[0], .6, z.p[1]),
         Q.setFromEuler(E.set(0, z.ty === RAIDER ? z.yaw : 0, 0)),
         S3.set(Tz.r * 1.1, 1, Tz.r * (z.ty === RAIDER ? 2 : 1.1))));
       if (z.ty === RAIDER) { drawRaider(z, sc, t); continue; }
+      if (z.ty === STANDARD_BEARER) { drawStandardBearer(z, sc, t, fall); continue; }
       base.compose(V3.set(z.p[0], (crawl ? 2 : 0) + air * 10 * Math.abs(Math.sin(t * 6)), z.p[1]), Q.setFromEuler(E.set(0, z.yaw, 0)), S3.set(sc, sc, sc));
       if (fall) base.multiply(tmp.makeRotationX(-(1 - Math.pow(1 - fall, 3)) * 1.5));
       else if (crawl) base.multiply(tmp.makeRotationX(1.35)).multiply(tmp.makeTranslation(0, -14, -8));
@@ -175,7 +243,8 @@ const ZFX = (() => {
     zShadow.count = shadowCount; zShadow.instanceMatrix.needsUpdate = true;
     suit.count = suitCount;
     raiderMarks.count = markCount;
-    for (const mesh of [suit, raiderMarks]) {
+    banners.count = bannerCount;
+    for (const mesh of [suit, raiderMarks, banners]) {
       if (!mesh.count) continue;
       mesh.instanceMatrix.needsUpdate = true;
       mesh.instanceColor.needsUpdate = true;
@@ -186,7 +255,7 @@ const ZFX = (() => {
   const dying = [];
   function kill(p, d, g, ty, lost, z) {
     const sc = ZT[ty].sc;
-    const L = ty === RAIDER ? { skin: 0x625770, shirt: 0x625472 } : z || look(Math.floor(Math.random() * 999), ty);
+    const L = ty === RAIDER ? { skin: 0x625770, shirt: 0x625472 } : ty === STANDARD_BEARER ? { skin: 0xbb8970, shirt: 0x713343 } : z || look(Math.floor(Math.random() * 999), ty);
     spray(p, 20 * sc, d, 10 + g * 10, 120 + g * 50, 1.6 + g * .3); bloodAt(p, 30 * sc + g * 8, 1);
     for (let i = 0; i < 2 + g; i++) bloodAt(add(p, d, 15 + Math.random() * 40 * (g * .4 + .6)), 10 + Math.random() * 16, .9);
     if (g >= 5) { for (let i = 0; i < 14; i++) gib(p, 18 * sc, d, [3 + Math.random() * 5, 3 + Math.random() * 5, 3 + Math.random() * 5].map(v => v * sc), Math.random() < .4 ? L.skin : Math.random() < .5 ? L.shirt : 0x7a0a0a, 230); bloodAt(p, 70 * sc, 1); return; }
