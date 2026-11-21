@@ -364,20 +364,28 @@ void main(){
     for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28 + r() * .5, rr = R + r() * 5, y = 38 + r() * Y; out.push([Math.cos(a) * rr, y, Math.sin(a) * rr, (10.5 + r() * 4.5) * s, y < 50 ? 'leaf2' : 'leaf']); }
     out.push([(r() - .5) * 6, top - 2 + r() * 3, (r() - .5) * 6, 11.5 * s, 'leaf']); return out; });
   // листовые карточки: плоскости с рисунком листьев (вырез по альфе) по поверхности кроны — даёт «лиственный» край вместо гладких комков
-  const leafCardTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), r = mkRng(77);
-    for (let i = 0; i < 70; i++) { const x = 14 + r() * 100, y = 14 + r() * 100, d = Math.hypot(x - 64, y - 64); if (d > 56) continue; const a = r() * 6.28, l = 9 + r() * 7, sh = .55 + r() * .45;
-      g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = `rgb(${190 * sh | 0},${215 * sh | 0},${150 * sh | 0})`; g.beginPath(); g.ellipse(0, 0, l, l * .42, 0, 0, 7); g.fill();
-      g.strokeStyle = `rgba(60,70,40,.5)`; g.lineWidth = 1; g.beginPath(); g.moveTo(-l, 0); g.lineTo(l, 0); g.stroke(); g.restore(); }
+  const leafCardTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'), r = mkRng(77);
+    for (let i = 0; i < 190; i++) { const x = 24 + r() * 208, y = 24 + r() * 208, d = Math.hypot(x - 128, y - 128); if (d > 112 - r() * 14) continue; const a = r() * 6.28, l = 11 + r() * 10, sh = .5 + r() * .5, yel = r() < .12 ? 1.18 : 1;
+      g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = `rgb(${Math.min(255, 188 * sh * yel) | 0},${215 * sh | 0},${140 * sh | 0})`;
+      g.beginPath(); g.moveTo(-l, 0); g.quadraticCurveTo(-l * .2, -l * .5, l, 0); g.quadraticCurveTo(-l * .2, l * .5, -l, 0); g.fill(); // лист с острым кончиком
+      g.strokeStyle = `rgba(50,60,30,.45)`; g.lineWidth = 1.2; g.beginPath(); g.moveTo(-l, 0); g.lineTo(l * .9, 0); g.stroke(); g.restore(); }
     const t = new T.CanvasTexture(c); t.anisotropy = 2; return t; })();
-  geo.leafCards = [0, 1, 2].map(v => { const r = mkRng(1201 + v * 17), L = [], quad = new T.PlaneGeometry(1, 1);
-    const cr = [[13, 16, 60], [10, 24, 70], [18, 11, 54]][v];
-    // карточки лежат на поверхности эллипсоида кроны (бока и верх), повёрнуты наружу и чуть вверх — без «листьев в воздухе»
-    const cy = (32 + cr[2]) / 2, ry = (cr[2] - 32) / 2 + 4, rxz = cr[0] + 7;
-    for (let i = 0; i < 44; i++) { const a = r() * 6.28, el = -.35 + Math.acos(1 - r() * 1.6) / Math.PI * 1.9, d = new T.Vector3(Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el)), sz = 15 + r() * 8;
-      const pos = new T.Vector3(d.x * rxz * .92, cy + d.y * ry * .95, d.z * rxz * .92), n = new T.Vector3(d.x, d.y + .9, d.z).normalize();
-      const q = new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 0, 1), n).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 0, 1), r() * 6.28));
-      L.push([quad, new T.Matrix4().compose(pos, q, new T.Vector3(sz, sz, 1)), pos.y < 42 ? 0x9aa88a : 0xffffff]); }
-    const g = mergeG(L); g.userData.cards = 1; return g; });
+  // карточки с листьями по поверхности эллипсоида (центр cy, радиусы rxz/ry); нормали — от центра кроны (мягкий объёмный свет: солнечная сторона светлее),
+  // цвет вершин — «затенение» внутри и снизу кроны
+  function leafShell(seed, cy, ry, rxz, n, s0, s1) { const r = mkRng(seed), L = [], quad = new T.PlaneGeometry(1, 1);
+    for (let i = 0; i < n; i++) { const a = r() * 6.28, el = -.35 + Math.acos(1 - r() * 1.6) / Math.PI * 1.9, d = new T.Vector3(Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el)), sz = s0 + r() * s1;
+      const pos = new T.Vector3(d.x * rxz * .92, cy + d.y * ry * .95, d.z * rxz * .92), nn = new T.Vector3(d.x, d.y + .9, d.z).normalize();
+      const q = new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 0, 1), nn).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 0, 1), r() * 6.28));
+      L.push([quad, new T.Matrix4().compose(pos, q, new T.Vector3(sz, sz, 1)), 0xffffff]); }
+    const g = mergeG(L), P = g.attributes.position, N = g.attributes.normal, C = g.attributes.color;
+    for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), nv = new T.Vector3(x / rxz, (y - cy) / ry + .25, z / rxz).normalize(); N.setXYZ(i, nv.x, nv.y, nv.z);
+      const h = Math.min(1, Math.max(0, (y - (cy - ry)) / (2 * ry))), out = Math.min(1, Math.hypot(x / rxz, (y - cy) / ry)), ao = .5 + .32 * h + .28 * out; C.setXYZ(i, ao, ao, ao * .97); }
+    g.userData.cards = 1; return g; }
+  geo.leafCards = [[13, 16, 60], [10, 24, 70], [18, 11, 54]].map((cr, v) => leafShell(1201 + v * 17, (32 + cr[2]) / 2, (cr[2] - 32) / 2 + 4, cr[0] + 7, 52, 14, 8));
+  geo.bushCards = [0, 1, 2].map(v => leafShell(1601 + v * 11, 9, 8, 15, 20, 9, 5));
+  // у каждого дерева свой оттенок: в основном зелёные, часть желтеет, редкие — рыжие (конец лета)
+  const LEAFC = [0x8c9c5c, 0x80965a, 0x98a462, 0x7e8e50, 0x8a9a56, 0xb0a24e, 0xa89846, 0xb8763c];
+  const leafOf = id => { const r = rh(id, 41); return LEAFC[r < .72 ? Math.floor(rh(id, 42) * 5) : r < .92 ? 5 + Math.floor(rh(id, 43) * 2) : 7]; };
   // приглушённые реальные цвета; у каждого экземпляра свой оттенок
   const VAR = {
     house: [0xd8cfbe, 0xc9b79c, 0xb9b3a6, 0xe0d5c0, 0xc4a98a], roof: [0x7e3a2c, 0x4a4f57, 0x6b4a3a, 0x5b4636, 0x8a4a34],
@@ -392,8 +400,8 @@ void main(){
       [geo.box, 0x40352a, M(0, 24, h / 2 + .6, 38, 48, 1.2)], [geo.box, 0xb8aea0, M(14, 24, h / 2 + 1.4, 2, 3, 1.5)]],
     tree: (w, h, o) => {
       const k = w / 44 * 1.15, v = o.id % 3, tall = [1, 1.12, .9][v];
-      return [[geo.treeWood[v], 0x5a4432, M(0, 0, 0, k, k * tall, k, o.id * .7)], [geo.leafCards[v], 'leaf', M(0, 0, 0, k, k * tall, k, o.id * .7)],
-        ...CROWN[v].map(([x, y, z, sz, c], i) => [geo.clump[(o.id + i) % 3], c, M(x * k, y * k * tall, z * k, sz * k * .7, sz * k * .7, sz * k * .7, i * 1.3 + o.id)])]; // комки — тёмная масса внутри, край кроны дают листовые карточки
+      return [[geo.treeWood[v], 0x5a4432, M(0, 0, 0, k, k * tall, k, o.id * .7)], [geo.leafCards[v], leafOf(o.id), M(0, 0, 0, k, k * tall, k, o.id * .7)],
+        ...CROWN[v].map(([x, y, z, sz, c], i) => [geo.clump[(o.id + i) % 3], c, M(x * k * .55, Math.min(54, Math.max(42, y)) * k * tall, z * k * .55, sz * k * .6, sz * k * .6, sz * k * .6, i * 1.3 + o.id)])]; // комки — тёмная масса внутри, край кроны дают листовые карточки
     },
     pine: (w) => { const k = w / 40; return [[geo.cyl6, 0x4a3626, M(0, 8 * k, 0, 2.6 * k, 16 * k, 2.6 * k)], [geo.cone7, 'pine', M(0, 26 * k, 0, 21 * k, 30 * k, 21 * k)], [geo.cone7, 'pine', M(0, 44 * k, 0, 16 * k, 26 * k, 16 * k, .5)], [geo.cone7, 'pine', M(0, 60 * k, 0, 10 * k, 22 * k, 10 * k, 1)], [geo.cone7, 'pine', M(0, 66 * k, 0, 5 * k, 10 * k, 5 * k)]]; },
     rock: (w) => { const k = w / 36; return [[geo.dod, 'rock', M(0, 5 * k, 0, 18 * k, 12 * k, 15 * k, 0, .2)], [geo.dod, 'rock', M(9 * k, 3 * k, 6 * k, 9 * k, 7 * k, 8 * k, 1)]]; },
@@ -437,11 +445,8 @@ void main(){
     bush: (w, h, o) => {
       const k = w / 34, spread = o.id % 2 ? 1 : .84;
       const c = i => geo.clump[(o.id + i) % 3];
-      return [[c(0), 'leaf2', M(0, 7 * k, 0, 14 * k, 9 * k, 13 * k)],
-        [c(1), 'leaf', M(8 * k, 9 * k, 5 * k, 9 * k * spread, 8 * k, 8 * k, 1)],
-        [c(2), 'leaf', M(-8 * k, 10 * k, -4 * k, 9 * k, 9 * k, 8 * k, 2)],
-        [c(0), 'leafTip', M(1 * k, 15 * k, 1 * k, 8 * k, 7 * k, 7 * k, 3)],
-        [c(1), 'leaf2', M(-3 * k, 6 * k, 9 * k, 8 * k, 6 * k, 7 * k, 2)]];
+      return [[c(0), 'leaf2', M(0, 6 * k, 0, 11 * k, 7 * k, 10 * k)], [c(1), 'leaf2', M(6 * k, 7 * k, 3 * k, 7 * k * spread, 6 * k, 6 * k, 1)], // тёмная середина куста
+        [geo.bushCards[o.id % 3], leafOf(o.id + 7), M(0, 0, 0, k * spread, k, k, o.id * .9)]];
     },
     wall: (w, h) => [[geo.box, 0x8d8d86, M(0, 11, 0, w, 22, h)], [geo.box, 0x76766f, M(0, 22.5, 0, w * 1.02, 2, h * 1.3)]],
     tent: (w, h) => [[geo.roof, 0x5a5a3a, M(0, 0, 0, w, 30, h)], [geo.box, 0x2e2e20, M(w / 2 + .3, 8, 0, .8, 14, 8)]],
