@@ -103,7 +103,7 @@ const OT = {
   house: { s: 0 }, car: { s: 1, hp: 160 }, truck: { s: 1, hp: 240 }, crate: { s: 0, hp: 45 }, wall: { s: 1 }, igloo: { s: 0 }, tent: { s: 1 },
   bw: { s: 1 }, furn: { s: 1, pass: 1 }, barrel: { s: 0, hp: 30 }, fence: { s: 1, pass: 1 }, bush: { s: 0, nc: 1, pass: 1 },
   grave: { s: 1, pass: 1 }, deadtree: { s: 0 }, ifence: { s: 1, pass: 1 }, antenna: { s: 0, pass: 1 }, billboard: { s: 1 }, dish: { s: 0, pass: 1 }, junk: { s: 0 }, shed: { s: 1 },
-  sandbag: { s: 1, pass: 1 }, jersey: { s: 1 }, // баррикады: мешки (пули пролетают, ранние зомби не перелезают) и бетонные блоки
+  sandbag: { s: 1, pass: 1 }, jersey: { s: 1 }, bus: { s: 1, hp: 320 }, // bus — брошенные автобусы // баррикады: мешки (пули пролетают, ранние зомби не перелезают) и бетонные блоки
 };
 // здания: план из комнат (BSP-деление), двери между комнатами, окна (пули и взгляд проходят, человек — нет)
 // style: стены/пол/крыша; hall — большой зал без деления; maxRoom — размер комнаты
@@ -292,6 +292,7 @@ function genWorld() {
       for (let t = 0; t < 90; t++) { const p = cen ? nearPt(r2, cen, 600) : rndMap(r2, 200), a = r2() * 6.2832; if (!inMap(p, 120) || !free(p, 62)) continue;
         putA('sandbag', add(p, rot(a, 0, -34)), 76, 14, a); for (const sd of [-1, 1]) putA('sandbag', add(p, rot(a, sd * 44, -6)), 48, 14, a + 1.5708);
         if (r2() < .7) putA('jersey', add(p, rot(a, (r2() - .5) * 40, 58)), 58, 16, a + (r2() - .5) * .5); break; } }
+    for (let k = 0; k < 9; k++) for (let t = 0; t < 250; t++) { const p = k < 5 ? nearPt(r2, [B[0].c, B[3].c][k % 2], 560) : rndMap(r2, 260); if (!inMap(p, 160) || !free(p, 55) || blds.some(b => dist(b.p, p) < b.rad + 150) || objs.some(o => (o.type === 'car' || o.type === 'truck' || o.type === 'bus' || o.type === 'wall') && dist(o.p, p) < 170)) continue; putA('bus', p, 250, 66, r2() * 6.2832); break; } // брошенные автобусы
     for (let k = 0; k < 26; k++) for (let t = 0; t < 30; t++) { const p = rndMap(r2, 200); if (!inMap(p, 100) || !free(p, 50)) continue; const a = r2() * 6.2832; putA('jersey', p, 58, 16, a); if (r2() < .5) putA('jersey', add(p, rot(a, 64, (r2() - .5) * 10)), 58, 16, a + (r2() - .5) * .4); break; } }
   // Убираем бункер №17 (мешал улицам) после расстановки карты — остальные здания и объекты сохраняют координаты.
   // Его стены и мебель помечаем gone: ниже они удаляются при перенумерации, как лишняя мебель.

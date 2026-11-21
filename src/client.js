@@ -165,7 +165,7 @@ function relStart() { if (relT > 0 || ammo[myW] >= magOf(myW)) return; relT = ZW
 // ===== стрельба: попадания считает клиент (что видишь — в то попадаешь), стены и машины останавливают пули =====
 // Пули летят видимыми штрихами (как в Crimsonland); урон, кровь и разбитые стёкла — в момент, когда пуля долетела.
 let outHits = [], outShots = [], outBooms = [], outObj = [], outGlass = [];
-const HITOBJ = new Set(['car', 'truck', 'barrel', 'crate']);
+const HITOBJ = new Set(['car', 'truck', 'bus', 'barrel', 'crate']);
 function addBullet(W, from, d, end, ev) {
   const b = { from, d, end, s: 0, v: (W.bv || 2600) * (W.pel > 1 ? .85 + Math.random() * .3 : 1), bl: (W.bl || 30) * 1.5, bw: W.bw || 2.4, bc: W.bc || 0xffe066, ev, W, done: false };
   if (W.trail) { const tr = { a: from, b: from, t: 0, life: W.trail === 3 ? .9 : W.trail === 2 ? .7 : .55, c: W.trail === 3 ? 0x5aa8ff : W.trail === 2 ? 0x6a6660 : 0x8a8a8a, w: W.trail === 3 ? 6 : W.trail === 2 ? 5 : 2.6, k: W.trail === 3 ? 1 : .55, follow: b }; trails.push(tr); }

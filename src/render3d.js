@@ -355,6 +355,43 @@ void main(){
   })();
   geo.wheel = (() => { const tire = new T.LatheGeometry([[5.2, -3.7], [8.4, -3.9], [9.2, -2.8], [9.4, 0], [9.2, 2.8], [8.4, 3.9], [5.2, 3.7]].map(([x, y]) => new T.Vector2(x, y)), 12);
     return mergeG([[tire, RX(0, 0, 0, 1, 1, 1, Math.PI / 2), 0x1d1d1d], [geo.cyl10, RX(0, 0, 0, 5.4, 6.6, 5.4, Math.PI / 2), 0x8c8a84], [geo.cyl6, RX(0, 0, 0, 2.2, 7.4, 2.2, Math.PI / 2), 0x55534e]]); })();
+  // ===== разнообразный транспорт: хэтчбек, внедорожник, микроавтобус, пикап; грузовики (фургон, армейский), автобус =====
+  // кузов легковушки по профилю: арки колёс, капот, лобовое, багажник (длина 120, ширина 52)
+  function carShape({ rear, front, bot, belt, hood, ws, wx, wr }, depth = 48) { return extr(null, depth, 2, sh => { sh.moveTo(rear + 3, bot); sh.lineTo(wx[0] - wr - 1, bot); sh.absarc(wx[0], bot, wr + 1, Math.PI, 0, true); sh.lineTo(wx[1] - wr - 1, bot); sh.absarc(wx[1], bot, wr + 1, Math.PI, 0, true);
+    sh.lineTo(front - 3, bot); sh.quadraticCurveTo(front, bot, front, bot + 4); sh.lineTo(front, hood - 5); sh.quadraticCurveTo(front, hood - .5, front - 4, hood); sh.lineTo(ws, belt); sh.lineTo(rear + 8, belt); sh.quadraticCurveTo(rear, belt - .5, rear, belt - 6); sh.lineTo(rear, bot + 4); sh.quadraticCurveTo(rear, bot, rear + 3, bot); }); }
+  // общие детали: бамперы, фары (яркие), фонари, номера, зеркала, ручки, пороги
+  function carTrim(L, { rear, front, bot, belt, hood, ws, W = 52, chrome = 0x9a9c9e }) { const hw = W / 2;
+    L.push([geo.box, RX(front + 1.4, bot + 4, 0, 4, 6, W - 1), chrome], [geo.box, RX(rear - 1.2, bot + 4, 0, 4, 6, W - 2), 0x2a2a2a], [geo.box, RX(front + 3.6, bot + 4.5, 0, .6, 3.6, 11), 0xe2ded2], [geo.box, RX(rear - 3.4, bot + 4.5, 0, .6, 3.6, 11), 0xe2ded2]);
+    L.push([geo.box, RX(front + .2, (bot + hood) / 2 + 1, 0, 1, (hood - bot) * .35, W * .42), 0x111111]);
+    for (const z of [-1, 1]) { L.push([geo.box, RX(front + .2, hood - 4, z * hw * .66, 1.4, 4, W * .17), 0xfff4c8], [geo.box, RX(rear - .2, belt - 6, z * hw * .62, 1.4, 4, W * .2), 0xc01c1c], [geo.box, RX(ws - 3, belt + 2, z * (hw + .8), 4, 3, 2.6), 0x1c1c1c], [geo.box, RX((rear + front) / 2, bot + 2, z * hw * .985, (front - rear) * .55, 2.4, 1), 0x1c1c1c]);
+      for (const x of [ws - 26, ws - 6]) L.push([geo.box, RX(x, belt - 3.4, z * hw * 1.006, 4, 1, .6), 0x8a8a86]); } }
+  const glow = g => { const C = g.attributes.color; for (let i = 0; i < C.count; i++) { const r = C.getX(i), gg = C.getY(i), b = C.getZ(i); if (r > .95 && gg > .9 && b > .7) C.setXYZ(i, 1.9, 1.8, 1.45); else if (r > .7 && gg < .15) C.setXYZ(i, 1.6, .18, .16); } return g; };
+  function makeCar(kind) { const P = [], T_ = [], W = 52; let spec, wheels, wr = 9.4;
+    if (kind === 'hatch') { spec = { rear: -52, front: 58, bot: 5, belt: 23, hood: 20, ws: 20, wx: [-34, 36], wr: 10.5 }; T_.push([extr([[-50, 23], [-45, 35], [6, 36], [20, 23]], 44, 1, poly), RX(0, 0, 0, 1, 1, 1), 0x24323c]); P.push([extr([[-46.5, 34.4], [6.5, 35.3], [6, 37.3], [-46, 36.8]], 46, .8, poly), RX(0, 0, 0, 1, 1, 1)]); wheels = [-34, 36]; }
+    else if (kind === 'suv') { wr = 12; spec = { rear: -58, front: 60, bot: 8, belt: 31, hood: 29, ws: 24, wx: [-37, 38], wr: 13 }; T_.push([extr([[-56, 31], [-54, 47], [12, 47.5], [24, 31]], 46, 1, poly), RX(0, 0, 0, 1, 1, 1), 0x24323c]); P.push([extr([[-54.5, 46.4], [12.5, 46.8], [12, 48.8], [-54, 48.4]], 48, .8, poly), RX(0, 0, 0, 1, 1, 1)]);
+      for (const z of [-17, 17]) T_.push([geo.box, RX(-20, 50.5, z, 56, 1.4, 1.6), 0x2a2a2a]); T_.push([geo.cyl10, RX(-60.5, 22, 0, 9, 4, 9, 0, 0, Math.PI / 2), 0x1d1d1d]); wheels = [-37, 38]; } // рейлинги и запаска
+    else if (kind === 'van') { wr = 10.5; spec = { rear: -60, front: 60, bot: 7, belt: 30, hood: 27, ws: 44, wx: [-38, 40], wr: 11.5 }; P.push([extr([[-60, 29], [-60, 53], [28, 54.5], [44, 29.5]], 48, 1.6, poly), RX(0, 0, 0, 1, 1, 1)]);
+      T_.push([extr([[43.4, 30.5], [28.4, 53.4], [30, 53.6], [44.8, 30.8]], 46.6, 0, poly), RX(0, 0, 0, 1, 1, 1), 0x24323c]); for (const z of [-25.6, 25.6]) T_.push([geo.box, RX(-14, 43, z, 74, 10, .8), 0x24323c], [geo.box, RX(-2, 18, z * 1.01, .6, 22, .4), 0x141414]); wheels = [-38, 40]; } // окна салона, сдвижная дверь
+    else if (kind === 'pickup') { wr = 11; spec = { rear: -60, front: 60, bot: 7, belt: 26, hood: 25, ws: 26, wx: [-38, 38], wr: 12 }; T_.push([extr([[-12, 26], [-8, 42], [14, 42.5], [26, 26]], 44, 1, poly), RX(0, 0, 0, 1, 1, 1), 0x24323c]); P.push([extr([[-8.5, 41.4], [14.5, 41.8], [14, 43.6], [-8, 43.4]], 46, .8, poly), RX(0, 0, 0, 1, 1, 1)]);
+      for (const z of [-24.5, 24.5]) P.push([geo.box, RX(-37, 30, z, 46, 8, 2.2)]); P.push([geo.box, RX(-59, 30, 0, 2.2, 8, 50)], [geo.box, RX(-14, 31, 0, 2, 10, 50)]); T_.push([geo.box, RX(-37, 26.4, 0, 44, .6, 46), 0x1e1e1c]); wheels = [-38, 38]; } // открытый кузов
+    P.unshift([carShape(spec), RX(0, 0, 0, 1, 1, 1)]); T_.push([geo.box, RX(0, spec.bot + 1, 0, 100, 3, 44), 0x141414]); carTrim(T_, spec);
+    return { paint: mergeG(P.map(([g, m]) => [g, m, 0xffffff])), trim: glow(mergeG(T_)), wheels: wheels.flatMap(x => [-1, 1].map(sd => [x, sd * 22, wr / 9.4])) }; }
+  // грузовики и автобус (длина 170, ширина 62)
+  function makeTruck(kind) { const P = [], T_ = []; let wheels;
+    const cab = (x0, x1, top) => { P.push([extr([[x0, 9], [x1, 9], [x1, 32], [x1 - 4, top - 2], [x0 + 6, top], [x0, top]], 58, 1.5, poly), RX(0, 0, 0, 1, 1, 1)]);
+      T_.push([extr([[x1 - .4, 33], [x1 - 4.2, top - 4], [x1 - 2.8, top - 4], [x1 + .9, 33]], 52, 0, poly), RX(0, 0, 0, 1, 1, 1), 0x24323c]);
+      for (const z of [-1, 1]) T_.push([geo.box, RX((x0 + x1) / 2 + 4, top - 12, z * 29.6, (x1 - x0) * .45, 12, .8), 0x24323c], [geo.box, RX(x1 - 6, top - 10, z * 33, 2, 8, 3), 0x1c1c1c]);
+      T_.push([geo.box, RX(x1 + 1.2, 14, 0, 3.5, 8, 62), 0x2a2a2a], [geo.box, RX(x1 + .3, 22, 0, 1, 9, 30), 0x151515]); for (const z of [-1, 1]) T_.push([geo.box, RX(x1 + .3, 22, z * 22, 1.4, 5, 9), 0xfff4c8]); };
+    if (kind === 'box') { cab(36, 85, 58); T_.push([geo.box, RX(-24, 44, 0, 120, 64, 62), 0xe4e2dc], [geo.box, RX(-24, 30, 0, 120.6, 5, 62.6), 0xb03a2a], [geo.box, RX(-84.4, 44, 0, .8, 58, 56), 0x9a9890], [geo.box, RX(-24, 10, 0, 160, 6, 30), 0x1a1a1a]); wheels = [64, -40, -60]; } // фургон с полосой
+    else if (kind === 'army') { cab(40, 85, 56); const tent = extr(null, 1, 0, sh => { sh.moveTo(-1, 0); sh.absarc(0, 0, 1, Math.PI, 0, true); sh.closePath(); }); tent.rotateY(Math.PI / 2); // полукруглый тент
+      T_.push([geo.box, RX(-22, 24, 0, 122, 14, 62), 0x4a5233], [tent, RX(-22, 38, 0, 120, 26, 31), 0x5a5e3e], [geo.box, RX(-22, 38, 0, 120, 1, 62), 0x50543a]); for (let k = 0; k < 4; k++) T_.push([geo.box, RX(-70 + k * 32, 50, 0, 1.4, 1.4, 63), 0x464a32]); T_.push([geo.box, RX(-24, 10, 0, 160, 6, 30), 0x1a1a1a]); wheels = [64, -40, -62]; } // тент на дугах
+    else { // автобус «ПАЗ»: скруглённая крыша, полоса окон, двери, двухцветная окраска
+      P.push([extr(null, 58, 2, sh => { sh.moveTo(-85, 9); sh.lineTo(85, 9); sh.lineTo(85, 56); sh.quadraticCurveTo(85, 64, 77, 64); sh.lineTo(-77, 64); sh.quadraticCurveTo(-85, 64, -85, 56); sh.closePath(); }), RX(0, 0, 0, 1, 1, 1)]);
+      for (const z of [-1, 1]) T_.push([geo.box, RX(-6, 45, z * 31.2, 150, 15, .8), 0x24323c], [geo.box, RX(-6, 30, z * 31.25, 166, 3, .7), 0xb03a2a], [geo.box, RX(-6, 13, z * 31.1, 166, 7, .6), 0x2a2a2a]);
+      for (const x of [60, -14]) T_.push([geo.box, RX(x, 32, 31.4, 16, 42, .8), 0x1e262c]); for (let k = 0; k < 8; k++) for (const z of [-31.3, 31.3]) T_.push([geo.box, RX(-74 + k * 18, 45, z, 1.6, 15, .9), 0x2a2a2a]);
+      T_.push([geo.box, RX(86.6, 42, 0, 1, 22, 54), 0x24323c], [geo.box, RX(86.7, 58, 0, 1, 4, 30), 0xffd060], [geo.box, RX(87, 12, 0, 3, 7, 62), 0x2a2a2a], [geo.box, RX(-86.6, 44, 0, 1, 14, 46), 0x24323c], [geo.box, RX(-86, 12, 0, 3, 7, 62), 0x2a2a2a]);
+      for (const z of [-1, 1]) T_.push([geo.box, RX(86.4, 18, z * 22, 1.4, 5, 9), 0xfff4c8], [geo.box, RX(-86.4, 20, z * 24, 1.4, 6, 6), 0xc01c1c]); T_.push([geo.box, RX(0, 66, 10, 40, 4, 22), 0x8a8a86]); wheels = [56, -54]; }
+    return { paint: mergeG(P.map(([g, m]) => [g, m, 0xffffff])), trim: glow(mergeG(T_)), wheels: wheels.flatMap(x => [-1, 1].map(sd => [x, sd * 25, 1.35])) }; }
   // деревья: ствол с корнями и ветками (одна геометрия на вариант), крона из неровных «облаков» листвы
   const hash3 = (x, y, z, s) => { const v = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719 + s * 4.17) * 43758.5453; return v - Math.floor(v); };
   const limbGeo = new T.LatheGeometry([[1, 0], [.94, .3], [.78, .7], [.6, 1]].map(([x, y]) => new T.Vector2(x, y)), 7);
@@ -453,10 +490,12 @@ void main(){
   // у каждого дерева свой оттенок: в основном зелёные, часть желтеет, редкие — рыжие (конец лета)
   const LEAFC = [0x8c9c5c, 0x80965a, 0x98a462, 0x7e8e50, 0x8a9a56, 0xb0a24e, 0xa89846, 0xb8763c];
   const leafOf = id => { const r = rh(id, 41); return LEAFC[r < .72 ? Math.floor(rh(id, 42) * 5) : r < .92 ? 5 + Math.floor(rh(id, 43) * 2) : 7]; };
+  const CARK = ['sedan', 'sedan', 'hatch', 'hatch', 'suv', 'van', 'pickup'], TRUCKK = ['box', 'army', 'bus', 'bus'];
+  const VEH = { hatch: makeCar('hatch'), suv: makeCar('suv'), van: makeCar('van'), pickup: makeCar('pickup'), box: makeTruck('box'), army: makeTruck('army'), bus: makeTruck('bus') };
   // приглушённые реальные цвета; у каждого экземпляра свой оттенок
   const VAR = {
     house: [0xd8cfbe, 0xc9b79c, 0xb9b3a6, 0xe0d5c0, 0xc4a98a], roof: [0x7e3a2c, 0x4a4f57, 0x6b4a3a, 0x5b4636, 0x8a4a34],
-    car: [0x2f4a63, 0x6e2626, 0x8a7d5e, 0xaeb0ab, 0x3a4a3a, 0x232323, 0x5e6266], house2: [0xbdb5a6, 0xa9a39a, 0xc8bfae, 0x9c958a],
+    car: [0x2f4a63, 0x6e2626, 0x8a7d5e, 0xaeb0ab, 0x3a4a3a, 0x232323, 0x5e6266, 0xc8c4b8, 0x7a5a2a, 0x2a4a3a], bus: [0xd8c25a, 0xe8e4da, 0xc8c0a8, 0x6a8aa8, 0xd8d0b8], cab: [0x7a2a24, 0x2a4a6a, 0xd8d4c8, 0x4a5a3a, 0x3a4a2a], house2: [0xbdb5a6, 0xa9a39a, 0xc8bfae, 0x9c958a],
     leaf: [0x778850, 0x85874a, 0x717c42, 0x9a874e, 0x577346],
     leaf2: [0x4e6038, 0x646539, 0x485d37], leafTip: [0x9ba066, 0xb1a063, 0x839356], pine: [0x435e42, 0x4c6849, 0x566744],
     rock: [0x7d7b74, 0x8a857a, 0x6e6c66],
@@ -486,14 +525,13 @@ void main(){
     bunker: (w, h) => [[geo.box, 0x82827a, M(0, 13, 0, w, 26, h)], [geo.box, 0x6e6e66, M(0, 28, 0, w * .9, 4, h * .9)], [geo.box, 0x151515, M(0, 17, h / 2 + .6, w * .5, 4, 1)], [geo.box, 0xa8966e, M(0, 4, h / 2 + 4, w * 1.05, 8, 7)], [geo.box, 0x9c8a64, M(0, 11, h / 2 + 3.5, w * .9, 6, 6)]],
     barn: (w, h) => [[geo.box, 0x72302a, M(0, 23, 0, w, 46, h)], [geo.roof, 0x4e535a, M(0, 46, 0, w * 1.05, 28, h * 1.1)], [geo.box, 0xd6d2c8, M(0, 16, h / 2 + .6, 32, 32, 1.2)], [geo.box, 0x5a2520, M(0, 16, h / 2 + .9, 28, 28, 1.2)]],
     market: (w, h) => [[geo.box, 0xcfcac0, M(0, 26, 0, w, 52, h)], [geo.box, 0x7a2e38, M(0, 46, h / 2 + 1, w * .98, 9, 2)], [geo.box, 0x77726a, M(0, 53, 0, w * 1.01, 3, h * 1.01)], [geo.box, 0x34474f, M(0, 18, h / 2 + .6, w * .7, 22, 1.5)], [geo.box, 0x8e8a82, M(w * .3, 58, 0, 22, 9, 16)]],
-    car: (w, h) => { const sx = w / 120, sz = h / 52; return [[geo.carBody, 'car', M(0, 0, 0, sx, 1, sz)], [geo.carTrim, 0xffffff, M(0, 0, 0, sx, 1, sz)],
+    car: (w, h, o) => { const sx = w / 120, sz = h / 52, kind = CARK[Math.floor(rh(o ? o.id : 0, 60) * CARK.length)];
+      if (kind !== 'sedan') { const V = VEH[kind]; return [[V.paint, 'car', M(0, 0, 0, sx, 1, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1, sz)], ...V.wheels.map(([x, z, k]) => [geo.wheel, 0xffffff, M(x * sx, 9.4 * k, z * sz, k, k, k)])]; }
+      return [[geo.carBody, 'car', M(0, 0, 0, sx, 1, sz)], [geo.carTrim, 0xffffff, M(0, 0, 0, sx, 1, sz)],
       ...[-37, 37].flatMap(x => [-22, 22].map(z => [geo.wheel, 0xffffff, M(x * sx, 9.4, z * sz, 1, 1, 1)]))]; },
-    truck: (w, h) => [[geo.box, 0x3d4a2a, M(w * .32, 24, 0, w * .3, 34, h)], [geo.carCabin, 0x556970, M(w * .43, 32, 0, w * .095, 12, h * .9)], [geo.box, 0x4a5233, M(-w * .15, 30, 0, w * .66, 40, h * 1.02)], [geo.box, 0x3a4228, M(-w * .15, 51, 0, w * .66, 3, h * 1.02)],
-      ...[-1, 1].flatMap(side => [
-        [geo.box, 0x868363, M(-w * .15, 43, side * (h * .51 + 1), w * .63, 2.2, 2)],
-        [geo.box, 0xd1c5a3, M(w * .48, 16, side * h * .31, 3, 5, 10)]
-      ]),
-      [geo.box, 0x1e1e1e, M(0, 9, 0, w, 6, h * .7)], ...[w * .32, -w * .05, -w * .35].flatMap(x => [-1, 1].map(sd => [geo.wheel, 0xffffff, M(x, 10.4, sd * h * .4, 1.1, 1.1, 1.1)]))],
+    truck: (w, h, o) => { const kind = TRUCKK[Math.floor(rh(o ? o.id : 0, 61) * TRUCKK.length)], V = VEH[kind], sx = w / 170, sz = h / 62;
+      return [[V.paint, kind === 'bus' ? 'bus' : 'cab', M(0, 0, 0, sx, 1, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1, sz)], ...V.wheels.map(([x, z, k]) => [geo.wheel, 0xffffff, M(x * sx, 9.4 * k, z * sz, k, k, k)])]; },
+    bus: (w, h, o) => { const V = VEH.bus, sx = w / 170, sz = h / 62; return [[V.paint, 'bus', M(0, 0, 0, sx, 1.08, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1.08, sz)], ...[-.78, -.28, .7].flatMap(x => [-1, 1].map(sd => [geo.wheel, 0xffffff, M(x * w / 2, 12.7, sd * 25 * sz, 1.35, 1.35, 1.35)]))]; }, // большой городской автобус
     crate: () => [[geo.box, 'crate', M(0, 13, 0, 26, 26, 26)]],
     furn: (w, h, o) => { const k = o.fk;
       if (k === 'bed') return [[geo.box, 0x5a4632, M(0, 5, 0, w, 10, h)], [geo.box, 0xcfc8b8, M(0, 11, h * .05, w * .9, 3, h * .8)], [geo.box, 0x6b7a5a, M(0, 11.5, h * .12, w * .92, 3, h * .5)], [geo.box, 0xe8e4da, M(0, 12.5, -h * .38, w * .7, 3, h * .14)]];
@@ -538,7 +576,7 @@ void main(){
   // постапокалипсис: брошенные машины (ржавые, сгоревшие, перевёрнутые), всё детерминировано по id
   const rh = (id, n) => ((id * 9301 + n * 49297 + 7) % 233280) / 233280;
   const RUST = new T.Color(0x6e4228), RUST2 = new T.Color(0x4a2e20), SOOT = new T.Color(0x221e1b), FLIP = new T.Matrix4().makeTranslation(0, 40, 0).multiply(new T.Matrix4().makeRotationX(Math.PI));
-  const wreckOf = o => { if (o.type !== 'car' && o.type !== 'truck') return 0; const r = rh(o.id, 5); return r < .28 ? 0 : r < .6 ? 1 : o.type === 'car' && r > .9 ? 3 : 2; };
+  const wreckOf = o => { if (o.type !== 'car' && o.type !== 'truck' && o.type !== 'bus') return 0; const r = rh(o.id, 5); return r < .28 ? 0 : r < .6 ? 1 : o.type === 'car' && r > .9 ? 3 : 2; };
   const basisAt = o => { const k = sizeVar(o); return new T.Matrix4().compose(new T.Vector3(o.p[0], 0, o.p[1]), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -o.a), new T.Vector3(k, k, k)); };
   function buildPlantContacts(objs) {
     const plants = objs.filter(o => o.type === 'tree' || o.type === 'pine' || o.type === 'bush' || o.type === 'deadtree');
@@ -1214,7 +1252,7 @@ void main(){
   function debrisAt(v, n, col, sp = 90, size = 2.4) { for (let k = 0; k < n; k++) { const m = debris[debI++ % debris.length], u = m.userData; m.position.copy(v); m.material.color.setHex(col); const s = size * (.6 + Math.random() * .8); m.scale.set(s, s * (.4 + Math.random() * .6), s); u.v.set((Math.random() - .5) * sp * 2, sp * (.5 + Math.random()), (Math.random() - .5) * sp * 2); u.w.set(Math.random() * 12, Math.random() * 12, 0); u.t = 0; m.visible = true; } }
   function breakGlass(id, objs) { glassBroken.add(id); const g = glassIdx[id]; if (glassMesh && g) { glassMesh.setMatrixAt(g[0], zero); glassMesh.instanceMatrix.needsUpdate = true; } const o = objs[id]; if (o) debrisAt(at(o.p, 36), 10, 0xcfeeff, 60, 1.8); }
   const wob = new Map(); // id -> t
-  const WOBBLY = { crate: .16, barrel: .2, car: .04, truck: .03, tree: .05, pine: .05, bush: .12, fence: .1, ifence: .08, grave: .06, billboard: .05, antenna: .15, dish: .15, junk: .12, deadtree: .06 };
+  const WOBBLY = { crate: .16, barrel: .2, car: .04, truck: .03, bus: .02, tree: .05, pine: .05, bush: .12, fence: .1, ifence: .08, grave: .06, billboard: .05, antenna: .15, dish: .15, junk: .12, deadtree: .06 };
   const MATC = { car: 0xffd080, truck: 0xffd080, barrel: 0xffd080, crate: 0x8a6a40, fence: 0x8a6a40, tree: 0x4a6b2a, pine: 0x2f5233, bush: 0x4a6b2a };
   function hitNear(objs, end) { let best = null, bd = 30; for (const o of nearObjs(objs, end, 40)) { if (o.dead || !WOBBLY[o.type]) continue; const d = Math.max(0, dist(o.p, end) - o.rad); if (d < bd) { bd = d; best = o; } } if (!best) return;
     wob.set(best.id, 0); if (MATC[best.type]) debrisAt(at(end, 18), 3, MATC[best.type], 50, 1.4); }
@@ -1252,15 +1290,39 @@ void main(){
     let fi = 0; const put = (x, y, z, sx, sy) => { if (fi >= flames.length) return; const s = flames[fi++]; s.position.set(x, y, z); s.scale.set(sx, sy, 1); s.visible = true; };
     for (const f of fires) { f.t += dt; const k = f.t / f.life; if (k >= 1) continue; for (let i = 0; i < f.n; i++) { const a = i * 2.4, rr = f.r * .35 * Math.sqrt(k + .1) * ((i % 3) / 3 + .4); put(f.p[0] + Math.cos(a) * rr, k * 30 * (i % 2), f.p[1] + Math.sin(a) * rr, f.r * .55 * (1 - k * .6), f.r * .9 * (1 - k * .5)); } }
     for (let i = fires.length - 1; i >= 0; i--) if (fires[i].t > fires[i].life) fires.splice(i, 1);
-    for (const [id, b] of burning) { b.t += dt; if (b.s === 2 && b.t < 25 && Math.abs(b.p[0] - camP_[0]) < 900 && Math.abs(b.p[1] - camP_[1]) < 900) for (let i = 0; i < 4; i++) { const f = .75 + .3 * Math.sin(now / 80 + i * 1.9 + id); put(b.p[0] + (i - 1.5) * 12, 18, b.p[1] + Math.sin(i * 2.1) * 8, 22 * f, 38 * f); }
+    const srcs = [];
+    for (const [id, b] of burning) { b.t += dt; if (b.s === 2 && b.t < 25 && Math.abs(b.p[0] - camP_[0]) < 900 && Math.abs(b.p[1] - camP_[1]) < 900) srcs.push({ p: b.p, h: 16, s: 1.3, r: 18, rate: 55 });
       if (Math.random() < dt * (b.s === 2 ? 4 : 2.2)) { const sm = smokes.find(x => x.userData.t > 2.5); if (sm) { sm.userData.t = 0; sm.userData.p = [b.p[0] + (Math.random() - .5) * 20, b.p[1] + (Math.random() - .5) * 20]; sm.visible = true; } } }
     // постоянные очаги: горящие остовы машин, бочки, окна сгоревших домов — только рядом с камерой, не больше 8
-    let nf = 0; for (const f of fireSpots) { if (nf >= 8 || fi >= flames.length - 3) break; if (Math.abs(f.p[0] - camP_[0]) > 650 || Math.abs(f.p[1] - camP_[1]) > 650) continue; const o = objs[f.id]; if (o && (o.dead && !f.win || burning.has(f.id))) continue; nf++;
-      for (let i = 0; i < f.n; i++) { const k = .72 + .28 * Math.sin(now / 70 + i * 2.3 + f.p[0]) + .14 * Math.sin(now / 29 + i * 1.3); put(f.p[0] + (i - (f.n - 1) / 2) * 10 * f.s, f.h, f.p[1] + Math.sin(i * 2.1) * 7 * f.s, 30 * f.s * k, 52 * f.s * k); } }
+    let nf = 0; for (const f of fireSpots) { if (nf >= 7) break; if (Math.abs(f.p[0] - camP_[0]) > 700 || Math.abs(f.p[1] - camP_[1]) > 700) continue; const o = objs[f.id]; if (o && (o.dead && !f.win || burning.has(f.id))) continue; nf++;
+      srcs.push({ p: f.p, h: f.win ? f.h : Math.max(10, f.h - 12), s: f.s * (f.win ? 1.1 : 1.45), r: f.win ? 9 : 20, rate: f.win ? 40 : 70 }); }
+    for (const s of srcs) emitFire(s, dt); stepFire(dt, now); fireGlows(srcs.filter(s => s.h < 30), now);
     drawPlumes(now, objs);
     return fi;
   }
   let camP_ = [0, 0];
+  // ===== настоящий огонь: частицы (одна отрисовка на все), языки поднимаются и закручиваются, цвет белый → жёлтый → оранжевый → тёмно-красный,
+  // искры летят вверх, под огнём мерцает отсвет на земле =====
+  const fireTex = cvTex(64, 64, g => { for (let i = 0; i < 6; i++) { const x = 32 + (Math.random() - .5) * 18, y = 34 + (Math.random() - .5) * 18, r = 14 + Math.random() * 12, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,.55)'); gr.addColorStop(.5, 'rgba(255,255,255,.22)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); } });
+  const FPN = lowEnd ? 260 : 420, fpMesh = new T.InstancedMesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ map: fireTex, blending: T.AdditiveBlending, depthWrite: false, transparent: true, fog: false }), FPN);
+  fpMesh.setColorAt(0, new T.Color()); fpMesh.count = 0; fpMesh.frustumCulled = false; fpMesh.renderOrder = 8; scene.add(fpMesh);
+  const fglow = new T.InstancedMesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ map: null, blending: T.AdditiveBlending, depthWrite: false, transparent: true, fog: false }), 16);
+  fglow.setColorAt(0, new T.Color()); fglow.count = 0; fglow.frustumCulled = false; fglow.renderOrder = 2; scene.add(fglow);
+  const fps = []; for (let i = 0; i < FPN; i++) fps.push({ a: 0, l: 0, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, s: 0, e: 0 });
+  let fpi = 0; const _fm = new T.Matrix4(), _fv = new T.Vector3(), _fs = new T.Vector3(), _fc = new T.Color();
+  function emitFire(src, dt) { const n = src.s * src.rate * dt; let k = Math.floor(n) + (Math.random() < n % 1 ? 1 : 0);
+    while (k-- > 0) { const p = fps[fpi]; fpi = (fpi + 1) % FPN; const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * src.r * src.s, ember = Math.random() < .1;
+      p.x = src.p[0] + Math.cos(a) * r; p.z = src.p[1] + Math.sin(a) * r; p.y = src.h + Math.random() * 3; p.vx = (Math.random() - .5) * 10; p.vz = (Math.random() - .5) * 10; p.vy = (ember ? 70 : 34) + Math.random() * 34; p.a = 0; p.l = ember ? 1.2 + Math.random() : .55 + Math.random() * .5; p.s = (ember ? 1.8 : 15 + Math.random() * 12) * src.s; p.e = ember ? 1 : 0; } }
+  function stepFire(dt, now) { let n = 0; const q = camera.quaternion;
+    for (const p of fps) { if (p.a >= p.l) continue; p.a += dt; if (p.a >= p.l) continue; const k = p.a / p.l;
+      p.vy += (p.e ? -10 : 34) * dt; p.vx += Math.sin(now / 160 + p.y * .12) * 30 * dt; p.vz += Math.cos(now / 190 + p.x * .1) * 26 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+      const sz = p.e ? p.s : p.s * (.55 + 1.1 * Math.sin(Math.min(1, k * 1.15) * Math.PI * .9)), f = p.e ? (1 - k) : (k < .1 ? k / .1 : 1 - (k - .1) / .9);
+      if (p.e) _fc.setRGB(1.6 * f, .8 * f, .25 * f); else if (k < .22) _fc.setRGB(1 * f, .78 * f, .32 * f); else if (k < .55) _fc.setRGB(.95 * f, .4 * f, .08 * f); else _fc.setRGB(.55 * f, .12 * f, .03 * f);
+      fpMesh.setMatrixAt(n, _fm.compose(_fv.set(p.x, p.y, p.z), q, _fs.set(sz, sz * (p.e ? 1 : 1.25), 1))); fpMesh.setColorAt(n++, _fc); if (n >= FPN) break; }
+    fpMesh.count = n; fpMesh.instanceMatrix.needsUpdate = true; if (n) fpMesh.instanceColor.needsUpdate = true; }
+  function fireGlows(srcs, now) { if (!fglow.material.map) { fglow.material.map = glowTex; fglow.material.needsUpdate = true; } let n = 0;
+    for (const s of srcs) { if (n >= 16) break; const f = .8 + .2 * Math.sin(now / 90 + s.p[0]) + .1 * Math.sin(now / 37 + s.p[1]), r = 70 * s.s * f; fglow.setMatrixAt(n, _fm.compose(_fv.set(s.p[0], 1.2, s.p[1]), new T.Quaternion(), _fs.set(r, 1, r))); fglow.setColorAt(n++, _fc.setRGB(.55 * f, .26 * f, .06 * f)); }
+    fglow.count = n; fglow.instanceMatrix.needsUpdate = true; if (n) fglow.instanceColor.needsUpdate = true; }
   // ===== постапокалипсис: завалы, мусор, трещины и ямы на асфальте, очаги огня и столбы дыма =====
   const ruinMeshes = []; let fireSpots = [], plumeSrc = [], ruinDecals = [], ruinV = 0;
   function buildRuin(objs) {
