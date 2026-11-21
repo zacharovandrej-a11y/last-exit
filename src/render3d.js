@@ -1221,6 +1221,16 @@ void main(){
     { n: 'Заговор', shirt: 0x8a7a5a, pants: 0x4a4038, skin: 0xd4a07a, skirt: 0x8a7a5a, hat: 'fedora', item: 'folder' },
     { n: 'Плакат', shirt: 0x2a6ad8, pants: 0x2a6ad8, skin: 0x9c6a48, hat: 'capyel', item: 'roll' },
   ];
+  const HERO_MODELS = {
+    10: { shirt: 0x4b646f, skin: 0xd2aa91, pants: 0x40474e, hat: 'darkhair', jacket: true },
+    11: { shirt: 0x333136, skin: 0xc39a80, pants: 0x312e2e, hat: 'priest', wide: true, robe: true, cross: true },
+    12: { shirt: 0x242c33, skin: 0xd0aa92, pants: 0x282a31, hat: 'veil', robe: true },
+    13: { shirt: 0x8c664d, skin: 0xd2ac90, pants: 0x514548, hat: 'elder', jacket: true },
+    14: { shirt: 0xe3d8bd, skin: 0xbe9376, pants: 0x3c6390, hat: 'redcap', tank: true, wide: true },
+    15: { shirt: 0x8c3944, skin: 0xd7ad95, pants: 0x383b44, hat: 'medic', jacket: true, patch: true },
+    16: { shirt: 0x456888, skin: 0xc69579, pants: 0x466381, hat: 'mechanic', jacket: true, gloves: true, wide: true }
+  };
+  geo.heroRobe = new T.CylinderGeometry(.36, .5, 1, 10);
   const rigidCharCache = new Map();
   function mergeRigidChar(node, skin, cloth) {
     for (const child of [...node.children]) if (child.isGroup) mergeRigidChar(child, skin, cloth);
@@ -1252,8 +1262,9 @@ void main(){
     x.strokeStyle = '#956958'; x.lineWidth = 2; x.beginPath(); x.moveTo(23, 46); x.quadraticCurveTo(32, 49, 41, 46); x.stroke(); return new T.CanvasTexture(c); })();
   function makeChar(ch) {
     const g = new T.Group(), body = new T.Group(); g.add(body);
-    const cv = ch >= CH_SECT ? CIV_S[(ch - CH_SECT) % 4] : ch >= 100 ? CIV[(ch - 100) % CIV.length] : null;
-    const refined = ch === CH_SECT, rounded = refined || !cv;
+    const hero = HERO_MODELS[ch];
+    const cv = hero || (ch >= CH_SECT ? CIV_S[(ch - CH_SECT) % 4] : ch >= 100 ? CIV[(ch - 100) % CIV.length] : null);
+    const refined = ch === CH_SECT, rounded = refined || !cv || !!hero;
     if (STYLE !== 'real') g.scale.setScalar(1.15); // в ярких стилях люди крупнее
     const cm = camo(ch), mats = cv ? { shirt: charrable(MAT({ color: cv.shirt })), skin: charrable(MAT({ color: cv.skin })), pants: charrable(MAT({ color: cv.pants })) } : { shirt: charrable(MAT({ color: 0xffffff, map: cm })), skin: charrable(MAT({ color: SKIN[ch % 10] })), pants: charrable(MAT({ color: 0xe8e8e8, map: cm })) };
     if (refined) {
@@ -1280,6 +1291,29 @@ void main(){
       if (cv.trim) part(geo.box, lam(cv.trim), 0, 33, 3.6, 2, 15, .6);
       if (cv.back) part(geo.box, lam(cv.back), 0, 33, -5.6, 10, 12, 4);
     }
+    if (hero?.robe) {
+      part(geo.heroRobe, mats.shirt, 0, 16, 0, hero.wide ? 19 : 16, 29, hero.wide ? 15 : 12);
+      part(geo.sph, mats.shirt, 0, 29, 1, hero.wide ? 8.3 : 6.5, 7, hero.wide ? 5.6 : 4.4);
+      if (hero.cross) {
+        const chain = lam(0xab8956), cross = lam(0xd1ad68);
+        for (const side of [-1, 1]) part(geo.box, chain, side * 1.9, 37, 4.95, .55, 7, .7).rotation.z = -side * .52;
+        part(geo.box, cross, 0, 31.4, 6.5, 1.35, 5.4, .9);
+        part(geo.box, cross, 0, 32.3, 6.55, 4, 1.15, .95);
+      }
+    }
+    if (hero?.jacket) {
+      const trim = lam(hero.patch ? 0xd8b9a2 : 0xaaa59a);
+      part(geo.box, trim, 0, 33, 4, .8, 13.1, .55);
+      for (const side of [-1, 1]) {
+        part(geo.box, trim, side * 2.3, 38.6, 3.92, 3.2, 2, .75).rotation.z = side * .28;
+        part(geo.box, lam(hero.shirt), side * 3.1, 31.5, 4.05, 3, 3.7, 1.1);
+      }
+      if (hero.patch) {
+        part(geo.box, lam(0xeadbc5), -3.8, 35.5, 4.2, 3.8, 3.6, .42);
+        part(geo.box, lam(0x9e3547), -3.8, 35.5, 4.5, 2.65, .75, .28);
+        part(geo.box, lam(0x9e3547), -3.8, 35.5, 4.5, .75, 2.65, .28);
+      }
+    }
     const vest = new T.Group(); body.add(vest); vest.visible = false; // бронежилет (если подобрал броню)
     part(geo.box, lam(0x6b6248), 0, 33, 0, 14.4, 13, 9, vest); for (let i = -1; i <= 1; i++) part(geo.box, lam(0x585040), i * 4.2, 31, 4.9, 3.6, 5, 1.6, vest);
     if (!cv) part(geo.box, gear, 0, 30, -4.6, 8, 8, 2.4); // рюкзак-подсумок сзади
@@ -1293,9 +1327,49 @@ void main(){
       for (const side of [-1, 1]) part(geo.faceDetail, mats.skin, side * 4, -.3, .1, .7, 1.2, .7, head);
     }
     if (STYLE !== 'real') head.scale.setScalar(refined ? 1.06 : rounded ? 1.14 : 1.25);
-    if (!cv) head.add(hat(ch));
+    if (!cv) {
+      head.add(hat(ch));
+      if (ch === 0) part(geo.sph, lam(0x514037), 0, -2.55, 3.85, 3.15, 1.52, 1, head);
+    }
     else { const hm = (gg, c, x, y, z, sx, sy, sz, rx = 0) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.x = rx; head.add(o); };
-      ({ scarf: () => { hm(geo.dome, 0xd8a23a, 0, .6, -.2, 4.8, 4.6, 5); hm(geo.box, 0xd8a23a, 0, -4.4, 2.6, 2.4, 2, 1.6); },
+      ({ darkhair: () => {
+          hm(geo.dome, 0x292127, 0, 1.45, -.2, 4.75, 4.25, 4.75);
+          for (const side of [-1, 1]) hm(geo.sph, 0x292127, side * 3.6, -2.6, -.65, 1.45, 5.1, 2.65, side * .09);
+          hm(geo.sph, 0x382c2c, 0, -3.1, -2.8, 4.2, 5.3, 1.95);
+        },
+        priest: () => {
+          hm(geo.dome, 0x665d54, 0, 1.25, -.55, 4.5, 3.5, 4.5);
+          hm(geo.sph, 0x6e665d, 0, -3.65, 3.9, 3.6, 3.65, 2.25);
+          hm(geo.sph, 0x948778, 0, -2.0, 4.7, 2.2, 1.04, .8);
+        },
+        veil: () => {
+          hm(geo.dome, 0x20262d, 0, 1.15, -.25, 5.25, 4.9, 5.2);
+          hm(geo.box, 0x20262d, 0, -2.5, -2.65, 10, 11, 5);
+          for (const side of [-1, 1]) hm(geo.sph, 0x30383e, side * 4.15, -2, 1.7, 1.08, 5.55, 2.55);
+          hm(geo.box, 0xa7a6a0, 0, 2.1, 4.15, 7.7, .67, .8);
+        },
+        elder: () => {
+          hm(geo.dome, 0xa59077, 0, 1.25, -.5, 5.03, 4, 4.9);
+          for (const side of [-1, 1]) {
+            hm(geo.sph, 0xa48871, side * 3.85, -.9, 1.05, 1.32, 3.9, 2.6);
+            hm(geo.sph, 0x8c6158, side * 3.45, 1.7, 2.85, 1.0, 1.0, .5);
+            hm(geo.sph, 0x8c6a56, side * 1.8, -.7, 4.1, 1.1, .28, .43);
+          }
+          hm(geo.sph, 0xa59077, 0, -4.4, 1.75, 2.15, 2.0, 1.75);
+        },
+        redcap: () => {
+          hm(geo.dome, 0xa63434, 0, 1.6, 0, 4.95, 3.8, 4.9);
+          hm(geo.box, 0x963136, 0, 1.8, 5.1, 6.35, .8, 4.8);
+        },
+        medic: () => {
+          hm(geo.dome, 0x713f30, 0, 1.55, -.45, 4.75, 4.05, 4.85);
+          hm(geo.sph, 0x784836, -2.65, .75, 1.7, 2, 3.3, 2.4);
+        },
+        mechanic: () => {
+          hm(geo.dome, 0x554136, 0, 1.35, -.5, 4.4, 3.4, 4.65);
+          hm(geo.sph, 0x54413c, 0, -2.3, 3.9, 2.9, 1.6, 1.05);
+        },
+        scarf: () => { hm(geo.dome, 0xd8a23a, 0, .6, -.2, 4.8, 4.6, 5); hm(geo.box, 0xd8a23a, 0, -4.4, 2.6, 2.4, 2, 1.6); },
         capback: () => { hm(geo.dome, 0xd23a3a, 0, 1.6, 0, 4.9, 3.8, 4.9); hm(geo.box, 0xd23a3a, 0, 1.8, -5, 5, .6, 4); },
         foil: () => hm(geo.cone7, 0xdfe3e8, 0, 6, 0, 4.4, 9, 4.4),
         slick: () => hm(geo.dome, 0x1e1a16, 0, 1.4, -.4, 4.6, 3.2, 4.8),
@@ -1311,12 +1385,14 @@ void main(){
     const arm = s => { const sh = new T.Group(); sh.position.set(s * 8.2, 39, 0); body.add(sh); part(rounded ? geo.humanLimb : geo.box, mats.shirt, 0, -4.8, 0, 3.8, 9.6, 3.8, sh);
       const el = new T.Group(); el.position.y = -9.4; sh.add(el); part(rounded ? geo.humanLimb : geo.box, mats.shirt, 0, -4.2, 0, 3.4, 8.4, 3.4, el); part(refined ? geo.faceDetail : geo.box, refined ? mats.skin : lam(0x2a2a24), 0, -9.2, 0, refined ? 1.5 : 3, refined ? 2 : 2.6, refined ? 1.4 : 3, el); return [sh, el]; };
     const [armL, elL] = arm(-1), [armR, elR] = arm(1);
+    if (hero?.tank) for (const joint of [armL, elL, armR, elR]) joint.children.find(o => o.isMesh).material = mats.skin;
+    if (hero?.gloves) for (const joint of [elL, elR]) joint.children.filter(o => o.isMesh).at(-1).material = lam(0x82654e);
     armR.rotation.set(-.35, 0, .12); elR.rotation.x = -1.25;
     armL.rotation.set(-1.0, 0, -.45); elL.rotation.set(-.5, 0, .35);
     const gunHold = new T.Group(); gunHold.position.set(2.6, 32.5, 8); body.add(gunHold);
     const handHold = new T.Group(); handHold.position.set(0, -9.4, .6); handHold.rotation.x = Math.PI / 2 - .2; elR.add(handHold); // пистолет — в правой руке
     const itemG = new T.Group(); elR.add(itemG);
-    if (cv) { // жители без оружия: руки вниз, в руке — своя вещь
+    if (cv && !hero) { // жители без оружия: руки вниз, в руке — своя вещь
       armL.rotation.set(0, 0, -.12); elL.rotation.set(-.25, 0, 0); armR.rotation.set(-.2, 0, .12); elR.rotation.x = -.5;
       const it = (gg, c, x, y, z, sx, sy, sz, rx = 0) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.x = rx; itemG.add(o); };
       const items = { bag: () => it(geo.box, 0x4a2e1e, 0, -12, 0, 3, 7, 7), case: () => it(geo.box, 0x2a1e14, 0, -13, 0, 2.6, 8, 10), leaflets: () => it(geo.box, 0xfafafa, 0, -10, 2.5, 5, 1.6, 6.5), candle: () => { it(geo.cyl6, 0xf2e6c0, 0, -8, 3, 1, 6, 1); it(geo.sph, 0xffb020, 0, -4.4, 3, 1, 1.6, 1); }, folder: () => it(geo.box, 0xc9a85a, 0, -10, 2.5, 1.4, 8, 6), roll: () => it(geo.cyl10, 0xf6f6f2, 0, -9, 3, 1.6, 14, 1.6, 1.4), cane: () => it(geo.cyl6, 0x4a3020, 0, -14, 1.5, .8, 22, .8), phone: () => it(geo.box, 0x1a1a1a, 0, -10, 2, 2.6, 1, 4.6), wrench: () => it(geo.box, 0x8a9096, 0, -12, 1, 1.4, 10, 1.6) };
@@ -1328,7 +1404,7 @@ void main(){
       head.traverse(o => { if (o.isMesh) o.userData.noOutline = true; });
     }
     body.traverse(o => { if (o.isMesh) o.castShadow = !o.userData.noShadow; }); if (STYLE === 'toon') { const ms = []; body.traverse(o => { if (o.isMesh && !o.userData.noOutline) ms.push(o); }); ms.forEach(o => addOutline(o, refined ? OUT_P : OUT_C)); }
-    g.userData = { body, legL, legR, kneeL, kneeR, armL, armR, elL, elR, itemG, civ: !!cv, sectLook: ch >= CH_SECT, head, torso, vest, gunHold, handHold, gunNode: gunHold, muz: 18, gunKey: '', mats, shadow, ready: 0, fireT: 9 };
+    g.userData = { body, legL, legR, kneeL, kneeR, armL, armR, elL, elR, itemG, civ: !!cv && !hero, sectLook: ch >= CH_SECT, head, torso, vest, gunHold, handHold, gunNode: gunHold, muz: 18, gunKey: '', mats, shadow, ready: 0, fireT: 9 };
     return g;
   }
   const ONEH = w => w === 1 || w === 8; // пистолет, револьвер — одной рукой
@@ -1516,11 +1592,37 @@ void main(){
   let zoomCur = 1;
   const transport = plane(); transport.scale.setScalar(1.3); transport.traverse(o => { if (o.isMesh) o.castShadow = true; }); scene.add(transport);
   // ===== превью персонажа на старте =====
-  let pvR = null, pvScene = null, pvCam = null, pvChar = null, pvCh = -1;
+  let pvR = null, pvScene = null, pvCam = null, pvChar = null, pvCh = -1, pvLast = 0;
+  const previewHeroes = new Map();
   function preview(canvas, ch) {
-    if (!pvR) { pvR = new T.WebGLRenderer({ canvas, antialias: true, alpha: true }); pvR.setPixelRatio(2); pvR.setSize(90, 90, false); pvScene = new T.Scene(); pvScene.add(new T.AmbientLight(0xffffff, .65)); const d = new T.DirectionalLight(0xffffff, .7); d.position.set(30, 60, 50); pvScene.add(d); pvCam = new T.PerspectiveCamera(35, 1, 1, 500); pvCam.position.set(0, 45, 120); pvCam.lookAt(0, 26, 0); }
-    if (pvCh !== ch) { if (pvChar) pvScene.remove(pvChar); pvChar = makeChar(ch); setGun(pvChar, 2 | (2 << 4)); pvScene.add(pvChar); pvCh = ch; }
-    pvChar.rotation.y = performance.now() / 1200; pvR.render(pvScene, pvCam);
+    if (!pvR) {
+      pvR = new T.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      pvR.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+      pvR.setSize(258, 258, false);
+      pvScene = new T.Scene();
+      pvScene.add(new T.HemisphereLight(0xf5e7d7, 0x768992, 1.05));
+      const key = new T.DirectionalLight(0xffdfb4, .76);
+      key.position.set(30, 60, 50); pvScene.add(key);
+      const rim = new T.DirectionalLight(0x9bbcc9, .45);
+      rim.position.set(-30, 38, -50); pvScene.add(rim);
+      pvCam = new T.PerspectiveCamera(34, 1, 1, 500);
+      pvCam.position.set(0, 36, 116); pvCam.lookAt(0, 29, 0);
+    }
+    const now = performance.now();
+    if (pvCh === ch && now - pvLast < 32) return;
+    if (pvCh !== ch) {
+      if (pvChar) pvScene.remove(pvChar);
+      if (!previewHeroes.has(ch)) {
+        const figure = makeChar(ch), u = figure.userData;
+        u.armL.rotation.set(-.08, 0, -.19); u.armR.rotation.set(-.06, 0, .19);
+        u.elL.rotation.set(-.18, 0, 0); u.elR.rotation.set(-.18, 0, 0);
+        previewHeroes.set(ch, figure);
+      }
+      pvChar = previewHeroes.get(ch);
+      pvScene.add(pvChar); pvCh = ch;
+    }
+    pvChar.rotation.y = .31 + Math.sin(now / 1150) * .56;
+    pvR.render(pvScene, pvCam); pvLast = now;
   }
   // ===== кадр =====
   const chars = {}; // id -> group
