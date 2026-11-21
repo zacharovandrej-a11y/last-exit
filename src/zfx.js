@@ -72,17 +72,17 @@ const ZFX = (() => {
   const RAIDER = 1;
   const raiderGeo = new T.SphereGeometry(1, 8, 6);
   const suit = new T.InstancedMesh(raiderGeo, new T.MeshPhongMaterial({
-    color: 0xffffff, specular: 0x515669, shininess: 30
-  }), ZN * 12);
-  const visor = new T.InstancedMesh(raiderGeo, new T.MeshBasicMaterial({ color: 0xffffff }), ZN);
-  for (const mesh of [suit, visor]) {
+    color: 0xffffff, emissive: 0x252130, specular: 0x515669, shininess: 30
+  }), ZN * 11);
+  const raiderMarks = new T.InstancedMesh(raiderGeo, new T.MeshBasicMaterial({ color: 0xffffff }), ZN * 2);
+  for (const mesh of [suit, raiderMarks]) {
     mesh.count = 0;
     mesh.frustumCulled = false;
     mesh.setColorAt(0, WHITE);
     scene.add(mesh);
   }
   const limb = new T.Vector3(), limbUp = new T.Vector3(0, 1, 0);
-  let suitCount = 0, visorCount = 0;
+  let suitCount = 0, markCount = 0;
   function raiderPart(mesh, i, color, x, y, z, sx, sy, sz, rx = 0) {
     loc.compose(V3.set(x, y, z), Q.setFromEuler(E.set(rx, 0, 0)), S3.set(sx, sy, sz));
     mesh.setMatrixAt(i, tmp.multiplyMatrices(base, loc));
@@ -117,11 +117,11 @@ const ZFX = (() => {
     }
     raiderPart(suit, suitCount++, raiderColor(0x625472, z, t), 0, height, 2, 7, 5.6, 14, -.12 + recoil);
     raiderPart(suit, suitCount++, raiderColor(0x51465b, z, t), 0, height + .5, -10, 6, 4.8, 6);
-    raiderPart(suit, suitCount++, raiderColor(0xe88757, z, t), 0, height + 5.2, 6, 5.3, 1.4, 6.5);
+    raiderPart(raiderMarks, markCount++, raiderColor(0xe88757, z, t), 0, height + 5.2, 6, 5.3, 1.4, 6.5);
     if (!(z.lost & 16)) {
       const headZ = 16 + lunge * 3;
       raiderPart(suit, suitCount++, raiderColor(0x625770, z, t), 0, height + 1, headZ, 4.8, 5.8, 5.4, recoil);
-      raiderPart(visor, visorCount++, raiderColor(0xf2af68, z, t), 0, height + 2.5, headZ + 4.7, 3.9, 1.35, 1.2);
+      raiderPart(raiderMarks, markCount++, raiderColor(0xf2af68, z, t), 0, height + 2.5, headZ + 4.7, 3.9, 1.35, 1.2);
     }
     raiderColor(0x594e64, z, t);
     for (const side of [-1, 1]) {
@@ -145,7 +145,7 @@ const ZFX = (() => {
   }
   function draw(list, now) {
     let n = 0, shadowCount = 0; const t = now / 1000;
-    suitCount = visorCount = 0;
+    suitCount = markCount = 0;
     for (const z of list) {
       if (shadowCount >= ZN) break; const Tz = ZT[z.ty], sc = Tz.sc, crawl = z.lost & 4, ph = z.walk, sw = Math.sin(ph), att = z.fl & 1, air = z.fl & 4 ? 1 : 0, fall = z.fall || 0;
       zShadow.setMatrixAt(shadowCount++, M4.compose(V3.set(z.p[0], .6, z.p[1]),
@@ -174,8 +174,8 @@ const ZFX = (() => {
     for (const k of PART) { ZM[k].count = n; ZM[k].instanceMatrix.needsUpdate = true; if (ZM[k].instanceColor) ZM[k].instanceColor.needsUpdate = true; }
     zShadow.count = shadowCount; zShadow.instanceMatrix.needsUpdate = true;
     suit.count = suitCount;
-    visor.count = visorCount;
-    for (const mesh of [suit, visor]) {
+    raiderMarks.count = markCount;
+    for (const mesh of [suit, raiderMarks]) {
       if (!mesh.count) continue;
       mesh.instanceMatrix.needsUpdate = true;
       mesh.instanceColor.needsUpdate = true;
