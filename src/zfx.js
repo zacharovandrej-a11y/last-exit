@@ -76,9 +76,10 @@ const ZFX = (() => {
   }), ZN * 11);
   const raiderMarks = new T.InstancedMesh(raiderGeo, new T.MeshBasicMaterial({ color: 0xffffff }), ZN * 2);
   for (const mesh of [suit, raiderMarks]) {
+    // Three.js r128 выделяет буфер цветов по count при первом setColorAt.
+    mesh.setColorAt(0, WHITE);
     mesh.count = 0;
     mesh.frustumCulled = false;
-    mesh.setColorAt(0, WHITE);
     scene.add(mesh);
   }
   const limb = new T.Vector3(), limbUp = new T.Vector3(0, 1, 0);
@@ -171,9 +172,9 @@ const ZFX = (() => {
   const banners = new T.InstancedMesh(bannerGeo, new T.MeshBasicMaterial({
     map: new T.CanvasTexture(bannerCanvas), side: T.DoubleSide
   }), ZN);
+  banners.setColorAt(0, WHITE);
   banners.count = 0;
   banners.frustumCulled = false;
-  banners.setColorAt(0, WHITE);
   scene.add(banners);
   let bannerCount = 0;
   const bannerPivot = new T.Matrix4();
