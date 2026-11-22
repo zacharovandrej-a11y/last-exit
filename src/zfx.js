@@ -297,15 +297,15 @@ const ZFX = (() => {
   const enforcerTone = seed => ENFORCER_SKIN[Math.floor((seed || 0) / 2) % ENFORCER_SKIN.length];
   let enforcerSkinCount = 0;
   // громила и босс — цельная мускулистая модель со скелетом (src/brute.js)
-  const bruteRig = raiderRig ? BruteRig.create(T, RAIDER_SUIT_MODEL, 120, false) : null, bossRig = raiderRig ? BruteRig.create(T, RAIDER_SUIT_MODEL, 8, true) : null;
-  for (const r of [bruteRig, bossRig]) if (r) scene.add(r.mesh, r.cap);
+  const bruteRig = raiderRig ? BruteRig.create(T, RAIDER_SUIT_MODEL, 120, false) : null, bossRig = null; // босс — пока прежний
+  if (bruteRig) scene.add(bruteRig.mesh, bruteRig.cap);
   let bruteCount = 0, bossCount = 0;
+  const BRUTE_SKIN = [0x3b2a22, 0x4a3326, 0x2f2019, 0x54392b, 0x3a261c];
   function drawEnforcer(z, sc, t, fall) {
-    const boss = ZT[z.ty].boss, rig = boss ? bossRig : bruteRig;
-    if (rig && (boss ? bossCount < 8 : bruteCount < 120)) {
-      const atk = z.fl & 1 ? ((t * (boss ? .9 : 1.15) + z.id * .37) % 1) : -1;
-      rig.pose(boss ? bossCount++ : bruteCount++, { id: z.id, walk: z.walk * .62, yaw: z.yaw, x: z.p[0], z: z.p[1], scale: sc * .86, fall, atk, hit: z.flash, lost: z.lost,
-        burning: z.fl & 2, frozen: z.fl & 8, kick: z.kick || 0, lift: z.fl & 4 ? 8 * Math.abs(Math.sin(t * 6)) : 0, skin: boss ? 0x9a8a80 : enforcerTone(z.seed) });
+    if (bruteRig && !ZT[z.ty].boss && bruteCount < 120) {
+      const atk = z.fl & 1 ? ((t * 1.3 + z.id * .37) % 1) : -1;
+      bruteRig.pose(bruteCount++, { id: z.id, walk: z.walk * .62, yaw: z.yaw, x: z.p[0], z: z.p[1], scale: sc * .86, fall, atk, hit: z.flash, lost: z.lost,
+        burning: z.fl & 2, frozen: z.fl & 8, kick: z.kick || 0, lift: z.fl & 4 ? 8 * Math.abs(Math.sin(t * 6)) : 0, skin: BRUTE_SKIN[(z.seed || z.id) % BRUTE_SKIN.length] });
       return;
     }
     const crawl = z.lost & 4, stride = Math.sin(z.walk * .66);

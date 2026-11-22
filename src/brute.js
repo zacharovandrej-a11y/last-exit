@@ -77,8 +77,10 @@ const BruteRig = (() => {
     const L = (x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0) => new T.Matrix4().compose(V(x, y, z), new T.Quaternion().setFromEuler(new T.Euler(rx, ry, rz)), V(sx, sy, sz));
     const hand = restFrame(bind[6][0], bind[6][1], FRONT), at = (lm) => hand.clone().multiply(lm);
     if (!boss) { // кувалда: рукоять вдоль кисти, тяжёлый боёк поперёк
-      add(C(.62, .55, 25, 8), at(L(0, 13, 0)), 6, 2); add(C(.72, .72, 5.5, 8), at(L(0, 2.6, 0)), 6, 3);
-      add(Bx(4.4, 4.4, 11), at(L(0, 25.6, 0)), 6, 1); for (const z of [-5.7, 5.7]) add(C(2.3, 2.3, .7, 12), at(L(0, 25.6, z, 1, 1, 1, H)), 6, 1); add(C(2.5, 2.5, 1.2, 12), at(L(0, 25.6, 0)), 6, 7);
+      // чёрная резиновая полицейская дубинка: рифлёная рукоять, гарда-кольцо, длинный гладкий ствол со скруглённым концом
+      add(C(.95, 1.0, 1.4, 12), at(L(0, -1.6, 0)), 6, 8); add(S(12, 6, Math.PI / 2), at(L(0, -2.3, 0, 1, .6, 1, Math.PI)), 6, 8);
+      add(C(.88, .88, 5.2, 12), at(L(0, 1.4, 0)), 6, 3); for (let i = 0; i < 6; i++) add(C(.96, .96, .3, 12), at(L(0, -.6 + i * .85, 0)), 6, 8);
+      add(C(1.12, 1.12, .55, 14), at(L(0, 4.3, 0)), 6, 8); add(C(.92, .82, 13.5, 12), at(L(0, 11.3, 0)), 6, 8); add(S(12, 6, Math.PI / 2), at(L(0, 18.05, 0, .92, .7, .92)), 6, 8);
     } else { // босс: арматура с бетонной глыбой, торчащие прутья
       add(C(.75, .7, 30, 8), at(L(0, 15, 0)), 6, 1); add(C(.85, .85, 6, 8), at(L(0, 2.6, 0)), 6, 3);
       const rock = new T.IcosahedronGeometry(1, 1); const rp = rock.attributes.position; for (let i = 0; i < rp.count; i++) { const k = .78 + .3 * Math.abs(Math.sin(i * 12.9898) * 43758.5453 % 1); rp.setXYZ(i, rp.getX(i) * k, rp.getY(i) * k, rp.getZ(i) * k); }
@@ -164,7 +166,8 @@ const BruteRig = (() => {
             else if (m < 4.5) { c = vec3(.3, .03, .02); glow = vec3(2.6, .35, .12); spec = 0.; }
             else if (m < 5.5) { c = vec3(.46, .45, .42) * (.75 + .3 * n2); spec = .03; }
             else if (m < 6.5) { c = mix(vec3(.3, .29, .28), vec3(.38, .2, .1), smoothstep(.35, .8, n2)); spec = .55; }
-            else { c = vec3(.5, .1, .06); spec = .4; } }
+            else if (m < 7.5) { c = vec3(.5, .1, .06); spec = .4; }
+            else { c = vec3(.028, .028, .03) * (.9 + .2 * n2); spec = .5; } }
           diffuseColor.rgb *= c;
           float bruteSpec = spec; vec3 bruteGlow = glow;`)
         .replace('#include <specularmap_fragment>', 'float specularStrength = bruteSpec;')
@@ -211,8 +214,8 @@ const BruteRig = (() => {
       if (lost & 16) { bones[3].makeScale(0, 0, 0).setPosition(neck); stump(neck, 1.7); } else write(3, neck, face);
       // кисти в атаке: обе руки на рукояти
       const sh = bind[4][0].clone().applyMatrix4(bones[2]);
-      const wE = e2.set(1.2, sh.y + 8.6, -4.2), wT = V(0, 2.6, -1.7);
-      const sE = V(.8, sh.y - 10.5, 12.5), sT = V(0, -1.4, 2.8);
+      const wE = boss ? e2.set(1.2, sh.y + 8.6, -4.2) : e2.set(6.5, sh.y + 6.5, -3), wT = boss ? V(0, 2.6, -1.7) : V(-.6, 2.4, -1.8);
+      const sE = boss ? V(.8, sh.y - 10.5, 12.5) : V(3.5, sh.y - 5.5, 13), sT = boss ? V(0, -1.4, 2.8) : V(-.8, -1.2, 2.8);
       const hE = V().copy(wE).lerp(sE, slam / Math.max(A, .001) || 0), hT = V().copy(wT).lerp(sT, slam / Math.max(A, .001) || 0);
       for (let si = 0; si < 2; si++) { const side = si ? -1 : 1;
         for (let leg = 0; leg < 2; leg++) { const i = 4 + si * 6 + leg * 3; anchor.copy(bind[i][0]).applyMatrix4(bones[leg ? 0 : 2]);
@@ -222,7 +225,7 @@ const BruteRig = (() => {
           // руки висят широко (широчайшие), качаются; правая держит кувалду
           const swing = -st * side * (1 - A) * (1 - fe);
           end.set(side * 11.3, anchor.y - 12.6, 1.6 + swing * 3.8); tip.set(end.x + side * .4, end.y - 3, end.z + (si ? 1.2 : .4));
-          if (A > 0) { t2.copy(hE).add(si ? V(-.9, -2.8, -.2) : V(0, 0, 0)); end.lerp(t2, A); t2.copy(hE).add(hT).add(si ? V(-.9, -2.8, -.2) : V(0, 0, 0)); tip.lerp(t2, A); }
+          if (A > 0 && (boss || !si)) { t2.copy(hE).add(si ? V(-.9, -2.8, -.2) : V(0, 0, 0)); end.lerp(t2, A); t2.copy(hE).add(hT).add(si ? V(-.9, -2.8, -.2) : V(0, 0, 0)); tip.lerp(t2, A); }
           ref.set(side * .62, -.15 + A * .4, -1);
           solve(anchor, end, length[i] * 1.06, length[i + 1] * 1.06, ref); write(i, anchor, mid); write(i + 1, mid, end); write(i + 2, end, tip, front); } }
       for (let i = 0; i < NB; i++) bones[i].toArray(palette, (index * NB + i) * 16);
