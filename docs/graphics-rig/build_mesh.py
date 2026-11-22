@@ -112,6 +112,20 @@ decimate = obj.modifiers.new("Mobile mesh budget", "DECIMATE")
 decimate.ratio = .108
 decimate.use_collapse_triangulate = True
 bpy.ops.object.modifier_apply(modifier=decimate.name)
+# Relax the lower-back contour around the glute-to-thigh transition.
+rear = obj.vertex_groups.new(name="Rear contour")
+for vertex in obj.data.vertices:
+    x, y, z = vertex.co
+    weight = max(0, 1 - abs(y - 1.0) / 6.0) * min(1, max(0, (-z - .3) / 1.8))
+    if weight > 0:
+        rear.add([vertex.index], weight, "REPLACE")
+smooth = obj.modifiers.new("Round lower-back contour", "SMOOTH")
+smooth.vertex_group = rear.name
+smooth.factor = .64
+smooth.iterations = 3
+bpy.ops.object.modifier_apply(modifier=smooth.name)
+obj.vertex_groups.remove(obj.vertex_groups["Rear contour"])
+
 mesh = obj.data
 mesh.calc_loop_triangles()
 assert len(mesh.loop_triangles) <= 3000

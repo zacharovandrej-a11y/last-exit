@@ -1,4 +1,6 @@
 // Up to two diagonal steps, with a short hold before the next burst.
+export const SUIT_STRIDE_LENGTH = 13;
+
 export function suitStride(clock, id) {
   const sequence = clock * (1 + ((id % 7) - 3) * .028) / 2;
   const progress = Math.min(1, (sequence - Math.floor(sequence)) / (id % 3 ? .82 : .73));
@@ -103,11 +105,16 @@ export function createSuit(T, data, capacity = 400) {
           float ring = smoothstep(.37,.46,iris);
           float pupil = smoothstep(.16,.22,iris);
           vec3 eyeball = mix(mix(vec3(.037,.031,.028),vec3(.23,.18,.13),pupil),vec3(.37,.32,.27),ring);
-          gl_FragColor.rgb = eyeball * (.66+.28*max(normal.z,0.));
+          float inMaskShadow = smoothstep(.05,.95,opening.y) * .42;
+          gl_FragColor.rgb = eyeball * (.64+.20*max(normal.z,0.)) * (1.-inMaskShadow);
           gl_FragColor.rgb += vec3(.18)*(1.-smoothstep(.06,.13,length(opening-vec2(-.05,.24))));
         }
+        float lip = suitEye < .5 && p.z > 3.95
+          ? smoothstep(1.,1.10,length(opening))*(1.-smoothstep(1.10,1.29,length(opening)))
+          : 0.;
+        gl_FragColor.rgb += vec3(.038,.037,.035) * lip * (.35+.65*max(normal.y,0.));
         float rim = 1.0-max(dot(normal,normalize(vViewPosition)),0.0);
-        gl_FragColor.rgb += vec3(.11,.115,.13)*rim*rim*rim*.16;
+        gl_FragColor.rgb += vec3(.11,.115,.13)*rim*rim*rim*.24;
         gl_FragColor.rgb += vec3(.19,.181,.166)*(zipper*teeth*.53+tab*.36+hoodSeam*.13+sideSeam*.19);
       `);
   };
@@ -180,9 +187,15 @@ export function createSuit(T, data, capacity = 400) {
     const phase = walk + id * .13;
     const crouch = attack >= 0 && attack < .13 ? Math.sin(attack / .13 * Math.PI) * 2 : 0;
     const lunge = attack >= .13 ? Math.max(0, 1 - Math.abs((attack - .22) / .09)) : 0;
+    const stance = .58;
     const strideAngle = phase * Math.PI * 2;
     const roll = Math.sin(strideAngle);
-    const arch = Math.sin(strideAngle * 2) * .65;
+    const landingPhase = phase * 2 - Math.floor(phase * 2);
+    // Cushion each landing, then carry the chest over the planted diagonal.
+    const weight = Math.sin(Math.PI * Math.min(1, landingPhase / .54));
+    const supportSide = Math.sin(strideAngle) >= 0 ? 1 : -1;
+    const transfer = supportSide * weight;
+    const arch = Math.sin(strideAngle * 2) * .44;
     const fallEase = fall * (2 - fall);
     const t = frozen ? (state.freezeTime ?? time) : time;
     const twitch = (t + id * .71) % (3.1 + (id % 7) * .37);
@@ -195,10 +208,10 @@ export function createSuit(T, data, capacity = 400) {
     instance.copy(world.matrix);
     mesh.setMatrixAt(index, instance);
 
-    pelvis.set(arch * .5, ground(4.7, 18.2 + arch), -10.6 - reel);
-    waist.set(0, ground(3.9, 17.0 - arch * .55 - crouch), -7.8 - reel + lunge * 1.1);
-    chest.set(-roll * .58, ground(3.6, 15.8 + arch * .62 - crouch), -2.2 - reel + lunge * 3);
-    neck.set(arch * .45, ground(2.8, 15.05 - arch * .56 - crouch - hit * 1.2), 7.05 - reel + lunge * 7);
+    pelvis.set(-transfer * .66, ground(4.7, 17.95 + arch - weight * .27), -10.6 - reel);
+    waist.set(transfer * .19, ground(3.9, 16.9 - arch * .55 - weight * .50 - crouch), -7.8 - reel + lunge * 1.1);
+    chest.set(transfer * .91, ground(3.6, 15.8 + arch * .62 - weight * .82 - crouch), -2.2 - reel + lunge * 3);
+    neck.set(transfer * .36, ground(2.8, 15.05 - arch * .56 - weight * .48 - crouch - hit * 1.2), 7.05 - reel + lunge * 7);
     face.copy(neck).add(ref.set((id % 2 ? -1 : 1) * snap * 3.4 + backTurn * 1.2,
       ground(1.5, 6.5 - snap * 1.65), 3.4));
     ref.set(0, -1, .1);
@@ -222,20 +235,24 @@ export function createSuit(T, data, capacity = 400) {
           stump(anchor, leg ? 1.5 : 1.08);
           continue;
         }
-        if (!leg) anchor.y += side * roll * 1.15;
+        if (!leg) anchor.y -= (side * transfer * .62 + side * roll * .28) * (1 - fallEase);
         const diagonal = phase + ((sideIndex === leg) ? 0 : .5);
-        const step = diagonal - Math.floor(diagonal), stance = .58;
+        const step = diagonal - Math.floor(diagonal);
         const swing = Math.max(0, (step - stance) / (1 - stance));
-        const stride = step < stance ? 4.64 - step * 16 : -4.64 * Math.cos(swing * Math.PI);
+        const reach = SUIT_STRIDE_LENGTH * stance / 2;
+        const stride = step < stance ? reach - step * SUIT_STRIDE_LENGTH : -reach * Math.cos(swing * Math.PI);
+        // Raise the heel before lift-off; the toes stay down through the push.
+        const heel = leg && step < stance ? Math.max(0, (step - .38) / (stance - .38)) : 0;
+        const heelLift = Math.sin(heel * Math.PI) * (1 - fallEase);
         const lift = Math.sin(swing * Math.PI) * (leg ? 4.8 : 5.5);
-        end.set(side * ((leg ? 6.0 : 8.6) + blast * 2),
-          ground(1.9 + (side === impact ? .6 : 0), (leg ? 2.25 : .85) + lift + blast * 4 + (leg ? backTurn * 8 : 0)),
+        end.set(side * ((leg ? 5.8 : 8.1) + blast * 2),
+          ground(1.9 + (side === impact ? .6 : 0), (leg ? 2.25 : .85) + heelLift + lift + blast * 4 + (leg ? backTurn * 8 : 0)),
           (leg ? -16.4 : 11.5) + stride * (1 - fallEase) + (leg ? -backTurn * 8 : lunge * 9));
         ref.set(side * (leg ? .16 : .57), leg ? .75 : .33, leg ? .85 : -.82);
         solve(anchor, end, length[i] * (leg ? 1 : 1.25), length[i + 1] * (leg ? 1 : 1.15), ref);
         write(i, anchor, mid, front);
         write(i + 1, mid, end, front);
-        tip.set(end.x + side * .48, Math.max(.62, end.y - (leg ? 1.55 : .64)), end.z + (leg ? 4.05 : 3.1));
+        tip.set(end.x + side * .48, Math.max(.62, end.y - (leg ? 1.55 + heelLift : .64)), end.z + (leg ? 4.05 : 3.1));
         write(i + 2, end, tip, down);
       }
     }

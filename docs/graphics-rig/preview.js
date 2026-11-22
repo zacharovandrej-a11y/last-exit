@@ -1,4 +1,4 @@
-import { createSuit, suitStride } from './rig.js';
+import { createSuit, SUIT_STRIDE_LENGTH, suitStride } from './rig.js';
 
 const T = THREE;
 const canvas = document.querySelector('#scene');
@@ -24,19 +24,19 @@ try {
   Object.assign(sun.shadow.camera, { left:-38, right:38, top:38, bottom:-38, near:.1, far:170 });
   sun.shadow.normalBias = .35;
   scene.add(sun, sun.target);
-  const fill = new T.DirectionalLight(0x86a5d1, .40);
+  const fill = new T.DirectionalLight(0xb1bdcc, .43);
   fill.position.set(25, 22, -33);
   scene.add(fill);
 
   const floorTex = document.createElement('canvas');
   floorTex.width = floorTex.height = 256;
   const ctx = floorTex.getContext('2d');
-  ctx.fillStyle = '#746d63'; ctx.fillRect(0,0,256,256);
+  ctx.fillStyle = '#454448'; ctx.fillRect(0,0,256,256);
   let seed = 211;
   const rand = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
   for (let i=0; i<11500; i++) {
-    const v = 77 + Math.floor(rand() * 69);
-    ctx.fillStyle = `rgb(${v},${v-4},${v-9})`;
+    const v = 52 + Math.floor(rand() * 25);
+    ctx.fillStyle = `rgb(${v},${v-1},${v-1})`;
     ctx.fillRect(rand()*256,rand()*256,1+rand()*2,1+rand()*2);
   }
   const asphalt = new T.CanvasTexture(floorTex);
@@ -47,7 +47,7 @@ try {
   floor.receiveShadow = true;
   scene.add(floor);
   const mobileFloor = new T.Mesh(new T.PlaneGeometry(1500, 1500),
-    new T.MeshLambertMaterial({ color: 0x53504b }));
+    new T.MeshLambertMaterial({ color: 0x454447 }));
   mobileFloor.rotation.x = floor.rotation.x;
   mobileFloor.receiveShadow = true;
   scene.add(mobileFloor);
@@ -57,7 +57,7 @@ try {
   const views = [[1,1,1], [.18,.21,1], [1,.35,.03], [-.48,.58,-1]];
   let view=0;
   const capture=location.search.includes('capture');
-  const cycle = .86, advance = 16;
+  const cycle = .86;
   function resize(){
     renderer.setSize(Math.max(1,canvas.clientWidth),Math.max(1,canvas.clientHeight),false);
 
@@ -67,13 +67,13 @@ try {
     const aspect = canvas.clientWidth / canvas.clientHeight;
     const shorterSide = angle === 4 ? 470 : 37;
     const w = shorterSide * Math.max(1, aspect), h = shorterSide / Math.min(1, aspect);
-    Object.assign(camera,{left:-w/2,right:w/2,top:h/2,bottom:-h/2,near:.1,far:2200});
+    Object.assign(camera,{left:-w/2,right:w/2,top:h/2,bottom:-h/2,near:-1400,far:2200});
     camera.updateProjectionMatrix();
     const phase = suitStride(t / cycle, 1);
-    floor.position.z = -(phase * advance % 240);
+    floor.position.z = -(phase * SUIT_STRIDE_LENGTH % 240);
     floor.visible = angle !== 4;
     mobileFloor.visible = angle === 4;
-    mobileFloor.position.z = -(phase * advance % 240);
+    mobileFloor.position.z = -(phase * SUIT_STRIDE_LENGTH % 240);
     // The camera tracks the body; the ground moves at the same rate as the root.
     camera.position.set(x*75,y*75,z*75);
     camera.lookAt(0,8.8,-1.3);
