@@ -134,7 +134,7 @@ function genWorld() {
     const v = sub(b, a), t = Math.max(0, Math.min(1, dot(sub(p, a), v) / dot(v, v)));
     return dist(p, add(a, v, t)) < 60 + m;
   });
-  const free = (p, m) => { if (blocksApproach(p, m) || housePlots.some(b => { const r = sub(p, b.p); return Math.hypot(Math.max(0, Math.abs(dot(r, b.u)) - b.yard[0] / 2), Math.max(0, Math.abs(dot(r, b.v)) - b.yard[1] / 2)) < m; })) return false; for (const o of objs) if (o.bid === undefined && dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + (b.kind === 'ch0' ? 370 : b.kind === 'ch3' ? 330 : b.rad)) return false; return true; };
+  const free = (p, m) => { if (blocksApproach(p, m) || housePlots.some(b => { const r = sub(p, b.p); return Math.hypot(Math.max(0, Math.abs(dot(r, b.u)) - b.yard[0] / 2), Math.max(0, Math.abs(dot(r, b.v)) - b.yard[1] / 2)) < m; })) return false; for (const o of objs) if (o.bid === undefined && !o.gone && dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + (b.kind === 'ch0' ? 370 : b.kind === 'ch3' ? 330 : b.rad)) return false; return true; };
   function putA(type, p, w, h, a) {
     const u = [Math.cos(a), Math.sin(a)];
     const o = { id: objs.length, type, p, a, u, v: perp(u), w, h, rad: Math.hypot(w, h) / 2, sh: OT[type].s };
@@ -286,14 +286,45 @@ function genWorld() {
     putA('tree', local(240, 175), 64, 64, b.a);
     putA('shed', local(-240, -210), 100, 80, b.a);
   }
-  // постапокалипсис: брошенные блокпосты из мешков и бетонных блоков (свой генератор — остальной мир не меняется)
-  { const r2 = mkRng(31337), rot = (a, x, y) => [Math.cos(a) * x - Math.sin(a) * y, Math.sin(a) * x + Math.cos(a) * y], cens = [B[3].c, B[0].c, B[1].c, null];
-    for (let k = 0; k < 18; k++) { const cen = cens[k % 4];
-      for (let t = 0; t < 90; t++) { const p = cen ? nearPt(r2, cen, 600) : rndMap(r2, 200), a = r2() * 6.2832; if (!inMap(p, 120) || !free(p, 62)) continue;
-        putA('sandbag', add(p, rot(a, 0, -34)), 76, 14, a); for (const sd of [-1, 1]) putA('sandbag', add(p, rot(a, sd * 44, -6)), 48, 14, a + 1.5708);
-        if (r2() < .7) putA('jersey', add(p, rot(a, (r2() - .5) * 40, 58)), 58, 16, a + (r2() - .5) * .5); break; } }
+  // постапокалипсис: реквизит не россыпью, а сценами со смыслом (свой генератор — остальной мир не меняется).
+  // Случайные ящики и бочки на улицах убираем; вместо них блокпосты, лагеря выживших, склады у ангаров, бочки у гаражей, баррикады у домов.
+  { const r2 = mkRng(31337), r3 = mkRng(5150), rot = (a, x, y) => [Math.cos(a) * x - Math.sin(a) * y, Math.sin(a) * x + Math.cos(a) * y];
+    for (const o of objs) if ((o.type === 'crate' || o.type === 'barrel') && o.bid === undefined) o.gone = 1;
+    const at = (p, a, x, y) => add(p, rot(a, x, y)), J = (k = 1) => (r3() - .5) * k;
+    const P = (ty, p, a, x, y, w, h, da = 0, ex) => { const o = putA(ty, at(p, a, x, y), w, h, a + da); if (ex) Object.assign(o, ex); return o; };
+    const spot = (cen, R, m, tries = 400) => { for (let t = 0; t < tries; t++) { const p = cen ? nearPt(r3, cen, R) : rndMap(r3, 200); if (inMap(p, 120) && free(p, m)) return p; } return null; };
+    const beside = (b, m) => { const dirs = [b.u, b.v, [-b.u[0], -b.u[1]], [-b.v[0], -b.v[1]]]; const s0 = Math.floor(r3() * 4); for (let i = 0; i < 4; i++) { const d = dirs[(s0 + i) % 4], p = add(b.p, d, b.rad + m + 8); if (inMap(p, 100) && free(p, m)) return [p, Math.atan2(d[1], d[0])]; } return null; };
+    // 1) блокпосты: мешки буквой П, бетонные блоки поперёк, ящики с патронами, бочка-костёр
+    const cens = [B[3].c, B[0].c, B[1].c, null];
+    for (let k = 0; k < 12; k++) { const p = spot(cens[k % 4], 700, 78); if (!p) continue; const a = r3() * 6.2832;
+      P('sandbag', p, a, 0, -40, 84, 14); for (const sd of [-1, 1]) P('sandbag', p, a, sd * 48, -8, 56, 14, 1.5708);
+      for (let i = -1; i <= 1; i++) if (r3() < .85) P('jersey', p, a, i * 64 + J(8), 72 + J(10), 58, 16, J(i ? .5 : .2));
+      P('crate', p, a, -22, -14, 30, 18, J(.6), { vk: 1 }); if (r3() < .6) P('crate', p, a, 24, -18, 30, 18, J(.6), { vk: 1 });
+      P('barrel', p, a, 4, 16, 18, 18, 0, { fire: 1 }); }
+    // 2) лагеря выживших: палатка, бочка-костёр в центре, ящики, мешки, пара бочек
+    for (let k = 0; k < 8; k++) { const p = spot(k < 4 ? [B[0].c, B[2].c, B[3].c, B[4].c][k] : null, 760, 92); if (!p) continue; const a = r3() * 6.2832;
+      P('tent', p, a, 0, -52, 60, 50); if (r3() < .5) P('tent', p, a, -64, -10, 60, 50, 1.2 + J(.3));
+      P('barrel', p, a, 6, 18, 18, 18, 0, { fire: 1 });
+      P('crate', p, a, 46, -10, 26, 26, J(.8), { vk: 0, lv: r3() < .4 ? 2 : 1 }); P('crate', p, a, 52, 26, 34, 34, J(.5), { vk: 2 }); P('crate', p, a, -40, 40, 30, 18, J(.8), { vk: 1 });
+      P('sandbag', p, a, 0, 74, 70, 14, J(.2)); P('barrel', p, a, -46, 62, 18, 18, 0, { vk: 0 }); if (r3() < .6) P('barrel', p, a, -24, 70, 18, 18, 0, { vk: 4, tip: 1 }); }
+    // 3) склады у ангаров, рынка, казарм, офисов, амбаров: штабеля ящиков на поддонах
+    for (const b of blds) { if (!/^(hangar|market|barracks|office|barn)$/.test(b.kind) || r3() > .75) continue; const q = beside(b, 58); if (!q) continue; const [p, d] = q, a = d + 1.5708;
+      const nx = 2 + Math.floor(r3() * 2), ny = 2; for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) { if (r3() < .15) continue; P('crate', p, a, (i - (nx - 1) / 2) * 42, (j - .5) * 42, 36, 36, J(.08), { vk: r3() < .6 ? 0 : 2, lv: 1 + Math.floor(r3() * 3), pal: 1 }); }
+      if (r3() < .6) { P('barrel', p, a, nx * 21 + 16, -10, 18, 18, 0, { vk: 4 }); P('barrel', p, a, nx * 21 + 16, 12, 18, 18, 0, { vk: 4 }); } }
+    // 4) бочки у гаражей и сараев: ряды, одна опрокинута, рядом канистры-бочки другого цвета — взрываются цепочкой
+    const sheds = objs.filter(o => o.type === 'shed' && !o.gone);
+    for (let k = 0; k < 14; k++) { let p = null, a = r3() * 6.2832;
+      if (k < 8 && sheds.length) { const s = sheds[Math.floor(r3() * sheds.length)]; for (let t = 0; t < 8 && !p; t++) { const q = add(s.p, rot(r3() * 6.2832, 85, 0)); if (inMap(q, 100) && free(q, 40)) { p = q; a = s.a; } } }
+      else p = spot(k % 2 ? B[1].c : null, 560, 50); if (!p) continue; const vk = [0, 1, 2, 3, 4][Math.floor(r3() * 5)], cols = 2 + Math.floor(r3() * 2);
+      for (let i = 0; i < cols; i++) for (let j = 0; j < 2; j++) if (r3() < .9) P('barrel', p, a, (i - (cols - 1) / 2) * 20 + J(2), (j - .5) * 20 + J(2), 18, 18, 0, { vk: r3() < .8 ? vk : 0 });
+      if (r3() < .7) P('barrel', p, a, cols * 10 + 18, 8, 18, 18, J(1), { vk, tip: 1 }); }
+    // 5) баррикады у домов: мешки вдоль стены, ящики рядом — тут кто-то держал оборону
+    for (const b of blds) { if (!/^(apart|office|villa|lodge)$/.test(b.kind) || r3() > .3) continue; const q = beside(b, 30); if (!q) continue; const [p, d] = q, a = d + 1.5708;
+      P('sandbag', p, a, J(20), 0, 70, 14, J(.15)); P('crate', p, a, 48, 6, 26, 26, J(.5), { vk: 0 }); if (r3() < .5) P('crate', p, a, -46, 4, 30, 18, J(.5), { vk: 1 }); }
+    // одиночные бетонные блоки на дорогах-пустырях (их было много — оставляем меньше)
+    for (let k = 0; k < 12; k++) { const p = spot(null, 0, 50, 30); if (!p) continue; const a = r3() * 6.2832; P('jersey', p, a, 0, 0, 58, 16); if (r3() < .6) P('jersey', p, a, 64, J(8), 58, 16, J(.4)); }
     for (let k = 0; k < 9; k++) for (let t = 0; t < 250; t++) { const p = k < 5 ? nearPt(r2, [B[0].c, B[3].c][k % 2], 560) : rndMap(r2, 260); if (!inMap(p, 160) || !free(p, 55) || blds.some(b => dist(b.p, p) < b.rad + 150) || objs.some(o => (o.type === 'car' || o.type === 'truck' || o.type === 'bus' || o.type === 'wall') && dist(o.p, p) < 170)) continue; putA('bus', p, 250, 66, r2() * 6.2832); break; } // брошенные автобусы
-    for (let k = 0; k < 26; k++) for (let t = 0; t < 30; t++) { const p = rndMap(r2, 200); if (!inMap(p, 100) || !free(p, 50)) continue; const a = r2() * 6.2832; putA('jersey', p, 58, 16, a); if (r2() < .5) putA('jersey', add(p, rot(a, 64, (r2() - .5) * 10)), 58, 16, a + (r2() - .5) * .4); break; } }
+  }
   // Убираем бункер №17 (мешал улицам) после расстановки карты — остальные здания и объекты сохраняют координаты.
   // Его стены и мебель помечаем gone: ниже они удаляются при перенумерации, как лишняя мебель.
   const bunkerId = 17, removedBunker = blds[bunkerId]?.kind === 'bunker' ? blds[bunkerId] : null;

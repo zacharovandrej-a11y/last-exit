@@ -532,6 +532,63 @@ void main(){
     rock: [0x7d7b74, 0x8a857a, 0x6e6c66],
   };
   // части каждого типа: [геометрия, цвет (или ключ VAR), матрица в единицах w/h объекта]
+  // ===== реквизит: ящики, бочки, мешки с песком, бетонные блоки, палатка — детальные геометрии с цветами вершин =====
+  const PROP = (() => { const H = Math.PI / 2, hs = (i, k) => { const x = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); };
+    const tint = (g, f) => { const P = g.attributes.position, C = g.attributes.color; for (let i = 0; i < P.count; i++) { const k = f(P.getX(i), P.getY(i), P.getZ(i), i); C.setXYZ(i, C.getX(i) * k[0], C.getY(i) * k[1], C.getZ(i) * k[2]); } return g; };
+    // деревянный ящик 26: рама по рёбрам, доски с щелями, диагональные распорки, верх из досок
+    const crateW = (() => { const L = [], W = 0x8a6a40, D = 0x5e4528, F = 0x6e5030, s = 13;
+      L.push([geo.box, RX(0, 13, 0, 24.6, 24.6, 24.6), 0x3a2a18]);
+      for (const [fx, fz, ry] of [[0, 1, 0], [0, -1, 0], [1, 0, H], [-1, 0, H]]) { for (let i = 0; i < 3; i++) L.push([geo.box, RX(fx * 12.5, 4.6 + i * 8.2, fz * 12.5, 22, 7.2, .9, 0, ry), [W, 0x947246, 0x7e5f38][(i + fx + 2) % 3]]);
+        L.push([geo.box, RX(fx * 13.1, 13, fz * 13.1, 29, 2.6, .9, 0, ry, (fz || fx) > 0 ? .78 : -.78), F]); }
+      for (const x of [-1, 1]) for (const z of [-1, 1]) L.push([geo.box, RX(x * 12.4, 13, z * 12.4, 3, 26, 3), D]);
+      for (const y of [1.4, 24.6]) for (const [x, z, sx, sz] of [[0, 12.4, 26, 3], [0, -12.4, 26, 3], [12.4, 0, 3, 26], [-12.4, 0, 3, 26]]) L.push([geo.box, RX(x, y, z, sx, 2.8, sz), D]);
+      for (let i = 0; i < 4; i++) L.push([geo.box, RX(-8.4 + i * 5.6, 25.6, 0, 5, .9, 22.4), [W, 0x9a7a4c][i % 2]]);
+      L.push([geo.box, RX(0, 14, 13.2, 9, 5, .2), 0x1c1712]); // маркировка трафаретом
+      return mergeG(L); })();
+    // армейский ящик для патронов: зелёный, крышка с рёбрами, защёлки, ручки, жёлтая маркировка
+    const crateA = (() => { const L = [], G = 0x4a5532, G2 = 0x3c4628, M_ = 0x2a2c2a;
+      L.push([geo.box, RX(0, 7, 0, 30, 14, 18), G]); L.push([geo.box, RX(0, 14.8, 0, 31, 2.2, 19), G2]); for (let i = 0; i < 3; i++) L.push([geo.box, RX(-9 + i * 9, 16.2, 0, 6, .8, 15), G]);
+      for (const x of [-1, 1]) { L.push([geo.box, RX(x * 9, 11.5, 9.2, 3, 4, 1), M_]); L.push([geo.box, RX(x * 15.3, 9, 0, .8, 2, 8), M_]); }
+      L.push([geo.box, RX(0, 6.5, 9.05, 16, 2.4, .2), 0xc8a830]); L.push([geo.box, RX(-8, 3, 9.05, 8, 1.2, .2), 0xd8d0b0]);
+      for (const x of [-1, 1]) for (const z of [-1, 1]) L.push([geo.box, RX(x * 14.6, 7, z * 8.6, 1.4, 14.2, 1.4), G2]);
+      return mergeG(L); })();
+    // большой фанерный ящик: светлые стенки, тёмный брус по рёбрам, «FRAGILE»-полоса
+    const crateB = (() => { const L = [], P = 0xb89a68, D = 0x6a5232;
+      L.push([geo.box, RX(0, 15, 0, 33, 30, 33), P]);
+      for (const x of [-1, 1]) for (const z of [-1, 1]) L.push([geo.box, RX(x * 16, 15, z * 16, 3.2, 30.4, 3.2), D]);
+      for (const y of [1.6, 15, 28.4]) for (const [x, z, sx, sz] of [[0, 16.2, 33, 2.6], [0, -16.2, 33, 2.6], [16.2, 0, 2.6, 33], [-16.2, 0, 2.6, 33]]) L.push([geo.box, RX(x, y, z, sx, 3.2, sz), D]);
+      L.push([geo.box, RX(0, 22, 17.6, 14, 3, .2), 0x8a2a20]); L.push([geo.box, RX(17.6, 8, 0, .2, 4, 10), 0x222]);
+      return mergeG(L); })();
+    const pallet = (() => { const L = []; for (let i = 0; i < 5; i++) L.push([geo.box, RX(-14 + i * 7, 4.2, 0, 5.4, 1.2, 36), 0x9c7f55]); for (const z of [-14, 0, 14]) L.push([geo.box, RX(0, 2, z, 36, 3.6, 4), 0x7a6040]); for (let i = 0; i < 3; i++) L.push([geo.box, RX(-14 + i * 14, .4, 0, 5.4, .8, 36), 0x8a6e48]); return mergeG(L); })();
+    // бочка 200 л: тело с рёбрами жёсткости, ободья, крышка с пробками; ржавчина и потёки — цветом вершин
+    const drumG = new T.CylinderGeometry(1, 1, 1, 18, 8, false);
+    const barrel = (col, opt = {}) => { const L = [], R = 9.4, Hh = 26.5, rim = 0x2a2624;
+      L.push([drumG, RX(0, Hh / 2, 0, R, Hh, R), col]);
+      for (const y of [8.8, 17.7]) L.push([geo.lay, RX(0, y, 0, 1.3, R + .45, R + .45, 0, 0, H), col]);
+      for (const y of [.5, Hh - .3]) L.push([geo.lay, RX(0, y, 0, 1, R + .3, R + .3, 0, 0, H), rim]);
+      if (opt.open) { L.push([geo.cyl10, RX(0, Hh - 1.4, 0, R - .4, .2, R - .4), 0x0e0a08]); for (let i = 0; i < 7; i++) { const a = i * .9; L.push([geo.box, RX(Math.cos(a) * R, 4.5 + (i % 2) * 2.6, Math.sin(a) * R, 1.7, 1.7, 1.7, 0, -a), 0x120c08]); } }
+      else { L.push([geo.cyl10, RX(0, Hh + .1, 0, R - .3, .3, R - .3), col]); L.push([geo.cyl6, RX(4.4, Hh + .5, 2, 1.3, 1, 1.3), rim]); L.push([geo.cyl6, RX(-5.4, Hh + .4, -1, .8, .8, .8), rim]); }
+      if (opt.band) for (const y of [12.6, 14]) L.push([drumG, RX(0, y, 0, R + .05, 1.2, R + .05), opt.band]);
+      const g = mergeG(L); return tint(g, (x, y, z) => { const a = Math.atan2(z, x), n = hs(Math.floor(a * 3), Math.floor(y / 3)), streak = Math.max(0, Math.sin(a * 7 + 1.3)) * Math.max(0, 1 - y / 20), rust = (opt.rust || .4) * (n * .5 + streak * .8 + (y < 4 ? .5 : 0)), k = Math.min(1, rust);
+        return [1 - k * .25, 1 - k * .5, 1 - k * .68].map((v, j) => v * (opt.soot && y > 18 ? .45 : 1) * (.93 + n * .1)); }); };
+    const BARRELS = [barrel(0x6e4a30, { rust: .9 }), barrel(0x2f5d8a), barrel(0x8e2a20), barrel(0xc8a020, { band: 0x161616, rust: .3 }), barrel(0x4a5532, { rust: .3 }), barrel(0x4a3a2e, { open: 1, rust: 1, soot: 1 })];
+    // мешок с песком: «подушка» (сфера, раздутая к углам), шов на конце
+    const bag = (() => { const g = new T.SphereGeometry(1, 12, 8), P = g.attributes.position; for (let i = 0; i < P.count; i++) { const v = new T.Vector3().fromBufferAttribute(P, i); const k = v.clone().set(Math.sign(v.x) * Math.pow(Math.abs(v.x), .55), Math.sign(v.y) * Math.pow(Math.abs(v.y), .9), Math.sign(v.z) * Math.pow(Math.abs(v.z), .6)); P.setXYZ(i, k.x, k.y * (1 - .12 * Math.abs(k.x)), k.z); } g.computeVertexNormals(); return g; })();
+    // бетонный блок «нью-джерси»: профиль трапецией, светоотражающие полосы, сколы
+    const jersey = (() => { const g = extr(null, 1, 0, sh => { sh.moveTo(-8, 0); sh.lineTo(8, 0); sh.lineTo(8, 2.6); sh.lineTo(5.2, 6.4); sh.lineTo(3.2, 22); sh.lineTo(-3.2, 22); sh.lineTo(-5.2, 6.4); sh.lineTo(-8, 2.6); sh.closePath(); }); g.rotateY(H);
+      const C = 0x9a958a, L = [[g, RX(0, 0, 0, 1, 1, 1), C]];
+      return (w) => { const k = w; const LL = [[g, RX(0, 0, 0, k, 1, 1), C], [geo.box, RX(-k * .22, 14, 4.2, k * .18, 4, .3, -.12), 0xb03a2a], [geo.box, RX(-k * .03, 14, 4.2, k * .18, 4, .3, -.12), 0xe8e4da], [geo.box, RX(k * .16, 14, 4.2, k * .18, 4, .3, -.12), 0xb03a2a],
+        [geo.box, RX(-k * .35, 2, 0, 4, 2.6, 16.4), 0x6e6a62], [geo.box, RX(k * .35, 2, 0, 4, 2.6, 16.4), 0x6e6a62], [geo.box, RX(k * .49, 20, 2, 3, 4, 3, .4, .3), 0x7e7a70]];
+        const gg = mergeG(LL); return tint(gg, (x, y, z) => { const n = hs(Math.floor(x / 4), Math.floor(y / 3) + Math.floor(z)); const d = y < 5 ? .82 : 1; return [d * (.92 + n * .12), d * (.92 + n * .1), d * (.9 + n * .1)]; }); }; })();
+    const jerseyG = jersey(58);
+    // палатка: провисший тент на кольях, растяжки, тёмный вход
+    const tent = (() => { const L = [], C = 0x5d6340; const g = new T.CylinderGeometry(1, 1, 1, 3, 1, false, 0, Math.PI * 2); g.rotateZ(H); g.rotateY(H);
+      const P = g.attributes.position; for (let i = 0; i < P.count; i++) { const x = P.getX(i); } L.push([geo.roof, RX(0, 0, 0, 56, 30, 46), C]); L.push([geo.roof, RX(0, 3, 0, 57, 26, 40), 0x4e5436]);
+      L.push([geo.box, RX(28.2, 9, 0, .6, 16, 10), 0x16140e]); for (const x of [-28.6, 28.6]) L.push([geo.cyl6, RX(x, 16, 0, .6, 32, .6), 0x4a3a28]);
+      for (const x of [-1, 1]) for (const z of [-1, 1]) L.push([geo.box, RX(x * 34, 14, z * 12, .25, .25, 34, Math.atan2(30, 22) * -z * .9, 0), 0xc8c0a0]);
+      return mergeG(L); })();
+    return { crateW, crateA, crateB, pallet, BARRELS, bag, jerseyG, tent };
+  })();
   const PARTS = {
     shed: (w, h) => [[geo.box, 0x79614b, M(0, 30, 0, w, 60, h)], [geo.roof, 0x4c555a, M(0, 60, 0, w + 8, 24, h + 8)],
       [geo.box, 0x40352a, M(0, 24, h / 2 + .6, 38, 48, 1.2)], [geo.box, 0xb8aea0, M(14, 24, h / 2 + 1.4, 2, 3, 1.5)]],
@@ -562,7 +619,10 @@ void main(){
     truck: (w, h, o) => { const kind = TRUCKK[Math.floor(rh(o ? o.id : 0, 61) * TRUCKK.length)], V = VEH[kind], sx = w / 170, sz = h / 62;
       return [[V.paint, kind === 'bus' ? 'bus' : 'cab', M(0, 0, 0, sx, 1, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1, sz)], ...V.wheels.map(([x, z, k]) => [geo.wheel, 0xffffff, M(x * sx, 9.4 * k, z * sz, k, k, k)])]; },
     bus: (w, h, o) => { const V = VEH.bus, sx = w / 170, sz = h / 62; return [[V.paint, 'bus', M(0, 0, 0, sx, 1.08, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1.08, sz)], ...[-.78, -.28, .7].flatMap(x => [-1, 1].map(sd => [geo.wheel, 0xffffff, M(x * w / 2, 12.7, sd * 25 * sz, 1.35, 1.35, 1.35)]))]; }, // большой городской автобус
-    crate: () => [[geo.box, 'crate', M(0, 13, 0, 26, 26, 26)]],
+    crate: (w, h, o) => { const vk = o.vk !== undefined ? o.vk : (o.id * 7) % 5 < 3 ? 0 : (o.id * 7) % 5 === 3 ? 1 : 2, g = [PROP.crateW, PROP.crateA, PROP.crateB][vk], ht = [26, 17, 30][vk], r = []; let y = 0;
+      if (o.pal) { r.push([PROP.pallet, 0xffffff, M(0, 0, 0, 1, 1, 1)]); y = 4.8; }
+      for (let i = 0; i < (o.lv || 1); i++) { const tw = i ? (((o.id + i) * 13) % 7 - 3) * .05 : 0, sx = i ? (((o.id + i) * 5) % 5 - 2) * .6 : 0; r.push([g, 0xffffff, M(sx, y, sx * .5, 1, 1, 1, tw)]); y += ht; }
+      if (vk === 1 && !o.lv) r.push([g, 0xffffff, M(2, ht, -1, .92, .92, .92, .4)]); return r; },
     furn: (w, h, o) => { const k = o.fk;
       if (k === 'bed') return [[geo.box, 0x5a4632, M(0, 5, 0, w, 10, h)], [geo.box, 0xcfc8b8, M(0, 11, h * .05, w * .9, 3, h * .8)], [geo.box, 0x6b7a5a, M(0, 11.5, h * .12, w * .92, 3, h * .5)], [geo.box, 0xe8e4da, M(0, 12.5, -h * .38, w * .7, 3, h * .14)]];
       if (k === 'bunk') return [[geo.box, 0x4a4f4a, M(0, 6, 0, w, 3, h)], [geo.box, 0x55603a, M(0, 8, 0, w * .9, 2, h * .9)], [geo.box, 0x4a4f4a, M(0, 24, 0, w, 3, h)], [geo.box, 0x55603a, M(0, 26, 0, w * .9, 2, h * .9)], [geo.box, 0x3a3d3a, M(w * .45, 14, h * .45, 1.6, 28, 1.6)], [geo.box, 0x3a3d3a, M(-w * .45, 14, -h * .45, 1.6, 28, 1.6)], [geo.box, 0x3a3d3a, M(w * .45, 14, -h * .45, 1.6, 28, 1.6)], [geo.box, 0x3a3d3a, M(-w * .45, 14, h * .45, 1.6, 28, 1.6)]];
@@ -576,14 +636,15 @@ void main(){
       if (k === 'altar2') return [[geo.box, 0x4a4a42, M(0, 10, 0, w, 20, h)], [geo.box, 0x2a2a26, M(-2, 24, 0, w * .7, 8, h * .6)], [geo.box, 0x7a8a6a, M(-2, 24, h * .2, w * .5, 4, 2)], [geo.cyl6, 0x8a9096, M(-4, 36, -h * .3, .8, 22, .8)], [geo.box, 0xd02020, M(2, 30, 0, 1, 1, 1)]]; // рация военных
       if (k === 'altar3') return [[geo.box, 0x55595e, M(8, 30, -14, 2, 40, 2)], [geo.box, 0x55595e, M(8, 30, 14, 2, 40, 2)], [geo.box, 0xe8ddbd, M(8, 42, 0, 1.5, 24, h)], [geo.box, 0xb03030, M(7, 44, 4, .5, 2, h * .5)], [geo.box, 0x355f8a, M(7, 40, -6, .5, 8, 10)], [geo.box, 0x2a2a2a, M(0, 6, 0, w * .6, 12, h * .5)]]; // карта эвакуации
       return [[geo.box, 0x6e6a62, M(0, 15, 0, w, 30, h)], [geo.box, 0xa8543a, M(-w * .2, 21, 0, w * .35, 6, h * .8)], [geo.box, 0x5a7a8a, M(w * .22, 21, 0, w * .3, 6, h * .8)], [geo.box, 0xc9a85a, M(0, 9, 0, w * .8, 6, h * .8)]]; },
-    barrel: (w) => [[geo.cyl10, 0x4a5a3a, M(0, 12, 0, w / 2, 24, w / 2)], [geo.cyl10, 0x2e3a26, M(0, 8, 0, w / 2 + .3, 1.5, w / 2 + .3)], [geo.cyl10, 0x2e3a26, M(0, 17, 0, w / 2 + .3, 1.5, w / 2 + .3)]],
+    barrel: (w, h, o) => { const vk = o.fire ? 5 : o.vk !== undefined ? o.vk : [0, 0, 1, 2, 3, 4][(o.id * 11) % 6], g = PROP.BARRELS[vk];
+      return o.tip ? [[g, 0xffffff, new T.Matrix4().makeTranslation(0, 9.4, 0).multiply(new T.Matrix4().makeRotationZ(Math.PI / 2)).multiply(new T.Matrix4().makeTranslation(0, -13, 0))]] : [[g, 0xffffff, M(0, 0, 0, 1, 1, 1)]]; },
     fence: (w) => [[geo.box, 0x6b5238, M(0, 10, 0, w, 2, 2)], [geo.box, 0x6b5238, M(0, 18, 0, w, 2, 2)], ...[-.5, -.25, 0, .25, .5].map(k => [geo.box, 0x5a4430, M(w * k * .96, 11, 0, 3, 22, 3)])],
     bush: (w, h, o) => {
       const k = w / 34, spread = o.id % 2 ? 1 : .84;
       return [[geo.bushSolid[o.id % 3], leafOf(o.id + 7), M(0, 0, 0, k * spread, k, k, o.id * .9)], [geo.bushFringe[o.id % 3], leafOf(o.id + 7), M(0, 0, 0, k * spread, k, k, o.id * .9)]];
     },
     wall: (w, h) => [[geo.box, 0x8d8d86, M(0, 11, 0, w, 22, h)], [geo.box, 0x76766f, M(0, 22.5, 0, w * 1.02, 2, h * 1.3)]],
-    tent: (w, h) => [[geo.roof, 0x5a5a3a, M(0, 0, 0, w, 30, h)], [geo.box, 0x2e2e20, M(w / 2 + .3, 8, 0, .8, 14, 8)]],
+    tent: (w, h) => [[PROP.tent, 0xffffff, M(0, 0, 0, w / 56, 1, h / 46)]],
     grave: (w, h, o) => { const v = o.id % 4, st = 0x8a8a84, mound = [geo.box, 0x5a4a36, M(0, 1.5, 12, 12, 3, 18)];
       if (v === 0) return [mound, [geo.box, st, M(0, 8, 0, 14, 16, 5)], [geo.cyl10, st, MX(0, 16, 0, 7, 5, 7)]];
       if (v === 1) return [mound, [geo.box, 0x6e6e6a, M(0, 3, 0, 12, 6, 8)], [geo.box, 0x7a7a76, M(0, 18, 0, 6, 26, 6)], [geo.cone7, 0x7a7a76, M(0, 34, 0, 4.5, 7, 4.5)]];
@@ -594,8 +655,9 @@ void main(){
     antenna: () => [[geo.box, 0x6a6e72, M(0, 2, 0, 12, 4, 12)], [geo.cyl6, 0x9aa0a6, M(0, 24, 0, 1.6, 44, 1.6, 0, .35)], [geo.box, 0x9aa0a6, M(-5, 30, 0, 22, 1.2, 1.2, 0, .55)], [geo.box, 0x9aa0a6, M(-9, 40, 0, 16, 1.2, 1.2, 0, .1)], [geo.cyl6, 0x9aa0a6, M(14, 1.5, 6, 1.4, 30, 1.4, 0, 1.5)]],
     dish: () => [[geo.cyl6, 0x777b80, M(0, 9, 0, 2, 18, 2)], [geo.dome, 0xd8dde2, M(2, 22, 0, 13, 4, 13, 0, 1.9)], [geo.cyl6, 0x555a60, M(-4, 21, 0, 1, 12, 1, 0, 1.2)]],
     junk: () => [[geo.box, 0x7a6a4a, M(0, 6, 0, 18, 12, 14, .4)], [geo.box, 0x8a8e92, M(8, 4, -6, 12, 8, 10, 1.1)], [geo.lay, 0x1c1c1c, M(-8, 4, 8, 4, 4, 10)], [geo.box, 0xd8dde2, M(-2, 13, 0, 12, 3, 10, .2, .3)]],
-    sandbag: (w, h) => { const n = Math.max(3, Math.round(w / 13)), bw = w / n, r = []; for (let row = 0; row < 3; row++) { const m = row === 2 ? n - 1 : n; for (let i = 0; i < m; i++) r.push([geo.sph, row === 1 ? 0x8a7a58 : 0x7d6e4e, M(-w / 2 + bw * (i + .5 + (row === 2 ? .5 : 0)), 4.5 + row * 6, (row % 2 ? .8 : -.8), bw * .56, 3.6, h * .5, (i * 1.7 + row) % .3)]); } return r; },
-    jersey: (w, h) => [[geo.box, 0x9a958a, M(0, 3, 0, w, 6, h)], [geo.box, 0x8e897e, M(0, 12, 0, w * .99, 12, h * .55)], [geo.box, 0x9a958a, M(0, 19.5, 0, w * .98, 3, h * .42)], [geo.box, 0xb03a2a, M(-w * .25, 12, h * .28, w * .2, 4, .4)], [geo.box, 0xe8e4da, M(w * .1, 12, h * .28, w * .2, 4, .4)]],
+    sandbag: (w, h, o) => { const n = Math.max(3, Math.round(w / 14)), bw = w / n, r = [], T_ = [0x8a7a58, 0x7d6e4e, 0x948463, 0x6f6448, 0x857552, 0x9a8a68]; let q = o.id * 7;
+      for (let row = 0; row < 3; row++) { const m = row % 2 ? n - 1 : n; for (let i = 0; i < m; i++) { q = (q * 31 + 7) % 997; const j = q / 997; r.push([PROP.bag, T_[q % 6], M(-w / 2 + bw * (i + .5 + (row % 2 ? .5 : 0)) + (j - .5) * 1.4, 3.4 + row * 5.6, (j - .5) * 1.6, bw * .54, 3.1, h * .46, (j - .5) * .16)]); } } return r; },
+    jersey: (w, h) => [[PROP.jerseyG, 0xffffff, M(0, 0, 0, w / 58, 1, 1)]],
     billboard: (w) => [[geo.box, 0x55595e, M(-w * .3, 22, 0, 3, 44, 3)], [geo.box, 0x55595e, M(w * .3, 22, 0, 3, 44, 3)], [geo.box, 0xf2f0ea, M(0, 56, 0, w, 32, 3)], [geo.box, 0x3d8bff, M(0, 56, 1.8, w * .9, 26, .6)], [geo.box, 0xffd43b, M(-w * .1, 62, 2.3, w * .55, 4, .4)], [geo.box, 0xffffff, M(0, 54, 2.3, w * .7, 3, .4)], [geo.box, 0xffffff, M(-w * .08, 48, 2.3, w * .5, 3, .4)], [geo.box, 0xff5a5a, M(0, 56, -1.8, w * .9, 26, .6)], [geo.box, 0xffffff, M(w * .05, 60, -2.3, w * .6, 4, .4)], [geo.box, 0xffd43b, M(0, 50, -2.3, w * .4, 3, .4)]],
   };
   // лёгкая разница в размерах деревьев и камней
@@ -1440,7 +1502,7 @@ void main(){
     // машины и бочки: сгоревшие остовы дымят, часть ещё горит
     for (const o of objs) { const wk = wreckOf(o);
       if (wk >= 2) { dec.push([o.p[0], o.p[1], 90 + R() * 30, 'scorch', 0x16100c, .7, R() * 6.28, 1]); if (rh(o.id, 12) < .45) { fireSpots.push({ p: o.p, h: wk === 3 ? 34 : 38, n: 3, s: 1.1, id: o.id }); plumeSrc.push({ p: o.p, big: 1, seed: R(), id: o.id }); } }
-      else if (o.type === 'barrel' && rh(o.id, 13) < .3) fireSpots.push({ p: o.p, h: 24, n: 2, s: .8, id: o.id }); }
+      else if (o.type === 'barrel' && o.fire) fireSpots.push({ p: o.p, h: 27, n: 2, s: .48, id: o.id }); }
     for (const o of objs) if (o.type === 'tree' && rh(o.id, 1) >= .38) dec.push([o.p[0] + (R() - .5) * 8, o.p[1] + (R() - .5) * 8, o.w * (1.5 + R() * .6), 'b2', [0x6a5a2a, 0x7a5a26, 0x5a5228][o.id % 3], .32, R() * 6.28, 1]); // опавшая листва
     // подпалины и мусор по всей карте
     for (let i = 0; i < 160; i++) { const p = rndMap(rnd, 120); if (bldAt(Bl, p) >= 0) continue; if (R() < .5) dec.push([p[0], p[1], 40 + R() * 90, 'scorch', 0x16100c, .45, R() * 6.28, 1]); else if (okAt(p, 5)) junk(p); }
