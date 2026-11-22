@@ -303,8 +303,8 @@ const ZFX = (() => {
   const BRUTE_SKIN = [0x3b2a22, 0x4a3326, 0x2f2019, 0x54392b, 0x3a261c];
   function drawEnforcer(z, sc, t, fall) {
     if (bruteRig && !ZT[z.ty].boss && bruteCount < 120) {
-      const atk = z.fl & 1 ? ((t * 1.3 + z.id * .37) % 1) : -1;
-      bruteRig.pose(bruteCount++, { id: z.id, walk: z.walk * .62, yaw: z.yaw, x: z.p[0], z: z.p[1], scale: sc * .86, fall, atk, hit: z.flash, lost: z.lost,
+      const ac = t * 1.3 + z.id * .37, atk = z.fl & 1 ? ac % 1 : -1;
+      bruteRig.pose(bruteCount++, { id: z.id, time: t, kind: (Math.floor(ac) + z.id) % 3, walk: z.walk * .62, yaw: z.yaw, x: z.p[0], z: z.p[1], scale: sc * .86, fall, atk, hit: z.flash, lost: z.lost,
         burning: z.fl & 2, frozen: z.fl & 8, kick: z.kick || 0, lift: z.fl & 4 ? 8 * Math.abs(Math.sin(t * 6)) : 0, skin: BRUTE_SKIN[(z.seed || z.id) % BRUTE_SKIN.length] });
       return;
     }

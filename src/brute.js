@@ -76,9 +76,29 @@ const BruteRig = (() => {
     const C = (r0, r1, h, s = 10) => new T.CylinderGeometry(r1, r0, h, s, 1), Bx = (x, y, z) => new T.BoxGeometry(x, y, z), S = (s = 12, t = 8, tl = Math.PI) => new T.SphereGeometry(1, s, t, 0, Math.PI * 2, 0, tl);
     const L = (x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0) => new T.Matrix4().compose(V(x, y, z), new T.Quaternion().setFromEuler(new T.Euler(rx, ry, rz)), V(sx, sy, sz));
     const hand = restFrame(bind[6][0], bind[6][1], FRONT), at = (lm) => hand.clone().multiply(lm);
-    if (!boss) { // кувалда: рукоять вдоль кисти, тяжёлый боёк поперёк
+    // точка на поверхности тела (после перекачки): самая выступающая вершина в нужную сторону рядом с (x, y)
+    const surf = (x, y, dir, r = .8) => { let best = -1e9, bp = null; for (let i = 0; i < NP.length / 3; i++) { const vx = NP[i * 3], vy = NP[i * 3 + 1], vz = NP[i * 3 + 2]; const near = dir === 'z' ? Math.abs(vx - x) < r && Math.abs(vy - y) < r : Math.abs(vz - x) < r * 1.6 && Math.abs(vy - y) < r;
+      if (!near) continue; const v = dir === 'z' ? vz : dir === '+x' ? vx : -vx; if (v > best) { best = v; bp = [vx, vy, vz]; } } return bp || [0, y, 0]; };
+    // ботинки: цельная оболочка поверх стопы (у базовой модели видны пальцы) + голенище и толстая подошва
+    for (const [fb, sb] of [[9, 8], [15, 14]]) { const mn = V(1e9, 1e9, 1e9), mx = V(-1e9, -1e9, -1e9);
+      for (let v = 0; v < Jn.length / 4; v++) if (Jn[v * 4] === fb && Wn[v * 4] > .5 && MAT[v] === 0) { mn.min(V(NP[v * 3], NP[v * 3 + 1], NP[v * 3 + 2])); mx.max(V(NP[v * 3], NP[v * 3 + 1], NP[v * 3 + 2])); }
+      if (mn.x > 1e8) continue; const c = mn.clone().add(mx).multiplyScalar(.5), h = mx.clone().sub(mn).multiplyScalar(.5);
+      const shell = new T.SphereGeometry(1, 16, 10), sp = shell.attributes.position; for (let i = 0; i < sp.count; i++) { let y = sp.getY(i); if (y < -.55) y = -.55; sp.setY(i, y); sp.setZ(i, sp.getZ(i) * (sp.getZ(i) > 0 ? 1.06 : .95)); }
+      for (let v = 0; v < Jn.length / 4; v++) if (Jn[v * 4] === fb && Wn[v * 4] > .5 && MAT[v] === 0) for (let d = 0; d < 3; d++) NP[v * 3 + d] = c.getComponent(d) + (NP[v * 3 + d] - c.getComponent(d)) * .6; // прячем пальцы внутрь
+      add(shell, L(c.x, c.y + h.y * .18, c.z + .15, h.x * 1.06, h.y * 1.25, h.z * 1.02), fb, 9);
+      const sole = new T.CylinderGeometry(1, 1, 1, 16); add(sole, L(c.x, mn.y + .3, c.z + .2, h.x * 1.08, .6, h.z * 1.04), fb, 10);
+      add(C(h.x * 1.05, h.x * 1.12, 4.6, 14), L(c.x - (fb === 9 ? .25 : -.25), mn.y + 4.4, c.z - h.z * .45), sb, 9); }
+    if (!boss) { // снаряжение громилы: наручники на правом боку, рация в подсумке слева, армейские жетоны на груди
+      const hip = surf(.4, 5.3, '+x'), hipL = surf(.6, 5.3, '-x');
+      for (const [dy, rz] of [[0, .25], [-1.7, -.2]]) add(new T.TorusGeometry(.95, .2, 6, 16), L(hip[0] + .45, hip[1] - 1 + dy, hip[2] - .2, 1, 1, 1, 0, H, rz), 0, 1);
+      add(C(.12, .12, 1.1, 4), L(hip[0] + .45, hip[1] - 1.85, hip[2] - .2), 0, 1);
+      add(Bx(1.2, 3, 2.1), L(hipL[0] - .65, hipL[1] - 1.4, hipL[2] + .3), 0, 3); add(Bx(1.25, .9, 2.15), L(hipL[0] - .66, hipL[1] + .45, hipL[2] + .3), 0, 8); add(C(.14, .1, 2.4, 5), L(hipL[0] - .65, hipL[1] + 1.7, hipL[2] + 1), 0, 8);
+      const tag = surf(0, 12.6, 'z', .7), neckF = surf(0, 17.6, 'z', .9);
+      for (const sd of [-1, 1]) { const a = V(sd * 2.6, neckF[1] - .3, neckF[2] - 1.2), b = V(sd * .25, tag[1] + .9, tag[2] + .1), m = a.clone().add(b).multiplyScalar(.5), d = b.clone().sub(a);
+        add(C(.07, .07, d.length(), 4), new T.Matrix4().compose(m, new T.Quaternion().setFromUnitVectors(V(0, 1, 0), d.normalize()), V(1, 1, 1)), 2, 1); }
+      add(Bx(.9, 1.4, .12), L(tag[0] - .25, tag[1], tag[2] + .2, 1, 1, 1, -.15, 0, .12), 2, 1); add(Bx(.9, 1.4, .12), L(tag[0] + .3, tag[1] - .25, tag[2] + .3, 1, 1, 1, -.15, 0, -.1), 2, 1);
       // чёрная резиновая полицейская дубинка: рифлёная рукоять, гарда-кольцо, длинный гладкий ствол со скруглённым концом
-      add(C(.95, 1.0, 1.4, 12), at(L(0, -1.6, 0)), 6, 8); add(S(12, 6, Math.PI / 2), at(L(0, -2.3, 0, 1, .6, 1, Math.PI)), 6, 8);
+      add(C(.95, 1.0, 1.4, 12), at(L(0, -1.6, 0)), 6, 8); add(new T.TorusGeometry(.5, .1, 4, 10), at(L(0, -2.9, 0, 1, 1, 1, 0, H)), 6, 3); add(S(12, 6, Math.PI / 2), at(L(0, -2.3, 0, 1, .6, 1, Math.PI)), 6, 8);
       add(C(.88, .88, 5.2, 12), at(L(0, 1.4, 0)), 6, 3); for (let i = 0; i < 6; i++) add(C(.96, .96, .3, 12), at(L(0, -.6 + i * .85, 0)), 6, 8);
       add(C(1.12, 1.12, .55, 14), at(L(0, 4.3, 0)), 6, 8); add(C(.92, .82, 13.5, 12), at(L(0, 11.3, 0)), 6, 8); add(S(12, 6, Math.PI / 2), at(L(0, 18.05, 0, .92, .7, .92)), 6, 8);
     } else { // босс: арматура с бетонной глыбой, торчащие прутья
@@ -117,14 +137,22 @@ const BruteRig = (() => {
       if (!full) return;
       sh.fragmentShader = 'varying vec3 vO; varying float vM; varying vec3 vTone;\n' + sh.fragmentShader
         .replace('#include <color_fragment>', `#include <color_fragment>
-          vec3 p = vO; float ax = abs(p.x); float spec = .22; vec3 glow = vec3(0.);
-          float n1 = sin(p.x * 1.7 + p.z * .9) * sin(p.y * 1.3 + p.z * 2.1) * .5 + .5, n2 = sin(p.x * 5.1 - p.y * 3.7) * sin(p.z * 4.3 + p.y * 2.9) * .5 + .5;
+          vec3 p = vO; float ax = abs(p.x); float spec = .22; vec3 glow = vec3(0.); float bh = 0.;
+          float n1 = sin(p.x * 1.7 + p.z * .9) * sin(p.y * 1.3 + p.z * 2.1) * .5 + .5, n2 = sin(p.x * 5.1 - p.y * 3.7) * sin(p.z * 4.3 + p.y * 2.9) * .5 + .5, n3 = sin(p.x * 23. + p.y * 7.) * sin(p.y * 19. - p.z * 13.) * sin(p.z * 17. + p.x * 11.);
           vec3 skin = vTone * (.84 + .16 * n1);
           // рельеф: пресс, нижний край грудных, ключицы — тенью
           float front = smoothstep(1.2, 2.6, p.z);
           float abs_ = front * (1. - smoothstep(2.6, 3.1, ax)) * step(6.4, p.y) * (1. - step(10.4, p.y)) * (max(1. - smoothstep(.08, .3, ax), max(max(1. - smoothstep(.08, .26, abs(p.y - 5.3)), 1. - smoothstep(.08, .26, abs(p.y - 7.4))), 1. - smoothstep(.08, .26, abs(p.y - 9.4)))));
           float pec = front * (1. - smoothstep(.15, .5, abs(p.y - 11.1 - ax * .12))) * step(.5, ax) * (1. - step(5.2, ax));
           skin *= 1. - .3 * abs_ - .34 * pec;
+          // рельеф кожи: впадины пресса и грудных, разделение дельт, ложбина позвоночника, вены на предплечьях и бицепсах, поры
+          float delt = (1. - smoothstep(.1, .45, abs(ax - 5.6 - (p.y - 14.) * .25))) * step(11.5, p.y) * (1. - step(17., p.y));
+          float spine = (1. - smoothstep(.15, .6, ax)) * (1. - smoothstep(-.6, .6, p.z)) * step(5., p.y) * (1. - step(17., p.y));
+          vec3 el = vec3(9.4, 10.5, .4), wr_ = vec3(12.9, 7.4, 5.3), q = vec3(ax, p.y, p.z) - el, fd = normalize(wr_ - el); float al = dot(q, fd); vec3 qp = q - fd * al;
+          float vein = step(-1., al) * step(al, 6.4) * (1. - smoothstep(.05, .16, abs(sin(al * 1.15 + atan(qp.y, qp.z) * 2. + sin(al * 3.1) * .35))));
+          vec3 sh_ = vec3(5.3, 15.9, .4), fu = normalize(el - sh_), q2 = vec3(ax, p.y, p.z) - sh_; float al2 = dot(q2, fu); vec3 qp2 = q2 - fu * al2;
+          vein += step(1.5, al2) * step(al2, 6.) * (1. - smoothstep(.04, .13, abs(atan(qp2.y, qp2.z) - 1.2 + sin(al2 * 1.7) * .25))) * .7;
+          bh = -1.1 * abs_ - 1.2 * pec - .9 * delt - .8 * spine + .55 * vein + .06 * n3;
           float scar = (1. - smoothstep(.05, .16, abs((p.x + 2.8) * .72 + (p.y - 13.5) * .69))) * step(-4.2, p.x) * step(p.x, 1.4) * front;
           skin = mix(skin, vec3(.86, .55, .5) * length(vTone) * .75, scar * .7);
           vec3 c = skin; spec = .35;
@@ -132,31 +160,37 @@ const BruteRig = (() => {
           float eye = min(length((p - vec3(.92, 21.85, 3.7)) * vec3(1., 1.5, 1.)), length((p - vec3(-.92, 21.85, 3.7)) * vec3(1., 1.5, 1.)));
           float hood = step(20.55, p.y);
           if (hood > .5) { c = vec3(.075, .058, .048) * (.85 + .3 * n2); spec = .55;
+            bh = .18 * n3 + .12 * n2;
             if (eye < .62) { c = vec3(.02); spec = .05; if (eye < .26) { c = vec3(.25, .2, .16); spec = .9; } }
             float seam = (1. - smoothstep(.06, .16, ax)) * step(22.2, p.y) * step(fract(p.z * 1.8 + p.y * 1.8), .5); c = mix(c, vec3(.32, .26, .2), seam); }
-          else if (p.y > 18.6 && front > .1) c *= .86 - .1 * n2; // щетина
+          else if (p.y > 18.6 && front > .1) { c *= .86 - .1 * n2; // щетина, губы, подбородок
+            float lips = (1. - smoothstep(.12, .3, abs(p.y - 19.35))) * (1. - smoothstep(.8, 1.2, ax)) * step(3.2, p.z); c = mix(c, vTone * .55, lips); bh = -.6 * lips + .04 * n3; }
           // ремни крест-накрест с кольцом на груди
           float torso = step(6.3, p.y) * (1. - step(18.6, p.y)) * (1. - smoothstep(7.4, 7.8, ax));
           float sA = abs((p.x + 5.4) * .78 - (17.4 - p.y) * .58) , sB = abs((-p.x + 5.4) * .78 - (17.4 - p.y) * .58);
           float strap = torso * (1. - smoothstep(.62, .78, min(sA, sB)));
           float ring = torso * front * (1. - smoothstep(.12, .26, abs(length(vec2(p.x, p.y - 10.35)) - .82)));
-          if (strap > .5) { c = vec3(.16, .09, .05) * (.8 + .4 * n2); spec = .4; float rivet = step(.82, fract((p.y + p.x * .3) * 1.1)) * (1. - smoothstep(.12, .3, min(sA, sB))); c = mix(c, vec3(.55, .52, .46), rivet); }
-          if (ring > .5) { c = vec3(.58, .56, .52); spec = .95; }
+          bh += (1. - smoothstep(.4, .78, min(sA, sB))) * torso * 1.1;
+          if (strap > .5) { c = vec3(.16, .09, .05) * (.8 + .4 * n2); spec = .4; float rivet = step(.82, fract((p.y + p.x * .3) * 1.1)) * (1. - smoothstep(.12, .3, min(sA, sB))); c = mix(c, vec3(.55, .52, .46), rivet); bh += rivet * .5; }
+          if (ring > .5) { c = vec3(.58, .56, .52); spec = .95; bh += .8; }
           // ремень с пряжкой
-          if (p.y > 4.4 && p.y < 6.3) { c = vec3(.2, .12, .065) * (.8 + .3 * n2); spec = .45; if (ax < 1.25 && front > .5) { c = vec3(.6, .57, .5); spec = 1.; if (ax < .75 && abs(p.y - 5.35) < .55) c = vec3(.16, .09, .05); } }
+          if (p.y > 4.4 && p.y < 6.3) { c = vec3(.2, .12, .065) * (.8 + .3 * n2); spec = .45; bh = .9 - .9 * (1. - smoothstep(.0, .25, min(p.y - 4.4, 6.3 - p.y))) + .1 * n3; if (fract(ax * .55) < .12) bh -= .25; if (ax < 1.25 && front > .5) { c = vec3(.6, .57, .5); spec = 1.; if (ax < .75 && abs(p.y - 5.35) < .55) c = vec3(.16, .09, .05); } }
           // штаны: плотная ткань, наколенники, карманы, потёртости
           if (p.y <= 4.4) { c = vec3(.17, .16, .13) * (.82 + .3 * n1); spec = .1;
+            // складки ткани: под коленом, у ботинок, на паху; боковой шов
+            float knee = smoothstep(4., 0., abs(p.y + 10.8)), cuff = smoothstep(3.2, 0., abs(p.y + 18.4)), crotch = smoothstep(4., 0., abs(p.y)) * (1. - smoothstep(1., 3.5, ax));
+            bh = .42 * sin(p.y * 3.1 + sin(p.x * 2.3 + p.z) * 1.6) * (knee * (1. - step(.6, p.z) * .6) + cuff * 1.3 + crotch) + .07 * n3 + .5 * (1. - smoothstep(.06, .2, abs(p.z - .3))) * step(3.6, ax);
             if (abs(p.y + 10.6) < 1.7 && p.z > .9) { c = vec3(.085, .07, .06); spec = .5; }
             float pocket = step(4.3, ax) * step(-8., p.y) * step(p.y, -2.2) * step(-1.2, p.z) * step(p.z, 2.4);
-            if (pocket > .5) { c *= .82; if (abs(p.y + 2.6) < .3 || abs(p.y + 7.6) < .25) c *= .7; }
+            if (pocket > .5) { c *= .82; bh += .45; if (abs(p.y + 2.6) < .3 || abs(p.y + 7.6) < .25) { c *= .7; bh -= .3; } }
             c = mix(c, c * 1.35, smoothstep(.6, 1., n2) * step(-14., p.y) * step(p.y, -7.)); }
           // ботинки с подошвой и шнуровкой
-          if (p.y < -19.6) { c = vec3(.07, .06, .05) * (.8 + .3 * n2); spec = .6; if (p.y < -23.3) { c = vec3(.15, .14, .12); spec = .1; }
+          if (p.y < -19.6) { c = vec3(.07, .06, .05) * (.8 + .3 * n2); spec = .6; bh = .12 * n2 + .5 * step(fract(p.y * 1.6), .3) * step(.8, p.z) + .6 * (1. - smoothstep(.1, .3, abs(p.y + 23.3))); if (p.y < -23.3) { c = vec3(.15, .14, .12); spec = .1; }
             if (p.z > .8 && p.y > -22.2 && abs(ax - 6.4) < .7 && fract(p.y * 1.6) < .3) c = vec3(.2, .17, .13); if (p.z > 4.2) { c = vec3(.11, .1, .09); spec = .9; } }
           // бинты на запястьях и тёмные перчатки без пальцев
           float wr = min(length(p - vec3(12.9, 7.4, 5.2)), length(p - vec3(-12.9, 7.4, 5.2)));
           float hd = min(length(p - vec3(13.5, 6.2, 6.6)), length(p - vec3(-13.5, 6.2, 6.6)));
-          if (wr < 2.5 && hd > 1.3) { c = vec3(.6, .55, .46) * (.75 + .35 * step(.5, fract((p.y + p.z) * 1.3))); spec = .05; if (n2 > .82) c = vec3(.35, .06, .05); }
+          if (wr < 2.5 && hd > 1.3) { bh = .35 * sin((p.y + p.z * .7) * 8.2); c = vec3(.42, .38, .31) * (.75 + .35 * step(.5, fract((p.y + p.z) * 1.3))); spec = .05; if (n2 > .82) c = vec3(.35, .06, .05); }
           else if (hd < 1.75 && p.z > 6.2) { c = vec3(.09, .075, .065); spec = .45; }
           // снаряжение (vM): 1 сталь, 2 дерево, 3 обмотка, 4 свечение, 5 бетон, 6 ржавое железо, 7 полоса на бойке
           if (vM > .5) { float m = vM;
@@ -167,10 +201,16 @@ const BruteRig = (() => {
             else if (m < 5.5) { c = vec3(.46, .45, .42) * (.75 + .3 * n2); spec = .03; }
             else if (m < 6.5) { c = mix(vec3(.3, .29, .28), vec3(.38, .2, .1), smoothstep(.35, .8, n2)); spec = .55; }
             else if (m < 7.5) { c = vec3(.5, .1, .06); spec = .4; }
-            else { c = vec3(.028, .028, .03) * (.9 + .2 * n2); spec = .5; } }
+            else if (m < 8.5) { c = vec3(.028, .028, .03) * (.9 + .2 * n2); spec = .5; }
+            else if (m < 9.5) { c = vec3(.06, .05, .045) * (.8 + .4 * n2); spec = .35; }
+            else { c = vec3(.13, .12, .1); spec = .1; } }
+          if (vM > .5) bh = 0.;
           diffuseColor.rgb *= c;
-          float bruteSpec = spec; vec3 bruteGlow = glow;`)
+          float bruteSpec = spec; vec3 bruteGlow = glow; float bruteH = bh;`)
         .replace('#include <specularmap_fragment>', 'float specularStrength = bruteSpec;')
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+          { vec3 sp = -vViewPosition, dpx = dFdx(sp), dpy = dFdy(sp); float dhx = dFdx(bruteH) * .11, dhy = dFdy(bruteH) * .11;
+            vec3 r1 = cross(dpy, normal), r2 = cross(normal, dpx); float det = dot(dpx, r1); vec3 gr = sign(det) * (dhx * r1 + dhy * r2); normal = normalize(abs(det) * normal - gr); }`)
         .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += bruteGlow;')
         .replace('#include <dithering_fragment>', `#include <dithering_fragment>
           float rim = 1. - max(dot(normal, normalize(vViewPosition)), 0.); gl_FragColor.rgb += vec3(.2, .17, .14) * rim * rim * rim * .5;`);
@@ -196,36 +236,52 @@ const BruteRig = (() => {
       const along = (upper ** 2 - lower ** 2 + reach ** 2) / (2 * reach); pole.copy(dir).addScaledVector(axis, -dir.dot(axis)).normalize(); mid.copy(a).addScaledVector(axis, along).addScaledVector(pole, Math.sqrt(Math.max(0, upper ** 2 - along ** 2))); }
     function stump(p, w) { capS.set(w, w * .7, w * .85); capM.compose(p, capQ, capS).premultiply(instance); cap.setMatrixAt(cap.count++, capM); }
     const ease = k => k * k * (3 - 2 * k);
+    const refP = V(), refC = V(), refN = V();
     function pose(index, s) {
-      const { id = 1, walk = 0, yaw = 0, x: px = 0, z: pz = 0, scale = 1, fall = 0, atk = -1, hit = 0, lost = 0, burning = false, frozen = false, lift = 0, kick = 0, skin = 0xa87a5a } = s;
-      const st = Math.sin(walk), sw = Math.cos(walk), crouch = lost & 4 ? 1 : 0;
-      // атака кувалдой: замах за голову (0–.55) → удар об землю (.55–.66) → возврат
+      const { id = 1, time = 0, walk = 0, yaw = 0, x: px = 0, z: pz = 0, scale = 1, fall = 0, atk = -1, kind = 0, hit = 0, lost = 0, burning = false, frozen = false, lift = 0, kick = 0, skin = 0xa87a5a } = s;
+      const t = time, st = Math.sin(walk), sw = Math.cos(walk), crouch = lost & 4 ? 1 : 0;
+      // удары дубинкой: 0 — сверху вниз, 1 — наотмашь сбоку, 2 — тычок вперёд. Замах (0–.55) → удар (.55–.66) → возврат
       let wind = 0, slam = 0; if (atk >= 0) { if (atk < .55) wind = ease(atk / .55); else if (atk < .66) { const k = (atk - .55) / .11; wind = 1 - k * k; slam = k * k; } else slam = 1 - ease((atk - .66) / .34); }
-      const A = Math.min(1, wind + slam), fe = fall * (2 - fall);
-      const root = (23.6 + Math.abs(st) * 1.1 - slam * 3.4 + wind * .6) * (1 - crouch * .6);
-      world.position.set(px, lift + fe * 5 * scale, pz); world.rotation.set(-fe * 1.42 + crouch * .62 - kick * .18, yaw + sw * .06 * (1 - A), sw * .045 * (1 - fe), 'YXZ'); world.scale.setScalar(scale); world.updateMatrix(); instance.copy(world.matrix); mesh.setMatrixAt(index, instance);
-      const lean = 1 - fe;
-      pelvis.set(sw * 1.6 * (1 - A), root + bind[0][0].y, -.4);
-      waist.set(sw * .95 * (1 - A), root + bind[1][0].y, .1 + slam * .9 - wind * .6);
-      chest.set(-sw * .75 * (1 - A), root + bind[2][0].y - slam * 2.4 + wind * .7, (1.9 + slam * 5 - wind * 2.8 - kick * 2) * lean);
-      neck.set(-sw * .9 * (1 - A), root + bind[3][0].y - 1.1 - slam * 3.2 + wind * .5, (4.6 + slam * 7.5 - wind * 2.6 - kick * 3) * lean);
-      face.copy(neck).add(ref.set(sw * .25, 7.2, 1.8 + slam * 1.4));
-      write(0, pelvis, waist); write(1, waist, chest); write(2, chest, neck);
-      if (lost & 16) { bones[3].makeScale(0, 0, 0).setPosition(neck); stump(neck, 1.7); } else write(3, neck, face);
-      // кисти в атаке: обе руки на рукояти
+      const A = Math.min(1, wind + slam);
+      // смерть: колени подламываются (0–.4), затем падает лицом вниз
+      const kneel = ease(Math.min(1, fall / .4)), topple = ease(Math.max(0, (fall - .4) / .6)), alive = 1 - kneel;
+      const stag = Math.min(1, kick * 1.4 + hit * .5), burn = burning && fall < .01 ? 1 : 0;
+      // перенос веса: таз над опорной ногой, выше всего в середине шага; плечи скручиваются против таза
+      const tw = (st * .2 * (1 - A) + (kind === 1 ? wind * .55 - slam * .75 : kind === 2 ? wind * .3 - slam * .35 : wind * .15 - slam * .2)) * alive;
+      const twitchT = (t + id * 1.37) % (4.2 + (id % 5) * .6), twitch = twitchT < .3 ? Math.sin(twitchT / .3 * Math.PI) : 0;
+      const breathe = Math.sin(t * 1.9 + id) * .25;
+      const root = (23.2 + (1 - Math.abs(st)) * 1.1 * (1 - A) - slam * 2.6 + wind * .5 - stag * 1.2) * (1 - crouch * .6) - kneel * 10.5;
+      world.position.set(px, lift + topple * 3.5 * scale, pz); world.rotation.set(topple * 1.38 + crouch * .62, yaw, burn * Math.sin(t * 9) * .05, 'YXZ'); world.scale.setScalar(scale); world.updateMatrix(); instance.copy(world.matrix); mesh.setMatrixAt(index, instance);
+      refP.set(Math.sin(-tw * .6), 0, Math.cos(tw * .6)); refC.set(Math.sin(tw), 0, Math.cos(tw)); refN.set(Math.sin(tw * .5 + twitch * .35 * (id % 2 ? 1 : -1)), 0, 1).normalize();
+      const fw = alive; // наклон вперёд только у живого
+      pelvis.set(-st * 1.5 * (1 - A) * alive, root + bind[0][0].y, -.4 - kneel * 2);
+      waist.set(-st * .8 * (1 - A) * alive, root + bind[1][0].y, (.2 + slam * .9 - wind * .6 - stag * 1.2) * fw + kneel * 1.2);
+      chest.set(st * .5 * (1 - A) * alive, root + bind[2][0].y - slam * 2.2 + wind * .6 + breathe - stag * .6, (2.1 + slam * 4.6 - wind * 2.5 - stag * 3.4) * fw + kneel * 3.5);
+      neck.set(st * .6 * (1 - A) * alive + twitch * .5, root + bind[3][0].y - 1.1 - slam * 3 + wind * .4 - stag * .8, (4.8 + slam * 7 - wind * 2.4 - stag * 5) * fw + kneel * 5);
+      face.copy(neck).add(ref.set(twitch * (id % 2 ? 1.4 : -1.4) + burn * Math.sin(t * 7) * 1.2, 7.2 - stag * .6, 1.8 + slam * 1.2 - stag * 1.6));
+      write(0, pelvis, waist, refP); write(1, waist, chest, refC); write(2, chest, neck, refC);
+      if (lost & 16) { bones[3].makeScale(0, 0, 0).setPosition(neck); stump(neck, 1.7); } else write(3, neck, face, refN);
+      // цели для правой руки с дубинкой
       const sh = bind[4][0].clone().applyMatrix4(bones[2]);
-      const wE = boss ? e2.set(1.2, sh.y + 8.6, -4.2) : e2.set(6.5, sh.y + 6.5, -3), wT = boss ? V(0, 2.6, -1.7) : V(-.6, 2.4, -1.8);
-      const sE = boss ? V(.8, sh.y - 10.5, 12.5) : V(3.5, sh.y - 5.5, 13), sT = boss ? V(0, -1.4, 2.8) : V(-.8, -1.2, 2.8);
-      const hE = V().copy(wE).lerp(sE, slam / Math.max(A, .001) || 0), hT = V().copy(wT).lerp(sT, slam / Math.max(A, .001) || 0);
+      let wE, wT, sE, sT;
+      if (kind === 1) { wE = e2.set(10.5, sh.y + 1, -5); wT = V(1.6, .6, -2.4); sE = V(-5, sh.y - 3.5, 10.5); sT = V(-2.8, -.3, 1.2); }
+      else if (kind === 2) { wE = e2.set(7, sh.y - 7.5, -5.5); wT = V(.2, .8, 2.9); sE = V(2.2, sh.y - 3.5, 16.5); sT = V(-.2, -.2, 3); }
+      else { wE = e2.set(6.5, sh.y + 6.5, -3); wT = V(-.6, 2.4, -1.8); sE = V(3.5, sh.y - 5.5, 13); sT = V(-.8, -1.2, 2.8); }
+      const kS = slam / Math.max(A, .001) || 0, hE = V().copy(wE).lerp(sE, kS), hT = V().copy(wT).lerp(sT, kS);
       for (let si = 0; si < 2; si++) { const side = si ? -1 : 1;
         for (let leg = 0; leg < 2; leg++) { const i = 4 + si * 6 + leg * 3; anchor.copy(bind[i][0]).applyMatrix4(bones[leg ? 0 : 2]);
           if (lost & (leg ? 4 : (si ? 2 : 1))) { for (let k = i; k < i + 3; k++) bones[k].makeScale(0, 0, 0).setPosition(anchor); stump(anchor, leg ? 2.2 : 1.9); continue; }
-          if (leg) { const str = st * side * (1 - fe); end.set(side * 5.9, 3.2 + Math.max(0, str) * 2.6 - slam * .6, str * 5.6 - slam * (side > 0 ? -3 : 2)); ref.set(side * .25, 0, 1);
-            solve(anchor, end, length[i] * 1.03, length[i + 1] * 1.03, ref); write(i, anchor, mid); write(i + 1, mid, end); tip.set(end.x + side * .2, end.y - 1.7, end.z + 4.9); write(i + 2, end, tip, down); continue; }
-          // руки висят широко (широчайшие), качаются; правая держит кувалду
-          const swing = -st * side * (1 - A) * (1 - fe);
-          end.set(side * 11.3, anchor.y - 12.6, 1.6 + swing * 3.8); tip.set(end.x + side * .4, end.y - 3, end.z + (si ? 1.2 : .4));
-          if (A > 0 && (boss || !si)) { t2.copy(hE).add(si ? V(-.9, -2.8, -.2) : V(0, 0, 0)); end.lerp(t2, A); t2.copy(hE).add(hT).add(si ? V(-.9, -2.8, -.2) : V(0, 0, 0)); tip.lerp(t2, A); }
+          if (leg) { // шаг: стопа перекатывается с пятки на носок; в ударе левая нога выходит вперёд; при смерти — на колени
+            const str = st * side * (1 - A * .7) * alive, lf = Math.max(0, str) * 2.8 * alive;
+            end.set(side * (5.9 + stag * .8), 3.2 + lf - slam * .5 + kneel * 1.5, str * 5.8 + (side < 0 ? A * 4 : -A * 1.5) - stag * side * 1.5 - kneel * 2);
+            ref.set(side * .25, 0, 1); solve(anchor, end, length[i] * 1.03, length[i + 1] * 1.03, ref); write(i, anchor, mid); write(i + 1, mid, end);
+            const toe = Math.max(0, -str) * .9 * alive; tip.set(end.x + side * .2, end.y - 1.7 + toe * .6 + kneel * 1.2, end.z + 4.9 - toe * .4 - kneel * 1.6); write(i + 2, end, tip, down); continue; }
+          // руки: висят широко и качаются; правая держит дубинку; попадание — руки разлетаются; огонь — сбивает пламя с головы
+          const swing = -st * side * (1 - A) * alive;
+          end.set(side * (11.3 + stag * 2.4), anchor.y - 12.6 + stag * 3.5, 1.6 + swing * 4.2 - stag * 2.5); tip.set(end.x + side * .4, end.y - 3, end.z + (si ? 1.2 : .4));
+          if (burn) { const f = t * 11 + side; end.set(side * (5 + Math.sin(f) * 1.6), sh.y + 2 + Math.sin(f * 1.3) * 2.6, 3 + Math.cos(f) * 2); tip.set(end.x - side * 1.4, end.y + 1.5, end.z + 1.5); }
+          if (A > 0 && !si && !burn) { end.lerp(hE, A); t2.copy(hE).add(hT); tip.lerp(t2, A); }
+          if (kneel > 0) { end.lerp(V(side * 8, anchor.y - 10 + topple * 6, 8 + topple * 6), kneel); tip.copy(end).add(V(0, -2.4, 2)); }
           ref.set(side * .62, -.15 + A * .4, -1);
           solve(anchor, end, length[i] * 1.06, length[i + 1] * 1.06, ref); write(i, anchor, mid); write(i + 1, mid, end); write(i + 2, end, tip, front); } }
       for (let i = 0; i < NB; i++) bones[i].toArray(palette, (index * NB + i) * 16);
