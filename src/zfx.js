@@ -378,12 +378,27 @@ const ZFX = (() => {
   }, ZN * 4);
   let denimCount = 0, waistCount = 0, cottonCount = 0;
 
+  const streetRig = raiderRig ? RaiderSuit.createSuit(T, RAIDER_SUIT_MODEL, ZN, true) : null;
+  let streetCount = 0;
+  if (streetRig) {
+    streetRig.mesh.name = 'Skinned street raiders';
+    streetRig.mesh.castShadow = false;
+    scene.add(streetRig.mesh, streetRig.cap);
+  }
   function drawStreetRaider(z, sc, t, fall) {
     const crawl = z.lost & 4, turn = fall ? 0 : (z.backTurn || 0);
     const phase = z.walk * .85;
     const coral = z.coralShirt;
     const stride = Math.sin(phase) * (1 - turn * 2);
     const attack = z.fl & 1 ? .5 + .5 * Math.sin(t * 14) : 0;
+    if (coral && streetRig) {
+      streetRig.pose(streetCount++, {
+        walk: phase, yaw: z.yaw, x: z.p[0], z: z.p[1], scale: sc * .87,
+        fall, attack, hit: z.flash, lost: z.lost, burning: z.fl & 2, frozen: z.fl & 8,
+        backTurn: turn, lift: z.fl & 4 ? 8 * Math.abs(Math.sin(t * 6)) : 0
+      });
+      return;
+    }
     const air = z.fl & 4 ? 8 * Math.abs(Math.sin(t * 6)) : 0;
     const lean = .13 + attack * .24 + turn * .21 - (z.kick || 0) * .35;
     const bob = Math.abs(stride);
@@ -457,6 +472,8 @@ const ZFX = (() => {
     let shadowCount = 0;
     raiderCount = 0;
     if (raiderRig) raiderRig.begin();
+    streetCount = 0;
+    if (streetRig) streetRig.begin();
     const t = now / 1000;
     suitCount = markCount = bannerCount = enforcerSkinCount = printCount = supportCount = denimCount = waistCount = cottonCount = 0;
     for (const z of list) {
@@ -477,6 +494,7 @@ const ZFX = (() => {
       else drawStreetRaider(z, sc, t, fall);
     }
     if (raiderRig) raiderRig.upload(raiderCount);
+    if (streetRig) streetRig.upload(streetCount);
     zShadow.count = shadowCount; zShadow.instanceMatrix.needsUpdate = true;
     suit.count = suitCount;
     raiderMarks.count = markCount;

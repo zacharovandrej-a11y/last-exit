@@ -9,14 +9,29 @@ function suitStride(clock, id) {
 }
 
 /* Procedural GPU skinning prototype. No animation data or textures are baked. */
-function createSuit(T, data, capacity = 400) {
+function createSuit(T, data, capacity = 400, street = false) {
   const count = data.bones.length;
   const geometry = new T.BufferGeometry();
   const positions = [...data.positions], joints = [...data.joints];
   const weights = [...data.weights], indices = [...data.indices];
   const eyeFlags = Array(positions.length / 3).fill(0);
+  if (street) {
+    for (let i = 0; i < positions.length; i += 3) {
+      const [px, py, pz] = data.positions.slice(i, i + 3);
+      const shirt = py > 5 && py < 17 && Math.abs(px) < 7.9;
+      const shorts = py > -5.5 && py < 4.7;
+      if (shirt || shorts) {
+        const center = shorts && py < 0 ? Math.sign(px) * 3.3 : 0;
+        positions[i] += (px - center) * (shirt ? .045 : .075);
+        positions[i + 2] = pz * 1.075;
+      }
+      if (py > 23.2 && (pz < 1 || py > 24.1)) {
+        positions[i + 1] += Math.min(1.25, (py - 23.2) * .55) * (1 + .17 * px);
+      }
+    }
+  }
   const globe = new T.SphereGeometry(1, 8, 4);
-  for (const [cx, cy, cz] of data.eyes) {
+  for (const [cx, cy, cz] of (street ? [] : data.eyes)) {
     const base = positions.length / 3;
     const points = globe.attributes.position;
     for (let i = 0; i < points.count; i++) {
@@ -80,15 +95,41 @@ function createSuit(T, data, capacity = 400) {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nsuitEye=eyeSurface; suitBindPosition=position; transformed=(skin*vec4(transformed,1.)).xyz;');
     shader.fragmentShader = mask + shader.fragmentShader.replace('#include <clipping_planes_fragment>', `
       #include <clipping_planes_fragment>
-      if (suitEye < .5 && suitBindPosition.z > 3.95 && length(eyeOpening(suitBindPosition)) < 1.) discard;
+      if (${street ? "false" : "suitEye < .5"} && suitBindPosition.z > 3.95 && length(eyeOpening(suitBindPosition)) < 1.) discard;
     `);
   }
   const material = new T.MeshPhongMaterial({
-    color: 0xffffff, specular: 0x121212, shininess: 105, emissive: 0x070709
+    color: 0xffffff, specular: 0x121212, shininess: street ? 8 : 105, emissive: 0x070709
   });
-  material.customProgramCacheKey = () => 'instanced-suit-phong';
+  material.customProgramCacheKey = () => street ? 'instanced-street-phong' : 'instanced-suit-phong';
   material.onBeforeCompile = shader => {
     installSkin(shader);
+    if (street) {
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `
+        #include <color_fragment>
+        vec3 p = suitBindPosition;
+        float x = abs(p.x);
+        float front = smoothstep(1.5,3.5,p.z);
+        float collar = smoothstep(13.0,17.0,p.y);
+        float open = front * (1.-smoothstep(.36,.65,x-collar*2.25));
+        float torso = smoothstep(5.1,5.35,p.y) * (1.-smoothstep(16.6,18.5,p.y)) *
+          (1.-smoothstep(7.35,7.62,x));
+        float sleeve = smoothstep(11.0,11.28,p.y) * (1.-smoothstep(7.55,7.8,x));
+        float shirt = max(torso,sleeve * (1.-smoothstep(16.6,17.6,p.y))) * (1.-open);
+        float shorts = smoothstep(-5.6,-5.35,p.y) * (1.-smoothstep(4.6,4.82,p.y));
+        float seam = (1.-smoothstep(.08,.24,abs(x-6.0))) * shorts;
+        float hem = (1.-smoothstep(.05,.27,abs(p.y+5.05))) * shorts;
+        float shoes = 1.-smoothstep(-20.95,-20.68,p.y);
+        float sole = 1.-smoothstep(-24.25,-23.82,p.y);
+        float hair = smoothstep(22.0+front*1.8,22.5+front*1.8,p.y);
+        vec3 tone = mix(vec3(.66,.42,.29),vec3(.82,.28,.22),shirt);
+        tone = mix(tone,vec3(.16,.28,.46)+vec3(.19)*max(seam,hem),shorts);
+        tone = mix(tone,mix(vec3(.16,.15,.18),vec3(.77,.75,.70),sole),shoes);
+        tone = mix(tone,vec3(.12,.62,.73),hair);
+        diffuseColor.rgb *= tone;
+      `);
+      return;
+    }
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <dithering_fragment>', `
         #include <dithering_fragment>
@@ -117,7 +158,7 @@ function createSuit(T, data, capacity = 400) {
   mesh.frustumCulled = false;
   mesh.castShadow = true;
   const depth = new T.MeshDepthMaterial({ depthPacking: T.RGBADepthPacking });
-  depth.customProgramCacheKey = () => 'instanced-suit-depth';
+  depth.customProgramCacheKey = () => street ? 'instanced-street-depth' : 'instanced-suit-depth';
   depth.onBeforeCompile = installSkin;
   mesh.customDepthMaterial = depth;
   mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
@@ -136,7 +177,7 @@ function createSuit(T, data, capacity = 400) {
   }
   const inverse = bind.map(([a, b], i) => {
     const contact = i === 6 || i === 9 || i === 12 || i === 15;
-    return frame(a, b, contact ? down : front, new T.Matrix4()).invert();
+    return frame(a, b, contact && (!street || i === 9 || i === 15) ? down : front, new T.Matrix4()).invert();
   });
   const length = bind.map(([a, b]) => a.distanceTo(b));
   const bones = bind.map(() => new T.Matrix4());
@@ -257,8 +298,70 @@ function createSuit(T, data, capacity = 400) {
     if (hit > 0) color.lerp(white, Math.min(.3, hit * .3));
     mesh.setColorAt(index, color);
   }
+  function poseStreet(index, state) {
+    const { walk, yaw, x: px, z: pz, scale, fall, attack, hit, lost, burning, frozen, backTurn, lift } = state;
+    const sway = Math.cos(walk), strike = attack * (1 - fall);
+    const turn = 1 - backTurn * 2, crossing = (1 - strike) * (1 - backTurn);
+    const bob = Math.abs(Math.sin(walk)) * .85;
+    const crouch = (lost & 4) ? 1 : 0;
+    const root = (25.2 + bob - strike * 1.6) * (1 - crouch * .63);
+    world.position.set(px, lift + fall * 4 * scale, pz);
+    world.rotation.set(-fall * 1.49 + crouch * .65, yaw + Math.PI * backTurn, 0, 'YXZ');
+    world.scale.setScalar(scale);
+    world.updateMatrix();
+    instance.copy(world.matrix);
+    mesh.setMatrixAt(index, instance);
+
+    pelvis.set(sway * 1.05 * crossing, root + bind[0][0].y, -.8);
+    waist.set(sway * .56 * crossing, root + bind[1][0].y, -.65);
+    chest.set(-sway * .48 * crossing, root + bind[2][0].y, .8 + strike * 2);
+    neck.set(-sway * .72 * crossing, root + bind[3][0].y - strike, 2.5 + strike * 6);
+    face.copy(neck).add(ref.set(sway * .32, 7.4, 1.0 + strike * 1.2));
+    write(0, pelvis, waist);
+    write(1, waist, chest);
+    write(2, chest, neck);
+    if (lost & 16) {
+      bones[3].makeScale(0, 0, 0).setPosition(neck);
+      stump(neck, 1.15);
+    } else write(3, neck, face);
+
+    for (let sideIndex = 0; sideIndex < 2; sideIndex++) {
+      const side = sideIndex ? -1 : 1;
+      const stride = Math.sin(walk) * side;
+      for (let leg = 0; leg < 2; leg++) {
+        const i = 4 + sideIndex * 6 + leg * 3;
+        anchor.copy(bind[i][0]).applyMatrix4(bones[leg ? 0 : 2]);
+        if (lost & (leg ? 4 : (sideIndex ? 2 : 1))) {
+          for (let k = i; k < i + 3; k++) bones[k].makeScale(0, 0, 0).setPosition(anchor);
+          stump(anchor, leg ? 1.5 : 1.08);
+          continue;
+        }
+        if (leg) {
+          end.set(side * (4.2 - crossing * (1.4 + Math.max(0, stride) * 1.23)),
+            2.9 + Math.max(0, stride) * 2.5, stride * 6.1 * turn);
+          ref.set(side * .17, 0, 1);
+        } else {
+          end.set(side * 7.4 + sway * crossing * 1.2, anchor.y - 12.1 + strike * 3.6,
+            1.7 - stride * 3.9 * turn + strike * (side > 0 ? 10.4 : 7.4));
+          ref.set(side * .47, -.12, -1);
+        }
+        solve(anchor, end, length[i] * 1.05, length[i + 1] * 1.05, ref);
+        write(i, anchor, mid);
+        write(i + 1, mid, end);
+        if (leg) tip.set(end.x - side * .26, end.y - 1.63, end.z + 4.85);
+        else tip.set(end.x + side * sway * crossing * .92, end.y - 3 + strike * 2.6,
+          end.z + .75 - stride * .75 + strike * 2.2);
+        write(i + 2, end, tip, ref.set(0, leg ? -1 : 0, leg ? 0 : 1));
+      }
+    }
+    for (let i = 0; i < count; i++) bones[i].toArray(palette, (index * count + i) * 16);
+    color.setHex(burning ? 0xffa56e : 0xffffff);
+    if (frozen) color.lerp(ice, .58);
+    if (hit > 0) color.lerp(white, Math.min(.3, hit * .3));
+    mesh.setColorAt(index, color);
+  }
   return {
-    mesh, cap, geometry, texture, pose,
+    mesh, cap, geometry, texture, pose: street ? poseStreet : pose,
     begin() { cap.count = 0; },
     upload(instances) {
       mesh.count = instances;
