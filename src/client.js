@@ -351,10 +351,17 @@ function hud(now, dt, cur, meS, plist, zl) {
       for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.beginPath(); ctx.moveTo(mouse.x + a * (r + 2), mouse.y + b * (r + 2)); ctx.lineTo(mouse.x + a * (r + 8), mouse.y + b * (r + 8)); ctx.stroke(); }
       if (relT > 0) { ctx.strokeStyle = '#ffd43b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(mouse.x, mouse.y, r + 12, -1.57, -1.57 + 6.283 * (1 - relT / (ZW[myW].rel / (1 + (pk.rel || 0) * .25)))); ctx.stroke(); } }
     if (now < buf.shield) { ctx.strokeStyle = 'rgba(177,151,252,' + (.5 + .3 * Math.sin(now / 120)) + ')'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(px, py - 4, 30, 34, 0, 0, 7); ctx.stroke(); } }
-  // последние зомби: метки, чтобы не искать их по всей карте
-  if (cur.phase === 1 && cur.left > 0 && cur.left <= 5) for (const z of zl) { const sc = ZT[z.ty].sc, [x, y, vis] = G3.project(z.p, 46 * sc), bob = Math.sin(now / 160) * 4;
+  // полоски жизни над головами врагов (тонкие; над громилой и боссом — шире)
+  { const HB = [66, 36, 70, 64, 80, 118], BW = [24, 22, 34, 24, 40, 64], few = cur.phase === 1 && cur.left > 0 && cur.left <= 5;
+    for (const z of zl) { if (z.fall) continue; const ty = z.ty, [x, y, vis] = G3.project(z.p, HB[ty] || 60); if (!vis || x < -40 || x > W_ + 40 || y < 30 || y > H_ + 10) continue;
+      const w = BW[ty] || 24, h = ty >= 4 ? 4 : 3, hp = Math.max(0, Math.min(1, z.hp ?? 1)), x0 = Math.round(x - w / 2), y0 = Math.round(y - 6);
+      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x0 - 1, y0 - 1, w + 2, h + 2);
+      ctx.fillStyle = hp > .6 ? '#5fd35f' : hp > .3 ? '#f2c94c' : '#ff4d3d'; ctx.fillRect(x0, y0, Math.max(1, Math.round(w * hp)), h);
+      if (few) { ctx.strokeStyle = 'rgba(255,59,59,' + (.55 + .35 * Math.sin(now / 150)) + ')'; ctx.lineWidth = 1.5; ctx.strokeRect(x0 - 2.5, y0 - 2.5, w + 5, h + 5); } } }
+  // последние зомби: стрелки по краю экрана к тем, кого не видно (видимых и так выдаёт полоска жизни)
+  if (cur.phase === 1 && cur.left > 0 && cur.left <= 5) for (const z of zl) { const sc = ZT[z.ty].sc, [x, y, vis] = G3.project(z.p, 46 * sc);
     ctx.fillStyle = '#ff3b3b'; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineWidth = 2;
-    if (vis && x > 10 && x < W_ - 10 && y > 40 && y < H_ - 10) { ctx.beginPath(); ctx.moveTo(x, y - 4 + bob); ctx.lineTo(x - 9, y - 18 + bob); ctx.lineTo(x + 9, y - 18 + bob); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    if (vis && x > 10 && x < W_ - 10 && y > 40 && y < H_ - 10) continue;
     else { const cx = W_ / 2, cy = H_ / 2 + 15, dx = x - cx, dy = y - cy, k = Math.min((W_ / 2 - 30) / Math.max(1, Math.abs(dx)), (H_ / 2 - 70) / Math.max(1, Math.abs(dy))), ex = cx + dx * k, ey = cy + dy * k, a = Math.atan2(dy, dx);
       ctx.save(); ctx.translate(ex, ey); ctx.rotate(a); const pu = 1 + .15 * Math.sin(now / 150); ctx.scale(pu, pu); ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-8, -11); ctx.lineTo(-3, 0); ctx.lineTo(-8, 11); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
       txt(Math.round(dist(z.p, meP) * .036) + ' м', ex - Math.cos(a) * 26, ey - Math.sin(a) * 26 + 5, 12, '#ffb3b3'); } }
