@@ -1565,10 +1565,10 @@ void main(){
     const grip = (c, z = 0, y = -1.2, ang = .28, len = 5, wdt = 1.9) => prof(c, [[z - 1.4, y], [z + 1.5, y], [z + 1.5 - Math.sin(ang) * len, y - len], [z - 1.6 - Math.sin(ang) * len, y - len - .2], [z - 1.9 - Math.sin(ang) * len, y - len + .8]], wdt, .35);
     let muz = 22;
     if (w === 1) { // пистолет
-      box(GC.st, 0, 1.25, 3.4, 2, 2, 9.2); box(GC.dk, 0, 2.28, 3.4, 1.4, .1, 8.6);
+      prof(GC.st, [[-1.2, .3], [7.9, .3], [7.9, 1.9], [7.3, 2.2], [-.9, 2.2], [-1.2, 1.8]], 1.6, .22); box(GC.dk, 0, 2.43, 3.4, .5, .08, 7.6);
       for (let i = 0; i < 5; i++) for (const s of [-1, 1]) box(GC.dk, s * 1.02, 1.3, -.6 + i * .5, .08, 1.5, .2);
       box(GC.dk, 1.02, 1.5, 4.6, .06, .9, 2.4); // окно выброса
-      box(GC.po, 0, -.05, 3.6, 1.8, 1.2, 8.4); tube(GC.dk, 0, 1.4, 8.05, .42, .3, 10);
+      prof(GC.po, [[.2, -.65], [7.6, -.65], [7.8, .2], [.2, .35]], 1.5, .2); box(GC.dk, 0, -.55, 6.2, 1.4, .25, 2.6); tube(GC.dk, 0, 1.4, 8.05, .42, .3, 10);
       box(GC.dk, 0, 2.45, 7.4, .35, .5, .6); box(GC.dk, 0, 2.45, -.6, 1.1, .5, .5);
       guard(1.6, 4.8, -.6); grip(GC.po, -.1, -.4, .25, 5.4, 1.8); box(GC.dk, 0, -5.95, -1.6, 1.9, .5, 3.2, -.25);
       for (let i = 0; i < 4; i++) box(GC.dk, 0, -1.8 - i * 1, -.6 - i * .26, 1.92, .12, 2.2, -.25); // насечка рукояти
@@ -1609,7 +1609,7 @@ void main(){
       box(GC.dk, 0, -1.7, -17.5, 2.4, 5.6, .6); guard(-.6, 2.6, -1.6, GC.dk); box(GC.dk, 0, -2.4, 3.6, 1.5, 1.6, 3);
       for (const s of [-1, 1]) box(GC.dk, s * .7, -2.8, 15.5, .4, .4, 7, 0, s * .05); muz = 29.8;
     } else if (w === 5) { // Узи
-      box(GC.st, 0, .3, 3, 2.4, 3.4, 11); box(GC.dk, 0, 2.05, 3, 1.6, .2, 10.4); box(GC.dk, 0, 2.3, 5.4, .8, .7, .9); box(GC.dk, 1.22, .6, 4.4, .08, 1.2, 3);
+      prof(GC.st, [[-2.5, -1.4], [8.5, -1.4], [8.5, 1.5], [7.9, 1.9], [-2, 1.9], [-2.5, 1.4]], 2, .3); box(GC.dk, 0, 2.2, 3, 1.2, .2, 9.6); box(GC.dk, 0, 2.3, 5.4, .8, .7, .9); box(GC.dk, 1.22, .6, 4.4, .08, 1.2, 3);
       tube(GC.dk, 0, .4, 9.1, 1, 1.2, 12); tube(GC.dk, 0, .4, 10.6, .55, 2.6); for (const s of [-1, 1]) box(GC.st, s * .5, 2.4, 8, .25, 1.1, .6);
       prof(GC.po, [[.6, -1.4], [3.8, -1.4], [3.4, -8], [.4, -8]], 2.1, .35); box(GC.dk, 0, -8.3, 1.9, 2.4, .7, 3.6); for (let i = 0; i < 4; i++) box(GC.dk, 0, -3 - i * 1.2, .5, 2.15, .3, .3);
       guard(3.8, 7, -1.4, GC.st); for (const s of [-1, 1]) box(GC.st, s * 1.1, -.2, -4.4, .25, .25, 9); box(GC.st, 0, -.6, -9, 2.6, 2.6, .5);
@@ -1700,58 +1700,39 @@ void main(){
   // Один снимок на пушку. Лента показывает обычные картинки, без 3D-рендера при свайпе.
   const weaponImages = new Map(), weaponImageMaterials = new Map();
   let weaponImageScene, weaponImageCamera, weaponImageTarget;
-  function weaponImage(id) {
+  function weaponImage(id) { // иконка оружия: студийный свет, металл с бликами, суперсэмплинг ×3, тень и светлый контур
     if (weaponImages.has(id)) return weaponImages.get(id);
-    const width = 128, height = 64;
+    const OW = 384, OH = 192, SS = 3, width = OW * SS, height = OH * SS;
     if (!weaponImageTarget) {
       weaponImageTarget = new T.WebGLRenderTarget(width, height, { depthBuffer: true });
       weaponImageScene = new T.Scene();
-      weaponImageScene.add(new T.HemisphereLight(0xfff5e5, 0xc6cde0, 1.0));
-      const key = new T.DirectionalLight(0xffffff, 1.25);
-      key.position.set(-4, 6, 3);
-      weaponImageScene.add(key);
-      weaponImageCamera = new T.OrthographicCamera(-1, 1, 1, -1, .1, 250);
+      weaponImageScene.add(new T.HemisphereLight(0xfff1e0, 0x3a4050, .5));
+      const key = new T.DirectionalLight(0xfff2e0, .95); key.position.set(-5, 7, 4); weaponImageScene.add(key);
+      const fill = new T.DirectionalLight(0x9fb4d0, .3); fill.position.set(-4, -2, -5); weaponImageScene.add(fill);
+      const rim = new T.DirectionalLight(0xffd6a0, .8); rim.position.set(6, 4, -2); weaponImageScene.add(rim);
+      weaponImageCamera = new T.OrthographicCamera(-1, 1, 1, -1, .1, 400);
     }
-    const gun = gunMesh(ZW[id].m, 0);
-    { const src = gun.children[0].geometry, gg = src.clone(), C = gg.attributes.color, tint = new T.Color(0xc2b9aa); for (let i = 0; i < C.count; i++) { const c = new T.Color(C.getX(i), C.getY(i), C.getZ(i)); if (c.r > 1.2 || c.g > 1.2 || c.b > 1.2) continue; c.lerp(tint, .28); C.setXYZ(i, c.r, c.g, c.b); } gun.children[0].geometry = gg; gun.children[0].material = weaponImageMaterials.get(0) || (weaponImageMaterials.set(0, new T.MeshLambertMaterial({ vertexColors: true })), weaponImageMaterials.get(0)); }
-    const bounds = new T.Box3().setFromObject(gun), center = bounds.getCenter(new T.Vector3());
-    const size = bounds.getSize(new T.Vector3());
-    const half = Math.max(9, Math.max(size.z, size.y * 2) * .60);
-    weaponImageCamera.left = -half;
-    weaponImageCamera.right = half;
-    weaponImageCamera.top = half / 2;
-    weaponImageCamera.bottom = -half / 2;
-    weaponImageCamera.position.copy(center).add(new T.Vector3(-85, 25, 14));
-    weaponImageCamera.lookAt(center);
-    weaponImageCamera.updateProjectionMatrix();
-
-    const currentTarget = renderer.getRenderTarget();
-    const clear = renderer.getClearColor(new T.Color()), alpha = renderer.getClearAlpha();
-    const pixels = new Uint8Array(width * height * 4);
+    const gun = gunMesh(ZW[id].m, 0), mesh = gun.children[0];
+    { const gg = mesh.geometry.clone(), C = gg.attributes.color; for (let i = 0; i < C.count; i++) { const r = C.getX(i), g = C.getY(i), b = C.getZ(i); if (r > 1.2 || g > 1.2 || b > 1.2) continue; const l = Math.max(r, g, b), k = l < .2 ? 1.35 : 1; C.setXYZ(i, Math.min(1, r * k + .03), Math.min(1, g * k + .03), Math.min(1, b * k + .035)); }
+      mesh.geometry = gg; mesh.material = weaponImageMaterials.get(0) || (weaponImageMaterials.set(0, new T.MeshPhongMaterial({ vertexColors: true, shininess: 60, specular: 0x5a5a5a })), weaponImageMaterials.get(0)); }
+    gun.rotation.set(0, 0, 0); gun.updateMatrixWorld(true);
+    const bounds = new T.Box3().setFromObject(gun), center = bounds.getCenter(new T.Vector3()), size = bounds.getSize(new T.Vector3());
+    const half = Math.max(8, Math.max(size.z * .56, size.y * 1.12));
+    weaponImageCamera.left = -half; weaponImageCamera.right = half; weaponImageCamera.top = half / 2; weaponImageCamera.bottom = -half / 2;
+    weaponImageCamera.position.copy(center).add(new T.Vector3(-90, 30, 26)); weaponImageCamera.lookAt(center); weaponImageCamera.updateProjectionMatrix();
+    const currentTarget = renderer.getRenderTarget(), clear = renderer.getClearColor(new T.Color()), alpha = renderer.getClearAlpha(), pixels = new Uint8Array(width * height * 4);
     weaponImageScene.add(gun);
-    try {
-      renderer.setRenderTarget(weaponImageTarget);
-      renderer.setClearColor(0, 0);
-      renderer.clear();
-      renderer.render(weaponImageScene, weaponImageCamera);
-      renderer.readRenderTargetPixels(weaponImageTarget, 0, 0, width, height, pixels);
-    } finally {
-      weaponImageScene.remove(gun);
-      renderer.setRenderTarget(currentTarget);
-      renderer.setClearColor(clear, alpha);
-    }
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const paint = canvas.getContext('2d'), image = paint.createImageData(width, height);
-    for (let y = 0; y < height; y++) {
-      const row = (height - 1 - y) * width * 4;
-      image.data.set(pixels.subarray(row, row + width * 4), y * width * 4);
-    }
-    paint.putImageData(image, 0, 0);
-    const url = canvas.toDataURL();
-    weaponImages.set(id, url);
-    return url;
+    try { renderer.setRenderTarget(weaponImageTarget); renderer.setClearColor(0, 0); renderer.clear(); renderer.render(weaponImageScene, weaponImageCamera); renderer.readRenderTargetPixels(weaponImageTarget, 0, 0, width, height, pixels); }
+    finally { weaponImageScene.remove(gun); renderer.setRenderTarget(currentTarget); renderer.setClearColor(clear, alpha); }
+    const big = document.createElement('canvas'); big.width = width; big.height = height; const bp = big.getContext('2d'), image = bp.createImageData(width, height);
+    for (let y = 0; y < height; y++) { const row = (height - 1 - y) * width * 4; image.data.set(pixels.subarray(row, row + width * 4), y * width * 4); }
+    bp.putImageData(image, 0, 0);
+    const canvas = document.createElement('canvas'); canvas.width = OW; canvas.height = OH; const paint = canvas.getContext('2d'); paint.imageSmoothingQuality = 'high';
+    paint.save(); paint.shadowColor = 'rgba(0,0,0,.75)'; paint.shadowBlur = 10; paint.shadowOffsetY = 5; paint.drawImage(big, 0, 0, OW, OH); paint.restore(); // мягкая тень
+    const sil = document.createElement('canvas'); sil.width = OW; sil.height = OH; const sp = sil.getContext('2d'); sp.drawImage(big, 0, 0, OW, OH); sp.globalCompositeOperation = 'source-in'; sp.fillStyle = '#ffe9c8'; sp.fillRect(0, 0, OW, OH);
+    paint.save(); paint.globalCompositeOperation = 'destination-over'; paint.filter = 'blur(1.5px)'; paint.globalAlpha = .55; for (const [dx, dy] of [[-1.6, 0], [1.6, 0], [0, -1.6], [0, 1.6]]) paint.drawImage(sil, dx, dy); paint.restore(); // светлый ореол-контур
+    paint.drawImage(big, 0, 0, OW, OH);
+    const url = canvas.toDataURL(); weaponImages.set(id, url); return url;
   }
   // головные уборы
   function hat(ch) {

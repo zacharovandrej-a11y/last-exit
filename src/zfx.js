@@ -542,7 +542,7 @@ const ZFX = (() => {
     suitCount = markCount = bannerCount = enforcerSkinCount = printCount = supportCount = denimCount = waistCount = cottonCount = 0;
     for (const z of list) {
       if (shadowCount >= ZN) break;
-      const Tz = ZT[z.ty], sc = Tz.sc, fall = z.fall || 0;
+      const Tz = ZT[z.ty], sc = Tz.sc * (ZVIS[z.ty] || 1), fall = z.fall || 0;
       zShadow.setMatrixAt(shadowCount++, M4.compose(V3.set(z.p[0], .6, z.p[1]),
         Q.setFromEuler(E.set(0, z.ty === RAIDER ? z.yaw : 0, 0)),
         S3.set(Tz.r * 1.1, 1, Tz.r * (z.ty === RAIDER ? 2 : 1.1))));
@@ -586,9 +586,11 @@ const ZFX = (() => {
   }
   // ===== попадание и смерть =====
   function hit(p, d, gore, z) { spray(p, 20, d, 4 + gore * 3, 90 + gore * 40); if (Math.random() < .5) bloodAt(add(p, d, 12 + Math.random() * 20), 14 + gore * 5, .8); if (z) z.flash = .9; }
+  // видимый размер врагов под рост игрока (~62 ед. = 1.8 м): налётчики ~1.75 м, громила ~2 м, бегун — взрослый человек на четвереньках
+  const ZVIS = [1.38, 1.2, 1.02, 1.12, .9, 1];
   const dying = [];
   function kill(p, d, g, ty, lost, z) {
-    const sc = ZT[ty].sc;
+    const sc = ZT[ty].sc * (ZVIS[ty] || 1);
     const L = ty === RAIDER ? { skin: 0x625770, shirt: 0x625472 } : ty === STANDARD_BEARER ? { skin: 0xbb8970, shirt: 0x713343 } : (ty === ENFORCER || ZT[ty].boss) ? { skin: enforcerTone(z?.seed), shirt: LEATHER } : z || look(Math.floor(Math.random() * 999), ty);
     spray(p, 20 * sc, d, 10 + g * 10, 120 + g * 50, 1.6 + g * .3); bloodAt(p, 30 * sc + g * 8, 1);
     for (let i = 0; i < 2 + g; i++) bloodAt(add(p, d, 15 + Math.random() * 40 * (g * .4 + .6)), 10 + Math.random() * 16, .9);
