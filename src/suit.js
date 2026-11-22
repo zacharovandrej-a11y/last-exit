@@ -1,14 +1,15 @@
+const RaiderSuit = (() => {
 // Up to two diagonal steps, with a short hold before the next burst.
-export const SUIT_STRIDE_LENGTH = 13;
+const SUIT_STRIDE_LENGTH = 13;
 
-export function suitStride(clock, id) {
+function suitStride(clock, id) {
   const sequence = clock * (1 + ((id % 7) - 3) * .028) / 2;
   const progress = Math.min(1, (sequence - Math.floor(sequence)) / (id % 3 ? .82 : .73));
   return 2 * (Math.floor(sequence) + progress * progress * (3 - 2 * progress));
 }
 
 /* Procedural GPU skinning prototype. No animation data or textures are baked. */
-export function createSuit(T, data, capacity = 400) {
+function createSuit(T, data, capacity = 400) {
   const count = data.bones.length;
   const geometry = new T.BufferGeometry();
   const positions = [...data.positions], joints = [...data.joints];
@@ -57,10 +58,11 @@ export function createSuit(T, data, capacity = 400) {
     }
     mat4 suitSkin() {
       float sum = dot(jointWeights, vec4(1.0));
-      return (jointMatrix(int(jointIndices.x)) * jointWeights.x +
-              jointMatrix(int(jointIndices.y)) * jointWeights.y +
-              jointMatrix(int(jointIndices.z)) * jointWeights.z +
-              jointMatrix(int(jointIndices.w)) * jointWeights.w) / max(sum, .0001);
+      mat4 result = jointMatrix(int(jointIndices.x)) * jointWeights.x;
+      if (jointWeights.y > 0.) result += jointMatrix(int(jointIndices.y)) * jointWeights.y;
+      if (jointWeights.z > 0.) result += jointMatrix(int(jointIndices.z)) * jointWeights.z;
+      if (jointWeights.w > 0.) result += jointMatrix(int(jointIndices.w)) * jointWeights.w;
+      return result / max(sum, .0001);
     }
   `;
   const mask = `
@@ -73,8 +75,9 @@ export function createSuit(T, data, capacity = 400) {
   function installSkin(shader) {
     shader.uniforms.suitBones = { value: texture };
     shader.vertexShader = vertex + shader.vertexShader
-      .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nmat4 normalSkin = suitSkin(); objectNormal = mat3(normalSkin) * objectNormal;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nsuitEye=eyeSurface; suitBindPosition=position; transformed=(suitSkin()*vec4(transformed,1.)).xyz;');
+      .replace(/void main\s*\(\s*\)\s*\{/, '$&\nmat4 skin = suitSkin();')
+      .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nobjectNormal = mat3(skin) * objectNormal;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nsuitEye=eyeSurface; suitBindPosition=position; transformed=(skin*vec4(transformed,1.)).xyz;');
     shader.fragmentShader = mask + shader.fragmentShader.replace('#include <clipping_planes_fragment>', `
       #include <clipping_planes_fragment>
       if (suitEye < .5 && suitBindPosition.z > 3.95 && length(eyeOpening(suitBindPosition)) < 1.) discard;
@@ -90,15 +93,6 @@ export function createSuit(T, data, capacity = 400) {
       .replace('#include <dithering_fragment>', `
         #include <dithering_fragment>
         vec3 p = suitBindPosition;
-        float rear = smoothstep(.45,1.6,-p.z);
-        float zipper = (1.-smoothstep(.075,.22,abs(p.x))) * rear
-          * smoothstep(-1.6,-.9,p.y) * (1.-smoothstep(10.5,11.1,p.y));
-        float teeth = .58+.42*step(.44,fract(p.y*5.2));
-        float tab = (1.-smoothstep(.14,.24,abs(p.x)))
-          * (1.-smoothstep(.38,.54,abs(p.y+.82))) * rear;
-        float hoodSeam = (1.-smoothstep(.06,.16,abs(p.x))) * smoothstep(21.,23.,p.y) * rear;
-        float sideSeam = (1.-smoothstep(.09,.21,abs(p.z-.32))) * smoothstep(2.8,4.2,abs(p.x))
-          * smoothstep(-17.,-12.,p.y) * (1.-smoothstep(3.2,5.,p.y));
         vec2 opening = eyeOpening(p);
         if (suitEye > .5) {
           float iris = length((opening - vec2(.08, .03))*vec2(1.25,.76));
@@ -114,8 +108,7 @@ export function createSuit(T, data, capacity = 400) {
           : 0.;
         gl_FragColor.rgb += vec3(.038,.037,.035) * lip * (.35+.65*max(normal.y,0.));
         float rim = 1.0-max(dot(normal,normalize(vViewPosition)),0.0);
-        gl_FragColor.rgb += vec3(.11,.115,.13)*rim*rim*rim*.24;
-        gl_FragColor.rgb += vec3(.19,.181,.166)*(zipper*teeth*.53+tab*.36+hoodSeam*.13+sideSeam*.19);
+        gl_FragColor.rgb += vec3(.15,.16,.18)*rim*rim*.40;
       `);
   };
   const mesh = new T.InstancedMesh(geometry, material, capacity);
@@ -183,7 +176,7 @@ export function createSuit(T, data, capacity = 400) {
   function pose(index, state) {
     const { id = 1, time = 0, walk = 0, yaw = 0, attack = -1, backTurn = 0,
       hit = 0, fall = 0, impact = 1, blast = 0, lost = 0, frozen = false, burning = false,
-      x: px = 0, z: pz = 0 } = state;
+      x: px = 0, z: pz = 0, scale = 1, lift = 0 } = state;
     const phase = walk + id * .13;
     const crouch = attack >= 0 && attack < .13 ? Math.sin(attack / .13 * Math.PI) * 2 : 0;
     const lunge = attack >= .13 ? Math.max(0, 1 - Math.abs((attack - .22) / .09)) : 0;
@@ -202,15 +195,17 @@ export function createSuit(T, data, capacity = 400) {
     const snap = twitch < .23 ? Math.sin(twitch * 45) * (1 - twitch / .23) ** 2 : 0;
     const reel = blast * 6, ground = (fallback, standing) => fallback * fallEase + standing * (1 - fallEase);
     const rear = backTurn * Math.PI;
-    world.position.set(px, Math.sin(blast * Math.PI) * 4, pz);
-    world.rotation.set(-blast * .5 * impact, yaw + rear, fallEase * 1.05 * impact + blast * .65 * impact, 'YXZ');
+    const drop = Math.sin(fallEase * Math.PI / 2);
+    world.position.set(px, lift + (Math.sin(blast * Math.PI) * 4 + drop * 4.4) * scale, pz);
+    world.scale.setScalar(scale);
+    world.rotation.set(-blast * .5 * impact, yaw + rear, fallEase * 1.40 * impact + blast * .65 * impact, 'YXZ');
     world.updateMatrix();
     instance.copy(world.matrix);
     mesh.setMatrixAt(index, instance);
 
     pelvis.set(-transfer * .66, ground(4.7, 17.95 + arch - weight * .27), -10.6 - reel);
     waist.set(transfer * .19, ground(3.9, 16.9 - arch * .55 - weight * .50 - crouch), -7.8 - reel + lunge * 1.1);
-    chest.set(transfer * .91, ground(3.6, 15.8 + arch * .62 - weight * .82 - crouch), -2.2 - reel + lunge * 3);
+    chest.set(transfer * .91, ground(3.6, 15.8 + arch * .62 - weight * .82 - crouch * 1.9), -2.2 - reel + lunge * 3);
     neck.set(transfer * .36, ground(2.8, 15.05 - arch * .56 - weight * .48 - crouch - hit * 1.2), 7.05 - reel + lunge * 7);
     face.copy(neck).add(ref.set((id % 2 ? -1 : 1) * snap * 3.4 + backTurn * 1.2,
       ground(1.5, 6.5 - snap * 1.65), 3.4));
@@ -245,7 +240,7 @@ export function createSuit(T, data, capacity = 400) {
         const heel = leg && step < stance ? Math.max(0, (step - .38) / (stance - .38)) : 0;
         const heelLift = Math.sin(heel * Math.PI) * (1 - fallEase);
         const lift = Math.sin(swing * Math.PI) * (leg ? 4.8 : 5.5);
-        end.set(side * ((leg ? 5.8 : 8.1) + blast * 2),
+        end.set(side * ((leg ? 5.8 : 8.1 + crouch * 1.4) + blast * 2),
           ground(1.9 + (side === impact ? .6 : 0), (leg ? 2.25 : .85) + heelLift + lift + blast * 4 + (leg ? backTurn * 8 : 0)),
           (leg ? -16.4 : 11.5) + stride * (1 - fallEase) + (leg ? -backTurn * 8 : lunge * 9));
         ref.set(side * (leg ? .16 : .57), leg ? .75 : .33, leg ? .85 : -.82);
@@ -267,10 +262,20 @@ export function createSuit(T, data, capacity = 400) {
     begin() { cap.count = 0; },
     upload(instances) {
       mesh.count = instances;
-      mesh.instanceMatrix.needsUpdate = true;
-      mesh.instanceColor.needsUpdate = true;
-      cap.instanceMatrix.needsUpdate = true;
-      texture.needsUpdate = true;
+      if (instances) {
+        mesh.instanceMatrix.updateRange.count = instances * 16;
+        mesh.instanceColor.updateRange.count = instances * 3;
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.instanceColor.needsUpdate = true;
+        texture.needsUpdate = true;
+      }
+      if (cap.count) {
+        cap.instanceMatrix.updateRange.count = cap.count * 16;
+        cap.instanceMatrix.needsUpdate = true;
+      }
     }
   };
 }
+
+return { createSuit, SUIT_STRIDE_LENGTH, suitStride };
+})();

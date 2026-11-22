@@ -101,7 +101,30 @@ const ZFX = (() => {
     if (z.flash > 0) C.lerp(WHITE, z.flash);
     return C;
   }
+  const raiderRig = renderer.capabilities.isWebGL2 ? RaiderSuit.createSuit(T, RAIDER_SUIT_MODEL, ZN) : null;
+  let raiderCount = 0;
+  if (raiderRig) {
+    raiderRig.mesh.name = 'Skinned raiders';
+    scene.add(raiderRig.mesh, raiderRig.cap);
+    // The existing projected enemy shadow follows every raider.
+    raiderRig.mesh.castShadow = false;
+  }
+  function drawSkinnedRaider(z, sc, t) {
+    const id = z.id || 1, fall = z.fall || 0;
+    const frozen = Boolean(z.fl & 8);
+    const [dx, dz] = z.d || [0, 0];
+    const side = dx * Math.cos(z.yaw) - dz * Math.sin(z.yaw);
+    const attack = !frozen && !fall && (z.fl & 1) ? ((t - (z.attackSince ?? t)) % .85) : -1;
+    raiderRig.pose(raiderCount++, {
+      id, time: t, freezeTime: z.freezeSince, walk: (frozen ? (z.freezeWalk ?? z.walk) : z.walk) / (.12 * RaiderSuit.SUIT_STRIDE_LENGTH),
+      x: z.p[0], z: z.p[1], scale: sc, yaw: z.yaw, attack,
+      backTurn: fall ? 0 : (z.backTurn || 0), fall, impact: side < 0 ? -1 : 1,
+      lift: z.fl & 4 ? 10 * Math.abs(Math.sin(t * 6)) : 0,
+      hit: z.flash, lost: z.lost, frozen, burning: Boolean(z.fl & 2)
+    });
+  }
   function drawRaider(z, sc, t) {
+    if (raiderRig) return drawSkinnedRaider(z, sc, t);
     const fall = z.fall || 0, noLegs = z.lost & 4, phase = z.walk / (Math.PI * 2);
     const air = z.fl & 4 ? 10 * Math.abs(Math.sin(t * 6)) : 0;
     const lunge = z.fl & 1 ? .5 + .5 * Math.sin(t * 16) : 0;
@@ -407,6 +430,8 @@ const ZFX = (() => {
   }
   function draw(list, now) {
     let shadowCount = 0;
+    raiderCount = 0;
+    if (raiderRig) raiderRig.begin();
     const t = now / 1000;
     suitCount = markCount = bannerCount = enforcerSkinCount = printCount = supportCount = denimCount = waistCount = cottonCount = 0;
     for (const z of list) {
@@ -426,6 +451,7 @@ const ZFX = (() => {
       else if (z.ty === ENFORCER || Tz.boss) drawEnforcer(z, sc, t, fall);
       else drawStreetRaider(z, sc, t, fall);
     }
+    if (raiderRig) raiderRig.upload(raiderCount);
     zShadow.count = shadowCount; zShadow.instanceMatrix.needsUpdate = true;
     suit.count = suitCount;
     raiderMarks.count = markCount;

@@ -278,6 +278,13 @@ function loop(now) {
     for (const [id, zb] of S.b.z) { const za = S.a.z.get(id) || zb, p = lerp(za.p, zb.p, S.k);
       let z = zst.get(id); if (!z) { z = Object.assign({ id, p, lp: p, walk: Math.random() * 6, yaw: Math.atan2(meP[0] - p[0], meP[1] - p[1]), flash: 0 }, ZFX.look(id)); zst.set(id, z); }
       const d = dist(p, z.lp); z.walk += d * .12 / ZT[zb.ty].sc; if (d > .2) { const ty = Math.atan2(p[0] - z.lp[0], p[1] - z.lp[1]); let dy = ty - z.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); z.yaw += dy * .2; }
+      if (zb.ty === 1) {
+        if ((zb.fl & 1) && !(z.fl & 1)) z.attackSince = now / 1000;
+        if ((zb.fl & 8) && !(z.fl & 8)) {
+          z.freezeSince = now / 1000;
+          z.freezeWalk = z.walk;
+        }
+      }
       z.lp = p; z.p = p; z.ty = zb.ty; z.lost = zb.lost; z.fl = zb.fl;
       const facingBack = !(zb.lost & 4) && (zb.ty === 1 && raiderBackKick(id) && (zb.fl & 1) ||
         zb.ty === 0 && streetWalksBackward(id) && !(zb.fl & 1));

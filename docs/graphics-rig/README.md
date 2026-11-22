@@ -20,5 +20,5 @@
 Чтобы пересобрать модель, сохраните три исходных файла из указанных ссылок в одну папку и выполните:
 
 ```sh
-blender -b --factory-startup --python docs/graphics-rig/build_mesh.py -- /path/to/source "$PWD/docs/graphics-rig/model.json"
+blender -b --factory-startup --python docs/graphics-rig/build_mesh.py -- /path/to/source "$PWD/assets/raider-suit.json"
 ```

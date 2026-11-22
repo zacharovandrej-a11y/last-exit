@@ -1,4 +1,4 @@
-import { createSuit, SUIT_STRIDE_LENGTH, suitStride } from './rig.js';
+const { createSuit, SUIT_STRIDE_LENGTH, suitStride } = RaiderSuit;
 
 const T = THREE;
 const canvas = document.querySelector('#scene');
@@ -6,7 +6,7 @@ const error = document.querySelector('#error');
 try {
   const context = canvas.getContext('webgl2', { antialias: true, preserveDrawingBuffer: location.search.includes('capture') });
   if (!context) throw new Error('Для просмотра нужен браузер с WebGL 2.');
-  const response = await fetch('./model.json');
+  const response = await fetch('../../assets/raider-suit.json');
   if (!response.ok) throw new Error('Не удалось загрузить модель.');
   const data = await response.json();
   const renderer = new T.WebGLRenderer({ canvas, context, antialias: true, preserveDrawingBuffer: true });
