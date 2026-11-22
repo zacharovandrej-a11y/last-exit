@@ -150,7 +150,8 @@ export function createSuit(T, data, capacity = 400) {
     face.copy(neck).add(ref.set((id % 2 ? -1 : 1) * snap * 3.4 + backTurn * 1.2,
       ground(1.5, 3.9 - snap * .8), 5.6));
     ref.set(0, -1, .1);
-    write(0, pelvis, waist, ref);
+    // Rotate the pelvis without stretching the rear contour along the spine.
+    frame(pelvis, waist, ref, bones[0]).multiply(inverse[0]);
     write(1, waist, chest, ref);
     write(2, chest, neck, ref);
     if (lost & 16) {
