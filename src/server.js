@@ -217,7 +217,7 @@ export class World {
   explode(c, by, R, dmg) {
     this.sendAll({ t: 'boom', p: [Math.round(c[0]), Math.round(c[1])], r: R });
     for (const z of this.zs.values()) { const d = dist(z.p, c); if (d < R + z.r) { const k = 1 - Math.min(1, d / R); this.damageRaider(z, dmg * (.3 + k * k)); z.lastDir = norm(sub(z.p, c)); if (z.hp <= 0) this.killZ(z, by, 5); } }
-    for (const o of nearObjs(this.objs, c, R)) { if (o.dead || !(o.hp > 0) || dist(o.p, c) > R * .8) continue; if (o.type === 'barrel' || o.type === 'crate') { o.hp = 0; this.later.push([this.t + .15 + this.rnd() * .2, o, by]); } else if ((o.type === 'car' || o.type === 'truck') && !o.burnt) { o.hp -= dmg * .8; this.later.push([this.t + .3, o, by]); } }
+    for (const o of nearObjs(this.objs, c, R)) { if (o.dead || !(o.hp > 0) || dist(o.p, c) > R * .8) continue; if (o.type === 'barrel' || o.type === 'crate') { o.hp = 0; this.later.push([this.t + .15 + this.rnd() * .2, o, by]); } else if ((o.type === 'car' || o.type === 'truck' || o.type === 'bus') && !o.burnt) { o.hp -= dmg * .8; this.later.push([this.t + .3, o, by]); } }
   }
   hurt(p, dmg) {
     if (p.st === 0) { p.hp -= dmg; if (p.hp <= 0) { p.hp = 0; p.st = 1; p.downT = ZDOWN; p.revT = 0; this.msg('🆘 ' + p.name + ' упал! Ползи к напарнику', '#ff6b6b'); } }

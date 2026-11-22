@@ -606,7 +606,7 @@ void main(){
   // постапокалипсис: брошенные машины (ржавые, сгоревшие, перевёрнутые), всё детерминировано по id
   const rh = (id, n) => ((id * 9301 + n * 49297 + 7) % 233280) / 233280;
   const RUST = new T.Color(0x6e4228), RUST2 = new T.Color(0x4a2e20), SOOT = new T.Color(0x221e1b), FLIP = new T.Matrix4().makeTranslation(0, 40, 0).multiply(new T.Matrix4().makeRotationX(Math.PI));
-  const wreckOf = o => { if (o.type !== 'car' && o.type !== 'truck' && o.type !== 'bus') return 0; const r = rh(o.id, 5); return r < .28 ? 0 : r < .6 ? 1 : o.type === 'car' && r > .9 ? 3 : 2; };
+  const wreckOf = o => 0, wreckOld = o => { if (o.type !== 'car' && o.type !== 'truck' && o.type !== 'bus') return 0; const r = rh(o.id, 5); return r < .28 ? 0 : r < .6 ? 1 : o.type === 'car' && r > .9 ? 3 : 2; };
   const basisAt = o => { const k = sizeVar(o); return new T.Matrix4().compose(new T.Vector3(o.p[0], 0, o.p[1]), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -o.a), new T.Vector3(k, k, k)); };
   function buildPlantContacts(objs) {
     const plants = objs.filter(o => o.type === 'tree' || o.type === 'pine' || o.type === 'bush' || o.type === 'deadtree');
@@ -1350,6 +1350,10 @@ void main(){
       if (p.e) _fc.setRGB(1.6 * f, .8 * f, .25 * f); else if (k < .22) _fc.setRGB(1 * f, .78 * f, .32 * f); else if (k < .55) _fc.setRGB(.95 * f, .4 * f, .08 * f); else _fc.setRGB(.55 * f, .12 * f, .03 * f);
       fpMesh.setMatrixAt(n, _fm.compose(_fv.set(p.x, p.y, p.z), q, _fs.set(sz, sz * (p.e ? 1 : 1.25), 1))); fpMesh.setColorAt(n++, _fc); if (n >= FPN) break; }
     fpMesh.count = n; fpMesh.instanceMatrix.needsUpdate = true; if (n) fpMesh.instanceColor.needsUpdate = true; }
+  function flameJet(from, d, end) { // струя огнемёта: языки летят вдоль ствола, растут и краснеют
+    const moving = d[0] || d[1], n = moving ? 4 : 1;
+    for (let i = 0; i < n; i++) { const p = fps[fpi]; fpi = (fpi + 1) % FPN; const life = moving ? .28 + Math.random() * .16 : .5, sp = moving ? end / life * (.75 + Math.random() * .3) : 0, j = (Math.random() - .5) * .22, c = Math.cos(j), sn = Math.sin(j), dx = d[0] * c - d[1] * sn, dz = d[0] * sn + d[1] * c, st = Math.random() * 6;
+      p.x = from[0] + dx * st; p.z = from[1] + dz * st; p.y = moving ? 21 : 12 + Math.random() * 10; p.vx = dx * sp + (moving ? 0 : (Math.random() - .5) * 14); p.vz = dz * sp + (moving ? 0 : (Math.random() - .5) * 14); p.vy = moving ? -6 + Math.random() * 10 : 30; p.a = 0; p.l = life; p.s = moving ? 10 + Math.random() * 10 : 11; p.e = 0; } }
   function fireGlows(srcs, now) { if (!fglow.material.map) { fglow.material.map = glowTex; fglow.material.needsUpdate = true; } let n = 0;
     for (const s of srcs) { if (n >= 16) break; const f = .8 + .2 * Math.sin(now / 90 + s.p[0]) + .1 * Math.sin(now / 37 + s.p[1]), r = 70 * s.s * f; fglow.setMatrixAt(n, _fm.compose(_fv.set(s.p[0], 1.2, s.p[1]), new T.Quaternion(), _fs.set(r, 1, r))); fglow.setColorAt(n++, _fc.setRGB(.55 * f, .26 * f, .06 * f)); }
     fglow.count = n; fglow.instanceMatrix.needsUpdate = true; if (n) fglow.instanceColor.needsUpdate = true; }
@@ -1424,25 +1428,157 @@ void main(){
     for (let k = 1; k < pal.length; k++) for (let n = 0; n < 9; n++) { g.fillStyle = pal[k]; g.beginPath(); const x = rnd() * 64, y = rnd() * 64, r = 4 + rnd() * 8; for (let a = 0; a < 7; a++) { const ang = a / 7 * 6.2832, rr = r * (.6 + rnd() * .6); g.lineTo(x + Math.cos(ang) * rr * 1.4, y + Math.sin(ang) * rr); } g.fill(); }
     const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.magFilter = T.NearestFilter; return camoTex[i] = t;
   }
-  const METAL = 0x2a2c2e, WOOD = 0x5a3d26, POLY = 0x34352f;
+  // ===== оружие: детальные модели. Каждая пушка — одна геометрия с цветами вершин (одна отрисовка) =====
+  // Оси: z — вперёд по стволу, y — вверх, x — вбок. Рукоять под правую руку около z≈0, y≈-2.6.
+  const GC = { st: 0x2d3034, dk: 0x17181a, bl: 0x45494f, wd: 0x4a2a16, wd2: 0x6b4022, po: 0x2c2e2a, ol: 0x4a5431, ol2: 0x5d6b3c, tn: 0x7d6c48, br: 0xc09a45, cr: 0xa9afb5, rd: 0xa3241a, bk: 0x4f2a16, wh: 0xd4d7da };
+  const GLOW_C = new T.Color(.7, 2.3, 2.7), GLOW_B = new T.Color(.8, 1.5, 2.8), GLOW_O = new T.Color(2.6, 1.3, .35), LENS = new T.Color(.25, .55, .7);
+  const gcyl = {}; const cg = (seg, top = 1) => gcyl[seg + '|' + top] || (gcyl[seg + '|' + top] = new T.CylinderGeometry(top, 1, 1, seg, 1));
+  const gtor = {}; const tg = (t) => gtor[t] || (gtor[t] = new T.TorusGeometry(1, t, 5, 16));
+  const GMUZ = {}, gunGeos = {};
+  function gunGeo(w) {
+    const L = [], H = Math.PI / 2;
+    const box = (c, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0) => L.push([geo.box, RX(x, y, z, sx, sy, sz, rx, ry, rz), c]);
+    const tube = (c, x, y, z, r, l, seg = 12, top = 1) => L.push([cg(seg, top), RX(x, y, z, r, l, r, H), c]); // вдоль z, top — радиус спереди
+    const post = (c, x, y, z, r, l, seg = 10) => L.push([cg(seg), RX(x, y, z, r, l, r), c]); // вертикальный цилиндр
+    const side = (c, x, y, z, r, l, seg = 12) => L.push([cg(seg), RX(x, y, z, r, l, r, 0, 0, H), c]); // цилиндр поперёк (ось x)
+    const ring = (c, x, y, z, R, t = .14) => L.push([tg(t), RX(x, y, z, R, R, R), c]); // кольцо вокруг оси z
+    const ball = (c, x, y, z, sx, sy = sx, sz = sx) => L.push([geo.sph, RX(x, y, z, sx, sy, sz), c]);
+    const prof = (c, pts, wd, bev = .3, x = 0) => { const g = extr(pts, wd, bev, poly); g.rotateY(-H); const U = g.attributes.uv; for (let i = 0; i < U.count; i++) U.setXY(i, U.getX(i) * .1, U.getY(i) * .1); L.push([g, RX(x, 0, 0, 1, 1, 1), c]); }; // боковой профиль [z, y], толщина по x
+    const guard = (z0, z1, y = -1.4, c = GC.po) => { box(c, 0, y - .9, (z0 + z1) / 2, .45, .35, z1 - z0); box(c, 0, y - .4, z1, .45, 1.2, .35); box(GC.dk, 0, y - .45, z0 + (z1 - z0) * .45, .3, 1.1, .35, .35); }; // спусковая скоба + крючок
+    const grip = (c, z = 0, y = -1.2, ang = .28, len = 5, wdt = 1.9) => prof(c, [[z - 1.4, y], [z + 1.5, y], [z + 1.5 - Math.sin(ang) * len, y - len], [z - 1.6 - Math.sin(ang) * len, y - len - .2], [z - 1.9 - Math.sin(ang) * len, y - len + .8]], wdt, .35);
+    let muz = 22;
+    if (w === 1) { // пистолет
+      box(GC.st, 0, 1.25, 3.4, 2, 2, 9.2); box(GC.dk, 0, 2.28, 3.4, 1.4, .1, 8.6);
+      for (let i = 0; i < 5; i++) for (const s of [-1, 1]) box(GC.dk, s * 1.02, 1.3, -.6 + i * .5, .08, 1.5, .2);
+      box(GC.dk, 1.02, 1.5, 4.6, .06, .9, 2.4); // окно выброса
+      box(GC.po, 0, -.05, 3.6, 1.8, 1.2, 8.4); tube(GC.dk, 0, 1.4, 8.05, .42, .3, 10);
+      box(GC.dk, 0, 2.45, 7.4, .35, .5, .6); box(GC.dk, 0, 2.45, -.6, 1.1, .5, .5);
+      guard(1.6, 4.8, -.6); grip(GC.po, -.1, -.4, .25, 5.4, 1.8); box(GC.dk, 0, -5.95, -1.6, 1.9, .5, 3.2, -.25);
+      for (let i = 0; i < 4; i++) box(GC.dk, 0, -1.8 - i * 1, -.6 - i * .26, 1.92, .12, 2.2, -.25); // насечка рукояти
+      muz = 8.3;
+    } else if (w === 8) { // револьвер
+      tube(GC.cr, 0, 1.45, 6.2, .72, 8, 12); box(GC.cr, 0, 2.15, 6.2, .5, .55, 8); tube(GC.cr, 0, .45, 5.2, .32, 5.6, 8); box(GC.cr, 0, .9, 4.6, .4, .9, 3.6);
+      box(GC.dk, 0, 2.6, 9.8, .25, .8, .7); tube(GC.dk, 0, 1.45, 10.22, .4, .1, 10);
+      tube(GC.st, 0, .9, 1.5, 1.75, 3.3, 14); for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; box(GC.dk, Math.sin(a) * 1.68, .9 + Math.cos(a) * 1.68, 1.5, .4, .4, 2.6, 0, 0, -a); tube(GC.br, Math.sin(a) * 1, .9 + Math.cos(a) * 1, -.25, .34, .2, 8); }
+      box(GC.cr, 0, .7, -.7, 1.4, 3.2, 1.8); box(GC.cr, 0, 2.35, 1.5, 1.2, .5, 4.4); box(GC.cr, 0, -.9, 1.6, 1.3, .8, 4.2);
+      box(GC.dk, 0, 2.6, -1.6, .55, 1.3, .9, -.55); guard(.6, 3.2, -.4, GC.cr);
+      prof(GC.wd2, [[-.3, -.2], [-1.2, -.2], [-3.4, -4.8], [-2.6, -6.3], [-.6, -6], [.6, -1.6]], 1.7, .45);
+      ball(GC.cr, 0, -.2, -1.1, .3); muz = 10.3;
+    } else if (w === 2) { // автомат (АК)
+      box(GC.st, 0, 0, 2, 2.2, 3, 10); tube(GC.st, 0, 1.3, 2.4, 1.05, 9.4, 12); box(GC.dk, 1.12, .6, 3, .1, 1, 4); box(GC.st, 1.2, .6, 4.5, .25, .4, 3); ball(GC.st, 1.4, .6, 6, .45);
+      box(GC.st, 0, 2.2, 7.6, 1.2, .9, 1.8); box(GC.st, 1.25, .3, 1.8, .15, .7, 5.6); // прицел, переводчик
+      prof(GC.wd2, [[7, -1.4], [14, -1.2], [14, 1.2], [7, 1.3]], 2.6, .4); for (let i = 0; i < 3; i++) box(GC.wd, 0, -.2, 8.6 + i * 2, 2.75, 1.6, .3);
+      box(GC.wd2, 0, 2.1, 10.6, 1.6, 1.1, 6.4); tube(GC.st, 0, 2.05, 15.2, .5, 2.6); box(GC.st, 0, 1.4, 14.6, 1.4, 1.8, 1.4);
+      tube(GC.dk, 0, .4, 18.5, .55, 11); box(GC.st, 0, 1.4, 21.4, 1.1, 2.4, .9); box(GC.dk, 0, 2.7, 21.4, .25, .8, .3); tube(GC.dk, 0, .4, 24.6, .8, 2.6, 10); for (let i = 0; i < 2; i++) box(GC.st, 0, 1.15, 24 + i * 1.1, 1.3, .4, .4);
+      tube(GC.dk, 0, -.6, 13.6, .3, 6, 8); // шомпол
+      prof(GC.bk, [[4.3, -1.4], [7.3, -1.4], [8.3, -4.4], [9.9, -8.6], [7.4, -9.9], [5.2, -6], [4.2, -2.8]], 1.6, .25); for (let i = 0; i < 4; i++) box(GC.bk, 0, -3 - i * 1.6, 6.2 + i * .75, 1.75, .25, 2.6, .42);
+      guard(1.2, 4.2); grip(GC.bk, -.2, -1.4, .32, 5, 1.8);
+      prof(GC.wd2, [[-3, 1.25], [-3, -1.4], [-6, -2.2], [-16.6, -4.8], [-17, -4.6], [-17, 1.1], [-15, 1.55]], 2.2, .45); box(GC.dk, 0, -1.8, -17.4, 2.4, 6.2, .5);
+      ring(GC.st, 0, -.3, -9, 1.3, .12); muz = 25.9;
+    } else if (w === 3) { // помповый дробовик
+      box(GC.st, 0, 0, 1.5, 2.2, 3, 8); box(GC.dk, 1.12, .6, 2.6, .1, 1.1, 2.6); box(GC.st, 0, 1.55, 1.5, 1.7, .2, 7.6);
+      tube(GC.st, 0, .95, 14, .74, 17); box(GC.st, 0, 1.78, 14, .35, .25, 17); ball(GC.cr, 0, 2.02, 22.3, .32);
+      tube(GC.st, 0, -.95, 12, .68, 13); tube(GC.dk, 0, -.95, 18.7, .74, .7);
+      tube(GC.wd2, 0, -.95, 11, 1.25, 7, 12); for (let i = 0; i < 6; i++) ring(GC.wd, 0, -.95, 8 + i * 1.2, 1.24, .16);
+      box(GC.st, 0, 0, 6.2, 1.2, 1, 1.2);
+      guard(-.2, 3, -1.4); prof(GC.wd2, [[-2.5, 1.4], [-2.5, -1.5], [-1, -1.6], [-1.5, -3.8], [-3.3, -4.3], [-5.2, -2.6], [-15, -4.6], [-15.4, .9], [-6, 1.3]], 2.2, .4);
+      box(GC.dk, 0, -1.85, -15.7, 2.4, 5.6, .8); muz = 22.5;
+    } else if (w === 4) { // снайперская винтовка с оптикой
+      tube(GC.st, 0, 0, 2, 1.25, 10, 14); box(GC.st, 1.55, .2, -.6, 2.2, .35, .35); ball(GC.st, 2.8, .1, -.6, .6);
+      tube(GC.dk, 0, .2, 17, .64, 22, 12, .8); tube(GC.dk, 0, .2, 28.7, .9, 2.2, 8); for (let i = 0; i < 4; i++) box(GC.st, 0, .2, 28 + i * .5, 1.9, .35, .2);
+      tube(GC.dk, 0, 3.3, 3, 1, 10); tube(GC.dk, 0, 3.3, 9.4, 1.55, 3, 14, 1.15); tube(LENS, 0, 3.3, 10.95, 1.35, .12, 14); tube(GC.dk, 0, 3.3, -2.8, 1.25, 2.6, 14, .8); tube(LENS, 0, 3.3, -4.15, .9, .1, 12);
+      post(GC.dk, 0, 4.5, 3, .55, 1.3); side(GC.dk, 1.2, 3.3, 3, .55, 1.2); for (const z of [0, 6]) { box(GC.dk, 0, 2.1, z, 1.2, 1.6, 1); ring(GC.dk, 0, 3.3, z, 1.08, .2); }
+      prof(GC.tn, [[-3, 1.2], [7, 1.1], [7, -.8], [14, -.7], [14, -1.9], [2, -2.2], [.6, -2.2], [-.6, -5.8], [-2.8, -5.8], [-3, -2.6], [-7, -2.2], [-17, -4.4], [-17.2, 1], [-11, 2.2], [-5.5, 2.2]], 2.2, .4);
+      box(GC.dk, 0, -1.7, -17.5, 2.4, 5.6, .6); guard(-.6, 2.6, -1.6, GC.dk); box(GC.dk, 0, -2.4, 3.6, 1.5, 1.6, 3);
+      for (const s of [-1, 1]) box(GC.dk, s * .7, -2.8, 15.5, .4, .4, 7, 0, s * .05); muz = 29.8;
+    } else if (w === 5) { // Узи
+      box(GC.st, 0, .3, 3, 2.4, 3.4, 11); box(GC.dk, 0, 2.05, 3, 1.6, .2, 10.4); box(GC.dk, 0, 2.3, 5.4, .8, .7, .9); box(GC.dk, 1.22, .6, 4.4, .08, 1.2, 3);
+      tube(GC.dk, 0, .4, 9.1, 1, 1.2, 12); tube(GC.dk, 0, .4, 10.6, .55, 2.6); for (const s of [-1, 1]) box(GC.st, s * .5, 2.4, 8, .25, 1.1, .6);
+      prof(GC.po, [[.6, -1.4], [3.8, -1.4], [3.4, -8], [.4, -8]], 2.1, .35); box(GC.dk, 0, -8.3, 1.9, 2.4, .7, 3.6); for (let i = 0; i < 4; i++) box(GC.dk, 0, -3 - i * 1.2, .5, 2.15, .3, .3);
+      guard(3.8, 7, -1.4, GC.st); for (const s of [-1, 1]) box(GC.st, s * 1.1, -.2, -4.4, .25, .25, 9); box(GC.st, 0, -.6, -9, 2.6, 2.6, .5);
+      muz = 12; } else if (w === 7) { // пулемёт ПКМ
+      box(GC.dk, 0, .4, 2.5, 2.6, 3.8, 12); box(GC.st, 0, 2.5, 2.5, 2.2, .6, 10); for (let i = 0; i < 4; i++) box(GC.dk, 0, 2.85, -1.5 + i * 2.6, 2.3, .15, .4);
+      tube(GC.dk, 0, .6, 17, .74, 18); for (let i = 0; i < 6; i++) ring(GC.st, 0, .6, 10 + i * 1.2, .8, .14); tube(GC.dk, 0, .6, 26.6, .95, 2.4, 8);
+      tube(GC.st, 0, -.8, 13.5, .48, 10); box(GC.wd2, 0, 3.6, 11, .7, .8, 4.6); box(GC.st, 0, 2.6, 9, .5, 1.4, .5); box(GC.st, 0, 2.6, 13, .5, 1.4, .5);
+      box(GC.dk, 0, 2.2, 24.4, .35, 2.2, .6); for (const s of [-1, 1]) box(GC.st, s * .6, -1.3, 20.5, .35, .35, 8, 0, s * .04);
+      box(GC.wd2, 0, .9, -9.3, 1.8, 1.4, 12); box(GC.wd2, 0, -3, -9.8, 1.8, 1.2, 11.4, -.24); box(GC.dk, 0, -1.2, -15.8, 2.2, 7, 1.1);
+      grip(GC.wd2, -.6, -1.6, .3, 4.8, 1.8); guard(.8, 3.8, -1.6, GC.dk);
+      box(GC.ol, -2.9, -3.4, 4, 3.2, 5.6, 6.4); box(GC.ol2, -2.9, -.45, 4, 3.4, .5, 6.6); box(GC.st, -4.55, -3.4, 4, .2, 1, 2.4);
+      for (let i = 0; i < 5; i++) side(GC.br, -1.6 + i * .2, .1 + i * .3, 4 - 1.3 + i * .65, .28, 1.4, 6); muz = 27.8;
+    } else if (w === 13) { // миниган
+      tube(GC.st, 0, 0, 2, 2.6, 8, 16); for (let i = 0; i < 3; i++) ring(GC.dk, 0, 0, -.8 + i * 2.6, 2.62, .16); tube(GC.dk, 0, 0, -3.5, 2.1, 3, 14);
+      for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; tube(GC.dk, Math.sin(a) * 1.45, Math.cos(a) * 1.45, 14, .42, 18, 8); tube(GC.st, Math.sin(a) * 1.45, Math.cos(a) * 1.45, 23.1, .5, .4, 8); }
+      tube(GC.st, 0, 0, 7, 2.3, 1.2, 14); tube(GC.st, 0, 0, 14, 2.15, 1, 14); tube(GC.st, 0, 0, 20.5, 2.15, 1, 14); tube(GC.dk, 0, 0, 14, .7, 18, 8);
+      box(GC.dk, 0, 3.8, 2, .8, .8, 6.6); box(GC.dk, 0, 3, -.8, .6, 1.6, .6); box(GC.dk, 0, 3, 4.8, .6, 1.6, .6);
+      box(GC.po, 0, -2.8, -3.6, 1.2, 4.6, 1.6); box(GC.ol, -3.1, -1, 2.6, 1.6, 2.2, 6); box(GC.ol, -3.6, -4.4, 0, 3.4, 5, 7.6); box(GC.ol2, -3.6, -1.75, 0, 3.6, .4, 7.8);
+      muz = 23.4; } else if (w === 10) { // револьверный гранатомёт
+      tube(GC.ol, 0, -.4, 3, 3, 6, 14); for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3 + .52; tube(GC.dk, Math.sin(a) * 1.9, -.4 + Math.cos(a) * 1.9, 6.05, .78, .15, 10); box(GC.ol2, Math.sin(a) * 2.95, -.4 + Math.cos(a) * 2.95, 3, .5, .5, 5.6, 0, 0, -a); }
+      tube(GC.dk, 0, -.4, -.15, 1, .5); tube(GC.ol2, 0, .7, 11.5, 1.45, 11, 14); tube(GC.dk, 0, .7, 17.05, 1.2, .15, 14); for (let i = 0; i < 3; i++) ring(GC.ol, 0, .7, 8 + i * 3, 1.48, .2);
+      box(GC.dk, 0, 2.4, 3, 1, .6, 7.4); box(GC.dk, 0, 2.4, 10, .5, .4, 9); box(GC.dk, 0, 3.4, 8.4, .2, 1.8, .9, -.3);
+      box(GC.po, 0, -3.8, 11.5, 1.3, 4.2, 1.7, .15); grip(GC.po, -1, -2.6, .25, 4.4, 1.9); guard(-.4, 1.8, -2.6);
+      box(GC.dk, 0, .3, -6, 1.4, 1.4, 8.6); box(GC.po, 0, -1, -10.6, 2.3, 6, 1.6); box(GC.dk, 0, -2.4, -6.5, .5, .5, 8);
+      muz = 17; } else if (w === 11) { // огнемёт
+      tube(GC.st, 0, 1, 14, .85, 18, 10); tube(GC.dk, 0, 1, 19.5, 1.5, 7.4, 14); for (let i = 0; i < 5; i++) for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + .4; box(0x050505, Math.sin(a) * 1.52, 1 + Math.cos(a) * 1.52, 16.7 + i * 1.4, .45, .45, .45, 0, 0, -a); }
+      tube(GC.dk, 0, 1, 23.8, 1.15, 1.2, 10, .75); tube(0x2a1408, 0, 1, 24.45, .75, .1, 10);
+      box(GC.dk, 0, -.6, 22.4, .7, .7, 2.2); ball(GLOW_B, 0, -.6, 23.6, .42);
+      for (const s of [-1, 1]) { tube(GC.rd, s * 1.65, -4, 3.5, 1.6, 11, 14); ball(GC.rd, s * 1.65, -4, 9, 1.6, 1.6, 1); ball(GC.rd, s * 1.65, -4, -2, 1.6, 1.6, 1); ring(GC.dk, s * 1.65, -4, 1.5, 1.62, .18); ring(GC.dk, s * 1.65, -4, 6, 1.62, .18); }
+      box(GC.cr, 0, -2.2, 10.2, .8, 1.6, .8); post(GC.cr, 0, -1.2, 10.2, .3, 1.6); side(GC.cr, 0, -2.2, 10.6, .9, 3.5, 12); side(GC.wh, 1.8, -2.2, 10.6, .62, .1, 12);
+      { const cv = new T.CatmullRomCurve3([new T.Vector3(-1.6, -5.6, -2.4), new T.Vector3(-2.6, -6.6, -5), new T.Vector3(-3, -3, -6), new T.Vector3(-2, .4, -2), new T.Vector3(-1, 1, 3)]); L.push([new T.TubeGeometry(cv, 16, .45, 6), new T.Matrix4(), GC.dk]); }
+      grip(GC.po, -.2, -.2, .2, 4.6, 1.8); guard(1, 4, -.2, GC.dk); box(GC.po, 0, -1.8, 14, 1.1, 3.2, 1.4, .1); box(GC.st, 0, 1, 2, 2, 2.4, 5);
+      muz = 24.5; } else if (w === 12) { // базука (РПГ)
+      tube(GC.dk, 0, 1.5, 3, 1.5, 30, 16); tube(GC.wd2, 0, 1.5, -1, 1.78, 7.4, 16); for (const z of [-4.6, 2.6]) ring(GC.dk, 0, 1.5, z, 1.8, .2);
+      tube(GC.dk, 0, 1.5, -14.5, 2.65, 5, 16, 1.5 / 2.65); tube(0x060606, 0, 1.5, -17.02, 2.4, .05, 16); ring(GC.st, 0, 1.5, -17, 2.62, .16);
+      tube(GC.ol, 0, 1.5, 19.6, .85, 3.4, 10); tube(GC.ol2, 0, 1.5, 22.6, 2.4, 3.6, 16); tube(GC.ol2, 0, 1.5, 26.2, 2.4, 3.6, 16, .32); tube(GC.br, 0, 1.5, 28.4, .5, 1, 8, .5); ring(GC.br, 0, 1.5, 20.8, 2.4, .12);
+      for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + .78; box(GC.ol, Math.sin(a) * 1.3, 1.5 + Math.cos(a) * 1.3, 18.8, .12, 1.6, 1.4, 0, 0, -a); }
+      grip(GC.dk, .2, 0, .15, 4.6, 1.8); guard(1.6, 4.4, 0, GC.dk); box(GC.dk, 0, -1, 3, 1.4, 2.2, 5); box(GC.dk, 0, -2.4, 7.4, 1.1, 4.8, 1.5, .15);
+      box(GC.dk, -2.3, 2.9, 2.6, 1.3, 2.1, 4.4); tube(GC.dk, -2.3, 3.2, -.6, .55, 2.4, 10); tube(LENS, -2.3, 3.2, 4.85, .5, .1, 10); box(GC.dk, -1.3, 2.4, 2.6, 1, .6, 1.6);
+      box(GC.dk, 0, 3.3, 11, .3, .9, .4); box(GC.dk, 0, 3.3, 4.5, .3, .9, .4); muz = 29.5;
+    } else if (w === 14) { // арбалет
+      prof(GC.po, [[-14, 1], [-14, -3.6], [-6, -1.8], [-3, -1.6], [-2.4, -6], [-.2, -6], [.6, -1.4], [12, -1.1], [12, .7], [-4, .9]], 2, .4); box(GC.dk, 0, -1.4, -14.3, 2.2, 5, .6);
+      box(GC.st, 0, 1.05, 5, .9, .4, 14); guard(.8, 3.6, -1.4, GC.dk); box(GC.dk, 0, 1.4, 3.6, 1.4, .9, 1.8);
+      box(GC.st, 0, .6, 12.4, 3.4, 2.2, 1.6); for (const s of [-1, 1]) { box(GC.dk, s * 4.4, .7, 11.2, 9, .9, 1.4, 0, s * .32); box(GC.st, s * 8.6, .7, 9.6, .7, 1.1, .7); }
+      for (const s of [-1, 1]) box(0xdccfb0, s * 4.3, .9, 6.5, 10.6, .16, .16, 0, -s * Math.atan2(6.1, 8.6));
+      tube(GC.cr, 0, 1.6, 9, .2, 13, 6); tube(GC.dk, 0, 1.6, 16.1, .5, 1.6, 8, .06); for (let k = 0; k < 3; k++) { const a = k * 2.094; box(GC.rd, Math.sin(a) * .5, 1.6 + Math.cos(a) * .5, 3.4, .08, .9, 2, 0, 0, -a); }
+      tube(GC.dk, 0, 3.1, 1.5, .75, 6.4, 12); tube(LENS, 0, 3.1, 4.75, .65, .1, 12); for (const z of [-.4, 3.4]) box(GC.dk, 0, 2.2, z, .8, 1.4, .7);
+      box(GC.st, 0, -.2, 14.4, .3, 2.4, 2.6); muz = 17;
+    } else if (w === 15) { // обрез двустволки
+      for (const s of [-1, 1]) { tube(GC.st, s * .76, .9, 8, .76, 10); tube(0x070707, s * .76, .9, 13.02, .55, .06, 10); }
+      box(GC.st, 0, 1.62, 8, .45, .3, 10); box(GC.st, 0, .6, 1.5, 2.2, 2.6, 4.2); box(GC.cr, 0, .2, 1.4, 2.25, 1.6, 3.2);
+      prof(GC.wd2, [[3.6, -.1], [9, .1], [9, -.9], [3.6, -1.2]], 2.2, .35); for (const s of [-1, 1]) box(GC.dk, s * .6, 2.3, -.4, .35, 1.2, .5, -.6);
+      box(GC.cr, 0, 2.1, 1.2, .5, .5, 2.4, .2); guard(.6, 3, -.8, GC.dk);
+      prof(GC.wd2, [[-.5, 1.7], [-.5, -.8], [-2.6, -4.4], [-4.8, -4.4], [-4.4, -1.8], [-3, 1.7]], 2, .45); muz = 13.1;
+    } else if (w === 16) { // автоматический дробовик с барабаном
+      box(GC.po, 0, .6, 2, 2.6, 4, 13); box(GC.dk, 1.32, 1.2, 3, .08, 1.2, 4); box(GC.dk, 0, 3.3, 3, .9, .9, 7); box(GC.dk, 0, 2.8, .2, .6, 1, .6); box(GC.dk, 0, 2.8, 6, .6, 1, .6);
+      tube(GC.dk, 0, .8, 14, .9, 11); tube(GC.po, 0, .8, 11.2, 1.45, 5.4, 12); for (let i = 0; i < 3; i++) for (const s of [-1, 1]) box(0x050505, s * 1.42, .8, 9.6 + i * 1.6, .1, .7, .9);
+      tube(GC.dk, 0, .8, 20, 1.15, 1.8, 8); for (let i = 0; i < 3; i++) box(GC.dk, 0, 1.95, 19.5 + i * .55, 1.5, .4, .25);
+      side(GC.po, 0, -5, 4.2, 4, 2.8, 20); side(GC.dk, 0, -5, 4.2, 4.05, .6, 20); side(GC.dk, 0, -5, 4.2, 1.2, 3, 10);
+      box(GC.po, 0, -2.2, 12.5, 1.2, 3.6, 1.5, .1); grip(GC.po, -.8, -1.4, .28, 4.8, 1.9); guard(.2, 3.2, -1.4, GC.dk);
+      box(GC.po, 0, .5, -8.6, 2.2, 3.4, 8.4); box(GC.dk, 0, -.1, -13.2, 2.4, 5, .9); muz = 21;
+    } else if (w === 17) { // плазмаган
+      prof(0x9aa3ad, [[-9, 1.6], [-9, -2.2], [-6.5, -2.2], [-3, -1], [6, -1.2], [12, -.6], [14.5, .4], [13, 2.2], [4, 2.6], [-3, 2.4]], 2.4, .4); box(GC.dk, 0, -.2, -7.6, 2.6, 3.6, .5);
+      box(GC.dk, 0, .6, 3, 2.9, 1.4, 14); for (const s of [-1, 1]) box(GLOW_C, s * 1.46, .62, 3, .06, .5, 12);
+      tube(GC.dk, 0, .6, 18, 1, 6, 12); for (let i = 0; i < 4; i++) ring(GLOW_C, 0, .6, 15.6 + i * 1.6, 1.35, .26); tube(GLOW_C, 0, .6, 21.05, .6, .1, 12);
+      post(GLOW_C, 0, -3.6, 3.4, 1.05, 3.6, 12); post(GC.dk, 0, -1.6, 3.4, 1.2, .6, 12); post(GC.dk, 0, -5.6, 3.4, 1.2, .6, 12);
+      grip(GC.dk, -2.6, -1.8, .25, 4.4, 1.9); guard(-1.4, 1.4, -1.8, GC.dk); box(GC.dk, 0, 4, 2, 1, 1.2, 5); tube(GLOW_C, 0, 4, 4.55, .4, .1, 10);
+      muz = 21.2; } else if (w === 18) { // рельсотрон
+      box(GC.dk, 0, 2.3, 12, 1.6, 1, 27); box(GC.dk, 0, -1.1, 12, 1.6, 1, 27); box(GLOW_B, 0, .6, 13, .5, .5, 25); for (let i = 0; i < 6; i++) { ring(GC.st, 0, .6, 4 + i * 3.6, 2.6, .32); box(GC.st, 0, .6, 4 + i * 3.6, 3.6, 4.6, .3); }
+      prof(0x30343a, [[-4, 3], [6, 3], [6, -2], [2, -2.4], [-4, -2.4]], 3, .4); for (const s of [-1, 1]) for (let i = 0; i < 3; i++) post(0x3a5c8c, s * 1, -3.6, -1.6 + i * 2.6, .78, 2.6, 10);
+      prof(0x30343a, [[-4, 2], [-4, -1.4], [-7, -1.6], [-14, -3.8], [-15, -3.8], [-15, 1.2], [-8, 1.4]], 2, .4); grip(GC.dk, .2, -2.4, .25, 4.2, 1.9); guard(1.4, 4.2, -2.4, GC.dk);
+      box(GC.dk, 0, 4.4, 2, 1, 1.6, 6); tube(GLOW_B, 0, 4.4, 5.05, .45, .1, 10); ball(GLOW_B, 0, .6, 25.6, .7); muz = 26;
+    } else if (w === 19) { // ракетница: 4 трубы
+      for (const sx of [-1, 1]) for (const sy of [-1, 1]) { tube(GC.ol, sx * 1.15, 1.6 + sy * 1.15, 8, 1.05, 18, 12); tube(GC.rd, sx * 1.15, 1.6 + sy * 1.15, 16.6, .7, .7, 10, .4); tube(0x0a0a0a, sx * 1.15, 1.6 + sy * 1.15, -1.02, .85, .05, 10); }
+      for (const z of [1.5, 8, 14.5]) box(GC.dk, 0, 1.6, z, 4.8, 4.8, 1);
+      grip(GC.po, .2, -.8, .2, 4.4, 1.9); guard(1.4, 4.4, -.8, GC.dk); box(GC.po, 0, -2.4, 9, 1.2, 3.6, 1.5, .1); box(GC.dk, 0, -.3, 3, 1.4, 1, 6);
+      box(GC.dk, -3, 2.4, 4, 1.2, 1.8, 3.6); tube(LENS, -3, 2.4, 5.85, .5, .1, 10); muz = 18;
+    } else { box(GC.st, 0, 0, 3, 2.4, 3, 10); tube(GC.st, 0, .4, 12, .6, 10); }
+    GMUZ[w] = muz; return mergeG(L);
+  }
+  const gunMat = lam(0xffffff, { vertexColors: true });
   function gunMesh(w, rar) {
-    const g = new T.Group();
-    const b = (c, x, y, z, sx, sy, sz, rx = 0) => { const o = new T.Mesh(geo.box, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.x = rx; g.add(o); return o; };
-    const tube = (c, x, y, z, r, l) => { const o = new T.Mesh(geo.cyl10, lam(c)); o.position.set(x, y, z); o.scale.set(r, l, r); o.rotation.x = Math.PI / 2; g.add(o); return o; };
-    let band = 2;
-    if (w === 1) { b(METAL, 0, 1, 3, 2, 2.4, 8); b(POLY, 0, -2, .5, 1.8, 4.5, 2.4, -.25); band = 1.5; } // пистолет
-    else if (w === 2) { b(METAL, 0, 0, 3, 2.4, 3.4, 10); b(POLY, 0, 0, 11, 2.8, 2.8, 7); tube(METAL, 0, .4, 17.5, .7, 7); b(METAL, 0, -4, 4.5, 2, 6, 3, .3); b(POLY, 0, -.3, -5, 2.2, 3.6, 7); b(POLY, 0, -3, 0, 1.8, 4, 2.2, -.3); b(0x111111, 0, 2.6, 3, 1.4, 1.8, 3); } // автомат
-    else if (w === 3) { b(METAL, 0, 0, 2, 2.4, 3, 8); tube(METAL, 0, .8, 13, .9, 16); tube(METAL, 0, -.9, 11, .8, 12); b(WOOD, 0, -.9, 11, 2.4, 2.4, 6); b(WOOD, 0, -.6, -6, 2.2, 3.8, 9); } // дробовик
-    else if (w === 4) { b(METAL, 0, 0, 2, 2.4, 3, 10); tube(METAL, 0, .4, 17, .7, 20); tube(0x111111, 0, 3.2, 3, 1.4, 10); b(WOOD, 0, -.5, -7, 2.4, 4.2, 10); b(WOOD, 0, -1, 9, 2.6, 2.8, 6); b(METAL, 0, -3.4, 2, 1.8, 3, 2.4); } // снайперка
-    else if (w === 5) { b(METAL, 0, 0, 2.5, 2.4, 3.6, 8); tube(METAL, 0, .6, 9, .7, 5); b(METAL, 0, -5, 3, 1.8, 8, 2.2, .1); b(METAL, 0, 0, -4, .8, 2.6, 6); b(POLY, 0, -3, -.5, 1.8, 4, 2.2, -.3); } // ПП
-    else if (w === 6) { b(METAL, 0, 0, 2, 2.4, 3, 10); tube(METAL, 0, .4, 14, .7, 14); tube(0x111111, 0, 3, 3, 1.1, 7); b(WOOD, 0, -.5, -6.5, 2.4, 4, 9); b(WOOD, 0, -.6, 9, 2.6, 2.6, 7); b(METAL, 0, -4, 3.5, 1.8, 5, 2.4, .2); } // винтовка
-    else if (w === 7) { b(POLY, 0, 0, 3, 3, 4, 12); tube(METAL, 0, .6, 15, .9, 12); b(0x3d4a2a, 2.4, -3, 4, 3.4, 5, 6); b(POLY, 0, -.3, -6, 2.4, 3.8, 8); b(METAL, 0, -4, 13, .6, 7, .6, .5); b(POLY, 0, 2.6, 6, 2, 1.4, 6); } // пулемёт
-    else if (w === 8) { b(METAL, 0, 1.4, 5, 1.6, 1.6, 8); tube(0x3a3a3a, 0, .6, 1.5, 1.6, 3.2); b(WOOD, 0, -2.4, -.5, 1.8, 5, 2.4, -.35); } // револьвер
-    else if (w === 10) { tube(0x3d4a2a, 0, 0, 8, 2.6, 18); b(0x2a2a2a, 0, -1, -2, 3, 4, 8); b(0x2a2a2a, 0, -4, 3, 2, 6, 2.6, .3); b(0x111111, 0, 3, 4, 1.4, 2, 4); } // гранатомёт
-    else if (w === 11) { tube(0x555a60, 0, 1, 12, 1.2, 16); b(0xc0392b, 0, -4, 3, 4.5, 7, 7); b(0x2a2a2a, 0, -1, -3, 2.4, 3.6, 7); b(0xffa040, 0, 1, 20.5, 1.6, 1.6, 1); } // огнемёт
-    else if (w === 9) { b(0x1e1e1e, 0, 0, 3, 2.4, 3.2, 9); b(0x1e1e1e, 0, 0, 10, 2.6, 2.6, 6); tube(METAL, 0, .4, 15, .6, 6); b(0x1e1e1e, 0, -3.8, 4, 1.8, 5, 2.6, .25); b(0x1e1e1e, 0, 0, -4.5, 2, 3, 6); b(0x111111, 0, 2.6, 3, 1.4, 2, 2.6); b(0xff3030, 0, 3.8, 3, .5, .5, .5); } // карабин
-    if (rar > 0) b(new T.Color(RARITY[rar]).getHex(), 0, 0, band, 2.7, 3.2, 1.2); // полоска редкости
-    return g;
+    const k = w + '|' + (rar || 0); let g = gunGeos[k];
+    if (!g) { const base = gunGeos[w + '|0'] || (gunGeos[w + '|0'] = gunGeo(w)); g = base;
+      if (rar > 0) { g = mergeG([[base, new T.Matrix4(), 0xffffff], [geo.box, RX(0, -.2, -2.6, 2.5, .8, 1.2), new T.Color(RARITY[rar]).getHex()]]); gunGeos[k] = g; } }
+    const grp = new T.Group(), m = new T.Mesh(g, gunMat); grp.add(m); grp.userData.muz = GMUZ[w] || 22; return grp;
   }
   // Один снимок на пушку. Лента показывает обычные картинки, без 3D-рендера при свайпе.
   const weaponImages = new Map(), weaponImageMaterials = new Map();
@@ -1460,25 +1596,7 @@ void main(){
       weaponImageCamera = new T.OrthographicCamera(-1, 1, 1, -1, .1, 250);
     }
     const gun = gunMesh(ZW[id].m, 0);
-    // Некоторые пушки используют общую модель в бою. На маленькой карточке выделяем их главную примету.
-    if (id === 5) gun.scale.z = .58;
-    if (id === 10 || id === 11 || id === 12 || id === 13) {
-      const color = { 10: 0x888d93, 11: 0x718488, 12: 0x40d8e8, 13: 0xc080fb }[id];
-      const collar = new T.Mesh(geo.cyl10, lam(color));
-      collar.position.set(0, .4, id === 13 ? 17 : 13);
-      collar.rotation.x = Math.PI / 2;
-      collar.scale.set(id === 10 ? 2.3 : 1.65, id === 10 ? 13 : 7, id === 10 ? 2.3 : 1.65);
-      gun.add(collar);
-    }
-    gun.traverse(part => {
-      if (!part.isMesh) return;
-      const color = part.material.color.getHex();
-      if (!weaponImageMaterials.has(color)) {
-        const paint = new T.Color(color).lerp(new T.Color(0xc2b9aa), .28);
-        weaponImageMaterials.set(color, new T.MeshLambertMaterial({ color: paint }));
-      }
-      part.material = weaponImageMaterials.get(color);
-    });
+    { const src = gun.children[0].geometry, gg = src.clone(), C = gg.attributes.color, tint = new T.Color(0xc2b9aa); for (let i = 0; i < C.count; i++) { const c = new T.Color(C.getX(i), C.getY(i), C.getZ(i)); if (c.r > 1.2 || c.g > 1.2 || c.b > 1.2) continue; c.lerp(tint, .28); C.setXYZ(i, c.r, c.g, c.b); } gun.children[0].geometry = gg; gun.children[0].material = weaponImageMaterials.get(0) || (weaponImageMaterials.set(0, new T.MeshLambertMaterial({ vertexColors: true })), weaponImageMaterials.get(0)); }
     const bounds = new T.Box3().setFromObject(gun), center = bounds.getCenter(new T.Vector3());
     const size = bounds.getSize(new T.Vector3());
     const half = Math.max(9, Math.max(size.z, size.y * 2) * .60);
@@ -1666,10 +1784,10 @@ void main(){
   const ONEH = w => w === 1 || w === 8; // пистолет, револьвер — одной рукой
   function setGun(c, wb) {
     const u = c.userData; if (u.gunKey === wb) return; u.gunKey = wb;
-    u.gunHold.clear(); u.handHold.clear(); const w = wb & 15;
+    u.gunHold.clear(); u.handHold.clear(); const w = wb & 31;
     if (u.civ) u.itemG.visible = !w; // житель взял оружие — вещь убираем
-    if (w) { const gm = gunMesh(w, wb >> 4); gm.traverse(o => { if (o.isMesh) o.castShadow = true; });
-      if (ONEH(w)) { gm.position.set(0, 2.2, -.6); u.handHold.add(gm); u.gunNode = u.handHold; u.muz = 10; } else { u.gunHold.add(gm); u.gunNode = u.gunHold; u.muz = 22; } }
+    if (w) { const gm = gunMesh(w, wb >> 5); gm.traverse(o => { if (o.isMesh) o.castShadow = true; });
+      if (ONEH(w)) { gm.position.set(0, 2.2, -.6); u.handHold.add(gm); u.gunNode = u.handHold; u.muz = gm.userData.muz + 1.5; } else { u.gunHold.add(gm); u.gunNode = u.gunHold; u.muz = gm.userData.muz; } }
   }
   // руки к точке: плечо + локоть (простая двухзвенная IK), локти смотрят вниз-наружу
   const _ik = { t: new T.Vector3(), h: new T.Vector3(), q: new T.Quaternion(), q2: new T.Quaternion(), p: new T.Vector3() };
@@ -1680,7 +1798,7 @@ void main(){
     _ik.h.set(0, -A - Bn * Math.cos(th), Bn * Math.sin(th)).normalize(); t.normalize();
     sh.quaternion.setFromUnitVectors(_ik.h, t); _ik.q2.setFromAxisAngle(t, side * .55); sh.quaternion.premultiply(_ik.q2);
   }
-  const GRIP = new T.Vector3(0, -2.6, .4), FORE = { 2: 10, 3: 11, 4: 9, 5: 4, 6: 9, 7: 12, 9: 9 };
+  const GRIP = new T.Vector3(0, -2.6, .4), FORE = { 2: 10, 3: 11, 4: 10, 5: 5, 7: 13, 10: 11, 11: 13, 12: 7, 13: 4, 14: 8, 15: 6, 16: 12, 17: 11, 18: 10, 19: 9 };
   function sectAcc(c, s) {
     const u = c.userData; if (u.accS === s) return; u.accS = s;
     for (const g of u.acc || []) g.parent && g.parent.remove(g); u.acc = [];
@@ -1701,7 +1819,7 @@ void main(){
     if (opt.dead) u.yaw = tgt; else if (jump) u.yaw = tgt; else u.yaw += angD(u.yaw, tgt) * Math.min(1, dt * (opt.fire ? 28 : 12)); // корпус поворачивается плавно
     c.position.set(p[0], opt.alt || 0, p[1]); c.rotation.set(0, u.yaw, 0);
     const sy = Math.sin(u.yaw), cy = Math.cos(u.yaw), fwd = u.vx * sy + u.vz * cy, side = u.vx * cy - u.vz * sy;
-    const B = u.body, armed = (opt.wb & 15) > 0;
+    const B = u.body, armed = (opt.wb & 31) > 0;
     // сброс позы
     B.position.set(0, 0, 0); B.rotation.set(0, 0, 0); u.head.rotation.set(0, 0, 0);
     u.vest.visible = !!opt.armor; u.shadow.visible = !opt.alt;
@@ -1736,7 +1854,7 @@ void main(){
     B.rotation.y = s1 * .08 * a; // корпус качается в такт шагам
     B.rotation.x = Math.max(-.12, Math.min(.22, fwd / SPEED * .2)) + run * .05; // наклон в беге
     B.rotation.z = Math.max(-.14, Math.min(.14, -side / SPEED * .14)) + (limp ? Math.sin(ph) * .09 : 0);
-    const w = opt.wb & 15, one = ONEH(w), sw = (.5 + run * .4) * a;
+    const w = opt.wb & 31, one = ONEH(w), sw = (.5 + run * .4) * a;
     u.fireT = opt.fire ? 0 : u.fireT + dt; u.ready += ((u.fireT < 1.6 ? 1 : 0) - u.ready) * Math.min(1, dt * 9); // стрелял недавно — оружие у плеча
     if (!w || one) { // свободные руки машут в противофазе ногам
       u.armL.rotation.set(-s1 * sw, 0, -.12 - run * .1); u.elL.rotation.set(-.25 - run * .9 * a, 0, 0);
@@ -1807,11 +1925,20 @@ void main(){
   const _bm = new T.Matrix4(), _bq = new T.Quaternion(), _bv = new T.Vector3(), _bs = new T.Vector3(), _be = new T.Euler(), _bc = new T.Color(), _bw = new T.Color(1, 1, 1);
   function putStreak(m, i, a, b, h, w, col, k = 1) { const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz); if (l < .01) { m.setMatrixAt(i, _bm.makeScale(0, 0, 0)); return; }
     m.setMatrixAt(i, _bm.compose(_bv.set((a[0] + b[0]) / 2, h, (a[1] + b[1]) / 2), _bq.setFromEuler(_be.set(0, -Math.atan2(dz, dx), 0)), _bs.set(l, 1, w))); m.setColorAt(i, _bc.copy(col).multiplyScalar(k)); }
+  // снаряды, которые видно в полёте: ракета базуки, болт арбалета, малые ракеты (вдоль +x)
+  const PJ = (() => { const Z = -Math.PI / 2, c = (seg, top = 1) => new T.CylinderGeometry(top, 1, 1, seg);
+    const rocket = mergeG([[c(12), RX(4, 0, 0, 2.4, 4, 2.4, 0, 0, Z), GC.ol2], [c(12, .3), RX(8, 0, 0, 2.4, 4, 2.4, 0, 0, Z), GC.ol2], [c(8), RX(10.4, 0, 0, .5, 1, .5, 0, 0, Z), GC.br], [c(10), RX(.6, 0, 0, .85, 3.2, .85, 0, 0, Z), GC.ol], [c(10), RX(-5, 0, 0, 1, 8, 1, 0, 0, Z), GC.dk],
+      ...[0, 1, 2, 3].map(k => [geo.box, RX(-8, 0, 0, 3, .2, 4.4, k * Math.PI / 4, 0, 0), GC.ol]), [geo.sph, RX(-9.4, 0, 0, 1.6, 1.1, 1.1), GLOW_O]]);
+    const bolt = mergeG([[c(6), RX(0, 0, 0, .3, 16, .3, 0, 0, Z), GC.cr], [c(8, .05), RX(8.8, 0, 0, .6, 1.8, .6, 0, 0, Z), GC.dk], ...[0, 1, 2].map(k => [geo.box, RX(-6.6, 0, 0, 2.4, .1, 1.2, k * 1.047, 0, 0), GC.rd])]);
+    const mk = (g) => { const m = new T.InstancedMesh(g, gunMat, 24); m.frustumCulled = false; m.count = 0; m.castShadow = true; scene.add(m); return m; };
+    return { 1: mk(rocket), 2: mk(bolt), 3: mk(rocket) }; })(), PJS = { 1: 1, 2: 1, 3: .55 }, _pn = { 1: 0, 2: 0, 3: 0 };
   function drawBullets(list, trails) {
     let n = 0;
     for (const b of list) { if (n >= BN) break; const head = Math.min(b.s, b.end), tail = Math.max(0, Math.min(b.end, b.s - b.bl)); if (head - tail < .5) continue;
+      if (b.W.proj && PJ[b.W.proj] && b.s < b.end + 4) { const k = b.W.proj, m = PJ[k]; if (_pn[k] < 24) { const h_ = add(b.from, b.d, head), sc = PJS[k]; m.setMatrixAt(_pn[k]++, _bm.compose(_bv.set(h_[0], 23, h_[1]), _bq.setFromEuler(_be.set(k === 2 ? 0 : b.s * .05, -Math.atan2(b.d[1], b.d[0]), 0, 'YXZ')), _bs.set(sc, sc, sc))); } if (k === 2) continue; }
       const A = add(b.from, b.d, tail), Bp = add(b.from, b.d, head); _bc.setHex(b.bc || 0xffe066); const col = _bc.clone();
       putStreak(bShadow, n, A, Bp, 1.4, (b.bw || 2.4) * 1.6, col, 1); putStreak(bGlow, n, A, Bp, 23, (b.bw || 2.4) * 4, col, .7); putStreak(bCore, n, A, Bp, 23.2, (b.bw || 2.4) * 1.3, col.lerp(_bw, .5), 1); n++; }
+    for (const k in PJ) { PJ[k].count = _pn[k]; PJ[k].instanceMatrix.needsUpdate = true; _pn[k] = 0; }
     bCore.count = bGlow.count = bShadow.count = n; bCore.instanceMatrix.needsUpdate = bGlow.instanceMatrix.needsUpdate = bShadow.instanceMatrix.needsUpdate = true; if (n) bCore.instanceColor.needsUpdate = bGlow.instanceColor.needsUpdate = true;
     let m = 0; for (const t of trails) { if (m >= 40) break; const k = Math.max(0, 1 - t.t / t.life); _bc.setHex(t.c); putStreak(bTrail, m++, t.a, t.b, 22.8, t.w * (1 + t.t * 2), _bc.clone(), k * k * t.k); }
     bTrail.count = m; bTrail.instanceMatrix.needsUpdate = true; if (m) bTrail.instanceColor.needsUpdate = true;
@@ -1936,5 +2063,5 @@ void main(){
     if (st.extra) st.extra(dt, now);
     renderer.render(scene, camera);
   }
-  return { weaponImage, ruin: () => ({ decals: ruinDecals, v: ruinV, fires: fireSpots, plumes: plumeSrc }), scene, camera, MAT, smashWall, flash: (p, h, s) => flashAt(at(p, h), s), puff: (p, h) => puffAt(at(p, h)), hitNear: (objs, p) => hitNear(objs, p), chars, frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt, altarBroken, breakGlass, reviveObj, boom, objState, debris: (p, h, n, col, sp, sz) => debrisAt(at(p, h), n, col, sp, sz) };
+  return { gunMesh, flameJet, weaponImage, ruin: () => ({ decals: ruinDecals, v: ruinV, fires: fireSpots, plumes: plumeSrc }), scene, camera, MAT, smashWall, flash: (p, h, s) => flashAt(at(p, h), s), puff: (p, h) => puffAt(at(p, h)), hitNear: (objs, p) => hitNear(objs, p), chars, frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt, altarBroken, breakGlass, reviveObj, boom, objState, debris: (p, h, n, col, sp, sz) => debrisAt(at(p, h), n, col, sp, sz) };
 })();

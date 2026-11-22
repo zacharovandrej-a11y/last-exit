@@ -436,15 +436,18 @@ const ZW = [ // bv/bl/bw/bc — вид пули: скорость, длина, �
   { n: 'Дробовик', dmg: 15, rate: 1.4, mag: 8, rel: 2.0, spread: .3, pel: 9, range: 300, wave: 3, m: 3, gore: 3, bv: 2000, bl: 18, bw: 2.2, bc: 0xffb84a, kick: 3.2, kb: 6 },
   { n: 'Автомат', dmg: 22, rate: 9, mag: 30, rel: 1.8, spread: .05, pel: 1, range: 620, wave: 5, m: 2, gore: 2, bv: 2900, bl: 44, bw: 2.4, bc: 0xffe066, kick: .9, kb: 8 },
   { n: 'Револьвер', dmg: 70, rate: 2, mag: 6, rel: 1.6, spread: .02, pel: 1, range: 560, wave: 6, m: 8, gore: 3, oneh: 1, pierce: 2, bv: 3000, bl: 52, bw: 3.4, bc: 0xfff0a0, kick: 2.4, kb: 20 },
-  { n: 'Обрез', dmg: 19, rate: 2.6, mag: 2, rel: 1.1, spread: .45, pel: 12, range: 220, wave: 7, m: 3, gore: 4, bv: 1800, bl: 16, bw: 2.4, bc: 0xffa040, kick: 4, kb: 7 },
+  { n: 'Обрез', dmg: 19, rate: 2.6, mag: 2, rel: 1.1, spread: .45, pel: 12, range: 220, wave: 7, m: 15, gore: 4, bv: 1800, bl: 16, bw: 2.4, bc: 0xffa040, kick: 4, kb: 7 },
+  { n: 'Арбалет', dmg: 120, rate: 1.5, mag: 5, rel: 1.6, spread: .006, pel: 1, range: 760, wave: 8, m: 14, gore: 3, pierce: 4, bv: 1700, bl: 26, bw: 1.8, bc: 0xe8dcc0, kick: 1, kb: 16, proj: 2 },
   { n: 'Пулемёт', dmg: 20, rate: 13, mag: 100, rel: 3.2, spread: .09, pel: 1, range: 640, wave: 9, m: 7, gore: 2, bv: 2900, bl: 46, bw: 2.6, bc: 0xffcf50, kick: 1, kb: 7 },
   { n: 'Снайперка', dmg: 170, rate: 1.3, mag: 6, rel: 2.0, spread: .004, pel: 1, range: 1300, wave: 11, m: 4, gore: 4, pierce: 6, bv: 5200, bl: 150, bw: 2.8, bc: 0xffffff, kick: 3.5, kb: 30, trail: 1 },
   { n: 'Гранатомёт', dmg: 150, rate: 1.2, mag: 6, rel: 2.4, spread: .02, pel: 1, range: 700, wave: 13, m: 10, gore: 5, boom: 95, bv: 1100, bl: 14, bw: 5, bc: 0xffa040, kick: 2.5, kb: 0, trail: 2 },
   { n: 'Огнемёт', dmg: 7, rate: 20, mag: 150, rel: 2.4, spread: .22, pel: 1, range: 210, wave: 15, m: 11, gore: 1, fire: 1, pierce: 3, kick: .3, kb: 1 },
-  { n: 'Миниган', dmg: 19, rate: 26, mag: 300, rel: 4.5, spread: .12, pel: 1, range: 620, wave: 18, m: 7, gore: 3, bv: 3000, bl: 40, bw: 2.4, bc: 0xffd860, kick: .7, kb: 6 },
-  { n: 'Авто-дробовик', dmg: 14, rate: 5, mag: 20, rel: 2.6, spread: .32, pel: 8, range: 300, wave: 21, m: 3, gore: 4, bv: 2000, bl: 18, bw: 2.2, bc: 0xffa040, kick: 2.2, kb: 6 },
-  { n: 'Плазмаган', dmg: 55, rate: 6, mag: 40, rel: 2.0, spread: .03, pel: 1, range: 720, wave: 24, m: 9, gore: 4, pierce: 4, bv: 1900, bl: 30, bw: 6, bc: 0x5ff0ff, kick: 1.2, kb: 14, plasma: 1 },
-  { n: 'Рельсотрон', dmg: 420, rate: .8, mag: 4, rel: 2.6, spread: 0, pel: 1, range: 1600, wave: 27, m: 4, gore: 6, pierce: 99, bv: 9000, bl: 400, bw: 4, bc: 0x8fd0ff, kick: 5, kb: 40, trail: 3 },
+  { n: 'Базука', dmg: 280, rate: .7, mag: 1, rel: 2.0, spread: .01, pel: 1, range: 820, wave: 16, m: 12, gore: 6, boom: 150, bv: 950, bl: 18, bw: 5, bc: 0xffb050, kick: 5, kb: 0, trail: 4, proj: 1 },
+  { n: 'Миниган', dmg: 19, rate: 26, mag: 300, rel: 4.5, spread: .12, pel: 1, range: 620, wave: 18, m: 13, gore: 3, bv: 3000, bl: 40, bw: 2.4, bc: 0xffd860, kick: .7, kb: 6 },
+  { n: 'Авто-дробовик', dmg: 14, rate: 5, mag: 20, rel: 2.6, spread: .32, pel: 8, range: 300, wave: 21, m: 16, gore: 4, bv: 2000, bl: 18, bw: 2.2, bc: 0xffa040, kick: 2.2, kb: 6 },
+  { n: 'Плазмаган', dmg: 55, rate: 6, mag: 40, rel: 2.0, spread: .03, pel: 1, range: 720, wave: 24, m: 17, gore: 4, pierce: 4, bv: 1900, bl: 30, bw: 6, bc: 0x5ff0ff, kick: 1.2, kb: 14, plasma: 1 },
+  { n: 'Рельсотрон', dmg: 420, rate: .8, mag: 4, rel: 2.6, spread: 0, pel: 1, range: 1600, wave: 27, m: 18, gore: 6, pierce: 99, bv: 9000, bl: 400, bw: 4, bc: 0x8fd0ff, kick: 5, kb: 40, trail: 3 },
+  { n: 'Ракетница', dmg: 90, rate: 3.5, mag: 12, rel: 2.6, spread: .07, pel: 1, range: 760, wave: 29, m: 19, gore: 5, boom: 75, bv: 1250, bl: 14, bw: 3.6, bc: 0xffb050, kick: 1.8, kb: 0, trail: 4, proj: 3 },
 ];
 // зомби. ab — умения: 1 перепрыгивает заборы, 2 лезет в окна, 4 ломает стены/окна/заборы/машины
 const ZT = [

@@ -168,7 +168,8 @@ let outHits = [], outShots = [], outBooms = [], outObj = [], outGlass = [];
 const HITOBJ = new Set(['car', 'truck', 'bus', 'barrel', 'crate']);
 function addBullet(W, from, d, end, ev) {
   const b = { from, d, end, s: 0, v: (W.bv || 2600) * (W.pel > 1 ? .85 + Math.random() * .3 : 1), bl: (W.bl || 30) * 1.5, bw: W.bw || 2.4, bc: W.bc || 0xffe066, ev, W, done: false };
-  if (W.trail) { const tr = { a: from, b: from, t: 0, life: W.trail === 3 ? .9 : W.trail === 2 ? .7 : .55, c: W.trail === 3 ? 0x5aa8ff : W.trail === 2 ? 0x6a6660 : 0x8a8a8a, w: W.trail === 3 ? 6 : W.trail === 2 ? 5 : 2.6, k: W.trail === 3 ? 1 : .55, follow: b }; trails.push(tr); }
+  if (W.trail === 4) { const tr = { a: from, b: from, t: 0, life: 1.6, c: 0x8a8580, w: W.proj === 3 ? 6 : 9, k: .75, follow: b }; trails.push(tr); }
+  else if (W.trail) { const tr = { a: from, b: from, t: 0, life: W.trail === 3 ? .9 : W.trail === 2 ? .7 : .55, c: W.trail === 3 ? 0x5aa8ff : W.trail === 2 ? 0x6a6660 : 0x8a8a8a, w: W.trail === 3 ? 6 : W.trail === 2 ? 5 : 2.6, k: W.trail === 3 ? 1 : .55, follow: b }; trails.push(tr); }
   tracers.push(b); return b;
 }
 function stepBullets(dt) {
@@ -238,7 +239,7 @@ function sfx(k, v = 1) {
   if (!A || v <= .02) return; const now = A.currentTime, g = A.createGain(); g.connect(A.destination);
   const noise = (f, d, gain, type = 'lowpass') => { const s = A.createBufferSource(); s.buffer = noiseB; const fl = A.createBiquadFilter(); fl.type = type; fl.frequency.value = f; s.connect(fl); fl.connect(g); g.gain.setValueAtTime(gain * v, now); g.gain.exponentialRampToValueAtTime(.001, now + d); s.start(now, Math.random() * .5); s.stop(now + d); };
   const tone = (f0, f1, d, gain, type = 'sine') => { const o = A.createOscillator(); o.type = type; o.connect(g); o.frequency.setValueAtTime(f0, now); o.frequency.exponentialRampToValueAtTime(f1, now + d); g.gain.setValueAtTime(gain * v, now); g.gain.exponentialRampToValueAtTime(.001, now + d); o.start(now); o.stop(now + d); };
-  if (k.startsWith('shot')) { const w = ZW[+k.slice(4)] || ZW[0]; if (w.fire) noise(700, .1, .12); else noise(w.pel > 1 ? 900 : w.dmg > 60 ? 1200 : w.rate > 10 ? 2600 : 1800, w.pel > 1 || w.dmg > 60 ? .3 : .12, .28); }
+  if (k.startsWith('shot')) { const w = ZW[+k.slice(4)] || ZW[0]; if (w.fire) noise(700, .1, .12); else if (w.proj === 1 || w.proj === 3) noise(520, .6, .55); else if (w.proj === 2) noise(3000, .05, .15); else noise(w.pel > 1 ? 900 : w.dmg > 60 ? 1200 : w.rate > 10 ? 2600 : 1800, w.pel > 1 || w.dmg > 60 ? .3 : .12, .28); }
   else if (k === 'boom') noise(380, 1, .9);
   else if (k === 'splat') noise(500, .18, .35, 'bandpass');
   else if (k === 'crate' || k === 'smash') noise(900, .15, .3, 'bandpass');
@@ -308,7 +309,7 @@ function loop(now) {
     wa.deadT = pb.st === 1 ? wa.deadT + dt : 0;
     plist.push({ id: pb.id, p, st: pb.st, hp: pb.hp, down: pb.down });
     if (pb.st === 2) continue;
-    list.push({ id: pb.id, ch: skinOf[pb.id] ?? PCH[pb.id], p, aim, wb: pb.st === 1 ? 0 : ZW[w].m | (Math.min(3, (pb.id === myId ? wl[w] : 1) - 1) << 4), walk: wa.walk, moving, fire, down: pb.st === 1, deadT: wa.deadT, hp: Math.round(pb.hp * 100), fall: pb.st === 1 ? [-aim[0], -aim[1]] : null });
+    list.push({ id: pb.id, ch: skinOf[pb.id] ?? PCH[pb.id], p, aim, wb: pb.st === 1 ? 0 : ZW[w].m | (Math.min(3, (pb.id === myId ? wl[w] : 1) - 1) << 5), walk: wa.walk, moving, fire, down: pb.st === 1, deadT: wa.deadT, hp: Math.round(pb.hp * 100), fall: pb.st === 1 ? [-aim[0], -aim[1]] : null });
     if (playing && pb.st === 0) ZFX.footsteps(pb.id, p, moving, dt);
   }
   const meS = cur && cur.pl.find(q => q.id === myId); if (meS) { if (meS.hp < lastHp - .01 && meS.st === 0) { hurtFlash = 1; sfx('hurt'); } lastHp = meS.hp; }
