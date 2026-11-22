@@ -296,7 +296,18 @@ const ZFX = (() => {
   const LEATHER = 0x302729, STRAP = 0x51332e;
   const enforcerTone = seed => ENFORCER_SKIN[Math.floor((seed || 0) / 2) % ENFORCER_SKIN.length];
   let enforcerSkinCount = 0;
+  // громила и босс — цельная мускулистая модель со скелетом (src/brute.js)
+  const bruteRig = raiderRig ? BruteRig.create(T, RAIDER_SUIT_MODEL, 120, false) : null, bossRig = raiderRig ? BruteRig.create(T, RAIDER_SUIT_MODEL, 8, true) : null;
+  for (const r of [bruteRig, bossRig]) if (r) scene.add(r.mesh, r.cap);
+  let bruteCount = 0, bossCount = 0;
   function drawEnforcer(z, sc, t, fall) {
+    const boss = ZT[z.ty].boss, rig = boss ? bossRig : bruteRig;
+    if (rig && (boss ? bossCount < 8 : bruteCount < 120)) {
+      const atk = z.fl & 1 ? ((t * (boss ? .9 : 1.15) + z.id * .37) % 1) : -1;
+      rig.pose(boss ? bossCount++ : bruteCount++, { id: z.id, walk: z.walk * .62, yaw: z.yaw, x: z.p[0], z: z.p[1], scale: sc * .86, fall, atk, hit: z.flash, lost: z.lost,
+        burning: z.fl & 2, frozen: z.fl & 8, kick: z.kick || 0, lift: z.fl & 4 ? 8 * Math.abs(Math.sin(t * 6)) : 0, skin: boss ? 0x9a8a80 : enforcerTone(z.seed) });
+      return;
+    }
     const crawl = z.lost & 4, stride = Math.sin(z.walk * .66);
     const swing = z.fl & 1 ? .5 + .5 * Math.sin(t * 11) : 0;
     const lean = .12 + swing * .26 - (z.kick || 0) * .32;
@@ -522,6 +533,7 @@ const ZFX = (() => {
     raiderCount = 0;
     if (raiderRig) raiderRig.begin();
     streetCount = 0;
+    bruteCount = bossCount = 0; if (bruteRig) bruteRig.begin(); if (bossRig) bossRig.begin();
     if (streetRig) streetRig.begin();
     bearerCount = poleCount = 0;
     if (bearerRig) bearerRig.begin();
@@ -546,6 +558,7 @@ const ZFX = (() => {
       else drawStreetRaider(z, sc, t, fall);
     }
     if (raiderRig) raiderRig.upload(raiderCount);
+    if (bruteRig) bruteRig.upload(bruteCount); if (bossRig) bossRig.upload(bossCount);
     if (streetRig) streetRig.upload(streetCount);
     if (bearerRig) bearerRig.upload(bearerCount);
     flagPole.count = poleCount;
