@@ -177,15 +177,26 @@ const ZFX = (() => {
     bannerInk.fillStyle = color;
     bannerInk.fillRect(0, i * stripeHeight, bannerCanvas.width, stripeHeight);
   });
-  const bannerGeo = new T.PlaneGeometry(1, 1, 6, 1);
-  const bannerVertices = bannerGeo.attributes.position;
-  for (let i = 0; i < bannerVertices.count; i++) {
-    const x = bannerVertices.getX(i) + .5;
-    bannerVertices.setXYZ(i, x, bannerVertices.getY(i) - .1 * x, Math.sin(x * 9) * .09 * x);
-  }
-  const banners = new T.InstancedMesh(bannerGeo, new T.MeshBasicMaterial({
+  const bannerGeo = new T.PlaneGeometry(1, 1, 12, 2).translate(.5, 0, 0);
+  const bannerTime = { value: 0 };
+  const bannerMaterial = new T.MeshBasicMaterial({
     map: new T.CanvasTexture(bannerCanvas), side: T.DoubleSide
-  }), ZN);
+  });
+  bannerMaterial.onBeforeCompile = shader => {
+    shader.uniforms.bannerTime = bannerTime;
+    shader.vertexShader = 'uniform float bannerTime; varying float foldLight;\n' + shader.vertexShader
+      .replace('#include <begin_vertex>', `
+        #include <begin_vertex>
+        float along = position.x;
+        float flutter = along * 12.5 - bannerTime * 4.4 + instanceMatrix[3].x * .027;
+        transformed.z += sin(flutter) * .16 * along;
+        transformed.y -= along * .115 + cos(flutter) * along * .04;
+        foldLight = .89 + cos(flutter) * along * .16;
+      `);
+    shader.fragmentShader = 'varying float foldLight;\n' + shader.fragmentShader
+      .replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb *= foldLight;');
+  };
+  const banners = new T.InstancedMesh(bannerGeo, bannerMaterial, ZN);
   banners.setColorAt(0, WHITE);
   banners.count = 0;
   banners.frustumCulled = false;
@@ -198,10 +209,48 @@ const ZFX = (() => {
   let supportCount = 0;
   let bannerCount = 0;
   const bannerPivot = new T.Matrix4();
+  const bearerRig = raiderRig ? RaiderSuit.createSuit(T, RAIDER_SUIT_MODEL, ZN, "bearer") : null;
+  if (bearerRig) {
+    bearerRig.mesh.name = 'Skinned standard bearers';
+    bearerRig.mesh.castShadow = false;
+    scene.add(bearerRig.mesh, bearerRig.cap);
+  }
+  const flagGrip = new T.Vector3();
+  const flagPole = new T.InstancedMesh(new T.LatheGeometry([
+    new T.Vector2(0, -15), new T.Vector2(.78, -15), new T.Vector2(.78, 32),
+    new T.Vector2(1.4, 32), new T.Vector2(1.45, 33.5), new T.Vector2(0, 36)
+  ], 8), new T.MeshPhongMaterial({ color: 0xffffff, shininess: 18 }), ZN);
+  flagPole.setColorAt(0, WHITE);
+  flagPole.count = 0;
+  flagPole.frustumCulled = false;
+  scene.add(flagPole);
+  let bearerCount = 0, poleCount = 0;
+
+  function drawSkinnedBearer(z, sc, t, fall, attack) {
+    const frozen = z.fl & 8, hasFlag = !(z.lost & 2);
+    const walk = z.walk * .56, wave = frozen || fall ? 0 : Math.sin(t * 4.8 + (z.seed || 0));
+    bearerRig.pose(bearerCount, {
+      walk, yaw: z.yaw, x: z.p[0], z: z.p[1], scale: sc * .88,
+      fall, attack: frozen ? 0 : attack, hit: z.flash, lost: z.lost, burning: z.fl & 2,
+      frozen, backTurn: 0, lift: 0, wave, grip: hasFlag ? flagGrip : null
+    });
+    if (hasFlag) {
+      bearerRig.mesh.getMatrixAt(bearerCount, base);
+      bannerPivot.makeTranslation(flagGrip.x, flagGrip.y, flagGrip.z);
+      bannerPivot.multiply(tmp.makeRotationZ(.13 + wave * .37));
+      bannerPivot.multiply(tmp.makeRotationX(.08 + attack * .5 + wave * .11));
+      base.multiply(bannerPivot);
+      enemyPart(flagPole, poleCount++, enemyColor(0xa48261, z, t), 0, 0, 0, 1, 1, 1);
+      enemyPart(banners, bannerCount++, enemyColor(0xffffff, z, t), 0, 23.4, 0, 23, 16, 18, 0, 0, -1.36);
+    }
+    bearerCount++;
+  }
+
   function drawStandardBearer(z, sc, t, fall) {
     const support = z.ty === RAIDER_SUPPORT;
     const crawl = z.lost & 4, stride = Math.sin(z.walk * .7);
     const attack = z.fl & 1 ? .5 + .5 * Math.sin(t * 12) : 0;
+    if (!support && bearerRig) return drawSkinnedBearer(z, sc, t, fall, attack);
     const lean = .07 + attack * .23 - (z.kick || 0) * .35;
     const bob = Math.abs(stride) * 1.2;
     base.compose(V3.set(z.p[0], 0, z.p[1]), Q.setFromEuler(E.set(0, z.yaw, 0)), S3.setScalar(sc));
@@ -378,7 +427,7 @@ const ZFX = (() => {
   }, ZN * 4);
   let denimCount = 0, waistCount = 0, cottonCount = 0;
 
-  const streetRig = raiderRig ? RaiderSuit.createSuit(T, RAIDER_SUIT_MODEL, ZN, true) : null;
+  const streetRig = raiderRig ? RaiderSuit.createSuit(T, RAIDER_SUIT_MODEL, ZN, "street") : null;
   let streetCount = 0;
   if (streetRig) {
     streetRig.mesh.name = 'Skinned street raiders';
@@ -474,7 +523,10 @@ const ZFX = (() => {
     if (raiderRig) raiderRig.begin();
     streetCount = 0;
     if (streetRig) streetRig.begin();
+    bearerCount = poleCount = 0;
+    if (bearerRig) bearerRig.begin();
     const t = now / 1000;
+    bannerTime.value = t;
     suitCount = markCount = bannerCount = enforcerSkinCount = printCount = supportCount = denimCount = waistCount = cottonCount = 0;
     for (const z of list) {
       if (shadowCount >= ZN) break;
@@ -495,6 +547,8 @@ const ZFX = (() => {
     }
     if (raiderRig) raiderRig.upload(raiderCount);
     if (streetRig) streetRig.upload(streetCount);
+    if (bearerRig) bearerRig.upload(bearerCount);
+    flagPole.count = poleCount;
     zShadow.count = shadowCount; zShadow.instanceMatrix.needsUpdate = true;
     suit.count = suitCount;
     raiderMarks.count = markCount;
@@ -509,7 +563,7 @@ const ZFX = (() => {
       supportRings.instanceMatrix.updateRange.count = supportCount * 16;
       supportRings.instanceMatrix.needsUpdate = true;
     }
-    for (const mesh of [suit, raiderMarks, banners, enforcerSkin, prints, denimLeg, denimWaist, streetCotton]) {
+    for (const mesh of [suit, raiderMarks, banners, flagPole, enforcerSkin, prints, denimLeg, denimWaist, streetCotton]) {
       if (!mesh.count) continue;
       mesh.instanceMatrix.updateRange.count = mesh.count * 16;
       mesh.instanceColor.updateRange.count = mesh.count * 3;

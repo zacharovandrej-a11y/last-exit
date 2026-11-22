@@ -9,7 +9,8 @@ function suitStride(clock, id) {
 }
 
 /* Procedural GPU skinning prototype. No animation data or textures are baked. */
-function createSuit(T, data, capacity = 400, street = false) {
+function createSuit(T, data, capacity = 400, outfit = null) {
+  const bearer = outfit === "bearer", street = outfit !== null;
   const count = data.bones.length;
   const geometry = new T.BufferGeometry();
   const positions = [...data.positions], joints = [...data.joints];
@@ -27,6 +28,47 @@ function createSuit(T, data, capacity = 400, street = false) {
       }
       if (py > 23.2 && (pz < 1 || py > 24.1)) {
         positions[i + 1] += Math.min(1.25, (py - 23.2) * .55) * (1 + .17 * px);
+      }
+    }
+  }
+  if (bearer) {
+    for (let i = 0; i < positions.length; i += 3) {
+      const py = positions[i + 1], px = positions[i];
+      const torso = Math.max(0, 1 - Math.abs(py - 7) / 16) * Math.max(0, 1 - Math.max(0, Math.abs(px) - 5) / 5);
+      positions[i] *= 1 + torso * .34;
+      positions[i + 2] *= 1 + torso * .48;
+      // Fuller swept-back hair profile, still continuous with the head.
+      if (py > 21 && positions[i + 2] < .7) positions[i + 2] -= Math.min(1.7, (py - 21) * .5);
+    }
+    // Remove the body surface fully covered by the skirt to prevent poke-through.
+    let visible = 0;
+    const covered = i => {
+      const py = positions[i * 3 + 1];
+      return py > -11.5 && py < 3 && Math.abs(positions[i * 3]) < 9;
+    };
+    for (let i = 0; i < indices.length; i += 3) {
+      if (covered(indices[i]) && covered(indices[i + 1]) && covered(indices[i + 2])) continue;
+      for (let j = 0; j < 3; j++) indices[visible++] = indices[i + j];
+    }
+    indices.length = visible;
+    const start = positions.length / 3, segments = 24;
+    const shape = [[3, 7.3, 5.65], [-1, 8.7, 6.5], [-7, 9.5, 7.7], [-13, 10.9, 9.0], [-15, 11.35, 9.6]];
+    for (let row = 0; row < shape.length; row++) {
+      const [height, width, depth] = shape[row];
+      for (let n = 0; n < segments; n++) {
+        const angle = n * 2 * Math.PI / segments;
+        const px = Math.cos(angle), pz = Math.sin(angle);
+        const pleat = 1 + Math.cos(angle * 8) * row * .009;
+        positions.push(px * width * pleat, height + Math.cos(angle * 8) * row * .09, pz * depth * pleat + Math.max(0, pz) * row * 1.25);
+        joints.push(0, px < 0 ? 13 : 7, 0, 0);
+        const follow = row * .072 * (.55 + .45 * Math.abs(px));
+        weights.push(1 - follow, follow, 0, 0);
+        eyeFlags.push(2);
+        if (row) {
+          const top = start + (row - 1) * segments, next = (n + 1) % segments;
+          indices.push(top + n, top + next, top + n + segments,
+            top + next, top + next + segments, top + n + segments);
+        }
       }
     }
   }
@@ -101,9 +143,30 @@ function createSuit(T, data, capacity = 400, street = false) {
   const material = new T.MeshPhongMaterial({
     color: 0xffffff, specular: 0x121212, shininess: street ? 8 : 105, emissive: 0x070709
   });
-  material.customProgramCacheKey = () => street ? 'instanced-street-phong' : 'instanced-suit-phong';
+  material.customProgramCacheKey = () => street ? 'instanced-' + outfit + '-phong' : 'instanced-suit-phong';
   material.onBeforeCompile = shader => {
     installSkin(shader);
+    if (bearer) {
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `
+        #include <color_fragment>
+        vec3 p = suitBindPosition;
+        float neckline = 17.05 - (1.-smoothstep(.35,3.8,abs(p.x))) * smoothstep(.7,3.8,p.z) * 2.2;
+        float bodice = smoothstep(-2.,1.,p.y) * (1.-smoothstep(neckline,neckline+.3,p.y))
+          * (1.-smoothstep(8.4,8.65,abs(p.x)));
+        float skirt = step(1.5,suitEye);
+        float cloth = max(bodice,skirt);
+        float trim = (1.-smoothstep(.24,.49,abs(p.y-2.1))) * cloth;
+        trim += smoothstep(13.7,14.5,-p.y) * skirt * (1.-smoothstep(14.5,15.,-p.y));
+        vec3 tone = mix(vec3(.65,.43,.34),vec3(.39,.14,.22),cloth);
+        tone = mix(tone,vec3(.54,.34,.22),clamp(trim,0.,1.)*.74);
+        float hair = smoothstep(21.2,22.1,p.y) *
+          (1.-smoothstep(-.3,.85,p.z) + smoothstep(23.4,24.25,p.y)*smoothstep(-.1,.6,p.z));
+        tone = mix(tone,vec3(.22,.115,.10),clamp(hair,0.,1.));
+        tone = mix(tone,vec3(.15,.12,.17),1.-smoothstep(-21.6,-20.5,p.y));
+        diffuseColor.rgb *= tone;
+      `);
+      return;
+    }
     if (street) {
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `
         #include <color_fragment>
@@ -158,7 +221,7 @@ function createSuit(T, data, capacity = 400, street = false) {
   mesh.frustumCulled = false;
   mesh.castShadow = true;
   const depth = new T.MeshDepthMaterial({ depthPacking: T.RGBADepthPacking });
-  depth.customProgramCacheKey = () => street ? 'instanced-street-depth' : 'instanced-suit-depth';
+  depth.customProgramCacheKey = () => street ? 'instanced-' + outfit + '-depth' : 'instanced-suit-depth';
   depth.onBeforeCompile = installSkin;
   mesh.customDepthMaterial = depth;
   mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
@@ -299,10 +362,10 @@ function createSuit(T, data, capacity = 400, street = false) {
     mesh.setColorAt(index, color);
   }
   function poseStreet(index, state) {
-    const { walk, yaw, x: px, z: pz, scale, fall, attack, hit, lost, burning, frozen, backTurn, lift } = state;
+    const { walk, yaw, x: px, z: pz, scale, fall, attack, hit, lost, burning, frozen, backTurn, lift, grip, wave = 0 } = state;
     const sway = Math.cos(walk), strike = attack * (1 - fall);
     const turn = 1 - backTurn * 2, crossing = (1 - strike) * (1 - backTurn);
-    const bob = Math.abs(Math.sin(walk)) * .85;
+    const bob = Math.abs(Math.sin(walk)) * (bearer ? .65 : .85);
     const crouch = (lost & 4) ? 1 : 0;
     const root = (25.2 + bob - strike * 1.6) * (1 - crouch * .63);
     world.position.set(px, lift + fall * 4 * scale, pz);
@@ -328,6 +391,7 @@ function createSuit(T, data, capacity = 400, street = false) {
     for (let sideIndex = 0; sideIndex < 2; sideIndex++) {
       const side = sideIndex ? -1 : 1;
       const stride = Math.sin(walk) * side;
+      const flagHand = bearer && side < 0 && grip;
       for (let leg = 0; leg < 2; leg++) {
         const i = 4 + sideIndex * 6 + leg * 3;
         anchor.copy(bind[i][0]).applyMatrix4(bones[leg ? 0 : 2]);
@@ -337,9 +401,12 @@ function createSuit(T, data, capacity = 400, street = false) {
           continue;
         }
         if (leg) {
-          end.set(side * (4.2 - crossing * (1.4 + Math.max(0, stride) * 1.23)),
-            2.9 + Math.max(0, stride) * 2.5, stride * 6.1 * turn);
+          end.set(side * (bearer ? 4.75 : 4.2 - crossing * (1.4 + Math.max(0, stride) * 1.23)),
+            2.9 + Math.max(0, stride) * 2.5, stride * (bearer ? 4.6 : 6.1) * turn);
           ref.set(side * .17, 0, 1);
+        } else if (flagHand) {
+          end.set(-8.4 - wave * 1.6, anchor.y - 6.9 + strike * 1.8, 7.0 + wave * 2.4 + strike * 2);
+          ref.set(-.7, -1, -.24);
         } else {
           end.set(side * 7.4 + sway * crossing * 1.2, anchor.y - 12.1 + strike * 3.6,
             1.7 - stride * 3.9 * turn + strike * (side > 0 ? 10.4 : 7.4));
@@ -349,7 +416,10 @@ function createSuit(T, data, capacity = 400, street = false) {
         write(i, anchor, mid);
         write(i + 1, mid, end);
         if (leg) tip.set(end.x - side * .26, end.y - 1.63, end.z + 4.85);
-        else tip.set(end.x + side * sway * crossing * .92, end.y - 3 + strike * 2.6,
+        else if (flagHand) {
+          tip.set(end.x - .45, end.y + .08, end.z + 2.85);
+          grip.copy(end).lerp(tip, .53);
+        } else tip.set(end.x + side * sway * crossing * .92, end.y - 3 + strike * 2.6,
           end.z + .75 - stride * .75 + strike * 2.2);
         write(i + 2, end, tip, ref.set(0, leg ? -1 : 0, leg ? 0 : 1));
       }
