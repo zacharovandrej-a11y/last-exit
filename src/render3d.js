@@ -1292,12 +1292,22 @@ void main(){
   let scT = null; const scorchTex = () => scT || (scT = cvTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 2, 32, 32, 32); gr.addColorStop(0, 'rgba(15,10,6,.95)'); gr.addColorStop(.6, 'rgba(25,18,10,.6)'); gr.addColorStop(1, 'rgba(25,18,10,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); }));
   const scorch = []; const mkScorch = () => { if (scorch.length) return; for (let i = 0; i < 12; i++) { const m = new T.Mesh(poolGeo, new T.MeshBasicMaterial({ map: scorchTex(), transparent: true, opacity: .8, depthWrite: false })); m.visible = false; m.userData = { t: 99 }; scene.add(m); scorch.push(m); } };
   let scI = 0;
-  function boom(p, r) {
-    flashAt(at(p, 20), r * 1.6); flashAt(at(p, 40), r * 1.1);
-    fires.push({ p, t: 0, life: .7, n: 10, r });
-    for (let k = 0; k < 6; k++) { const sm = smokes.find(x => x.userData.t > 2.5); if (sm) { sm.userData.t = Math.random() * .5; sm.userData.p = [p[0] + (Math.random() - .5) * r * .5, p[1] + (Math.random() - .5) * r * .5]; sm.visible = true; } }
-    debrisAt(at(p, 12), 16, 0x2a2622, 160, 3); debrisAt(at(p, 12), 8, 0xff9a30, 120, 1.6);
-    mkScorch(); const m = scorch[scI++ % scorch.length]; m.position.set(p[0], .95, p[1]); m.scale.set(r * .9, 1, r * .9); m.rotation.y = Math.random() * 6; m.userData.t = 0; m.material.opacity = .7; m.visible = true;
+  function boom(p, r) { // взрыв: вспышка и свет, огненный шар, ударная волна, пыль по земле, искры, обломки, грибок дыма, догорающее пятно
+    const B = Math.min(2, r / 100), q = lowEnd ? .65 : 1;
+    flashAt(at(p, 22), r * 1.8); flashAt(at(p, 55), r * 1.1); boomL.position.set(p[0], 70, p[1]); boomT = 0; boomI = 2.4 + B * 1.2;
+    shockAt(p, r);
+    for (let i = 0, n = Math.round((18 + 20 * B) * q); i < n; i++) { const P = fpNext(), a = Math.random() * 6.283, el = Math.random() * 1.25, sp = r * (1.3 + Math.random() * 2.4), rr = Math.random() * r * .16;
+      P.k = 3; P.x = p[0] + Math.cos(a) * rr; P.z = p[1] + Math.sin(a) * rr; P.y = 6 + Math.random() * r * .22; P.vx = Math.cos(a) * Math.cos(el) * sp; P.vz = Math.sin(a) * Math.cos(el) * sp; P.vy = Math.sin(el) * sp * .9 + 50; P.dr = 5.5; P.a = -Math.random() * .07; P.l = .5 + Math.random() * .6; P.s = r * (.26 + Math.random() * .34); }
+    for (let i = 0, n = Math.round((16 + 22 * B) * q); i < n; i++) { const P = fpNext(), a = Math.random() * 6.283, sp = 220 + Math.random() * 480 * B;
+      P.k = 2; P.x = p[0]; P.z = p[1]; P.y = 10 + Math.random() * 14; P.vx = Math.cos(a) * sp; P.vz = Math.sin(a) * sp; P.vy = 140 + Math.random() * 420; P.dr = .7; P.a = 0; P.l = .6 + Math.random() * .8; P.s = 2 + Math.random() * 1.6; }
+    for (let i = 0; i < 10; i++) { const P = fpNext(), a = Math.random() * 6.283, rr = Math.random() * r * .5; P.k = 1; P.x = p[0] + Math.cos(a) * rr; P.z = p[1] + Math.sin(a) * rr; P.y = 10 + Math.random() * 30; P.vx = (Math.random() - .5) * 40; P.vz = (Math.random() - .5) * 40; P.vy = 50 + Math.random() * 90; P.dr = 0; P.a = -Math.random() * .3; P.l = 1.5 + Math.random() * 1.5; P.s = 1.8 + Math.random() * 1.2; }
+    for (let i = 0, n = Math.round((10 + 8 * B) * q); i < n; i++) { const a = Math.random() * 6.283, rr = Math.random() * r * .3, sh = .07 + Math.random() * .08;
+      smoke(p[0] + Math.cos(a) * rr, 18 + Math.random() * r * .3, p[1] + Math.sin(a) * rr, Math.cos(a) * 35, 55 + Math.random() * 70, Math.sin(a) * 35, 2.6 + Math.random() * 1.8, r * .35, r * (.85 + Math.random() * .6), sh, sh * .95, sh * .9, .92, 1, .05 + Math.random() * .4, 1.2); }
+    for (let i = 0, n = Math.round(14 * q); i < n; i++) { const a = i / n * 6.283 + Math.random() * .3, v = r * (2.6 + Math.random());
+      smoke(p[0] + Math.cos(a) * r * .2, 5, p[1] + Math.sin(a) * r * .2, Math.cos(a) * v, 8 + Math.random() * 14, Math.sin(a) * v, 1.1 + Math.random() * .8, r * .22, r * (.5 + Math.random() * .25), .45, .39, .3, .55, 0, 0, 3.2); }
+    debrisAt(at(p, 12), Math.round(14 + 8 * B), 0x2a2622, 170 * Math.sqrt(B + .3), 3); debrisAt(at(p, 12), Math.round(6 + 6 * B), 0x5a554e, 140, 2); debrisAt(at(p, 14), 8, 0xff9a30, 130, 1.6);
+    mkScorch(); const m = scorch[scI++ % scorch.length]; m.position.set(p[0], .95, p[1]); m.scale.set(r * 1.05, 1, r * 1.05); m.rotation.y = Math.random() * 6; m.userData.t = 0; m.material.opacity = .78; m.visible = true;
+    pyre(p, .45 + B * .35, 2.5 + B * 2.5, r * .12);
   }
   // машины: 1 — дымит, 2 — сгорела (чёрная, горит), 0 — как новая
   const objCol = {};
@@ -1321,12 +1331,14 @@ void main(){
     for (const f of fires) { f.t += dt; const k = f.t / f.life; if (k >= 1) continue; for (let i = 0; i < f.n; i++) { const a = i * 2.4, rr = f.r * .35 * Math.sqrt(k + .1) * ((i % 3) / 3 + .4); put(f.p[0] + Math.cos(a) * rr, k * 30 * (i % 2), f.p[1] + Math.sin(a) * rr, f.r * .55 * (1 - k * .6), f.r * .9 * (1 - k * .5)); } }
     for (let i = fires.length - 1; i >= 0; i--) if (fires[i].t > fires[i].life) fires.splice(i, 1);
     const srcs = [];
-    for (const [id, b] of burning) { b.t += dt; if (b.s === 2 && b.t < 25 && Math.abs(b.p[0] - camP_[0]) < 900 && Math.abs(b.p[1] - camP_[1]) < 900) srcs.push({ p: b.p, h: 16, s: 1.3, r: 18, rate: 55 });
-      if (Math.random() < dt * (b.s === 2 ? 4 : 2.2)) { const sm = smokes.find(x => x.userData.t > 2.5); if (sm) { sm.userData.t = 0; sm.userData.p = [b.p[0] + (Math.random() - .5) * 20, b.p[1] + (Math.random() - .5) * 20]; sm.visible = true; } } }
+    for (const [id, b] of burning) { b.t += dt; if (Math.abs(b.p[0] - camP_[0]) > 900 || Math.abs(b.p[1] - camP_[1]) > 900) continue; const o = objs[id], L = o && o.type === 'bus' ? 90 : o && o.type === 'truck' ? 70 : 34, ax = o ? [Math.cos(o.a), Math.sin(o.a)] : [1, 0];
+      if (b.s === 2 && b.t < 30) { const fade = b.t < 22 ? 1 : 1 - (b.t - 22) / 8; for (const [u, h, sc] of [[0, 22, 1.25], [.55, 16, 1], [-.55, 18, .9]]) srcs.push({ p: [b.p[0] + ax[0] * L * u, b.p[1] + ax[1] * L * u], h, s: sc * fade, r: 16, rate: 55, smk: u === 0 ? 7 : 0 }); }
+      else if (b.s === 2 ? b.t < 90 : true) { if (Math.random() < dt * (b.s === 2 ? 3 : 2)) { const sh = b.s === 2 ? .12 : .32, a = Math.random() * 6.28; smoke(b.p[0] + Math.cos(a) * 10, 28, b.p[1] + Math.sin(a) * 10, 10, 30 + Math.random() * 20, 5, 3 + Math.random() * 2, 12, 50 + Math.random() * 30, sh, sh * .97, sh * .95, b.s === 2 ? .6 : .45, 0, 0, .3); } } }
+    for (let i = pyres.length - 1; i >= 0; i--) { const y = pyres[i]; y.t += dt; if (y.t > y.life) { pyres.splice(i, 1); continue; } const k = 1 - y.t / y.life; srcs.push({ p: y.p, h: 1, s: y.s * Math.sqrt(k), r: y.r, rate: 60, smk: y.s > .5 ? 3 : 0 }); }
     // постоянные очаги: горящие остовы машин, бочки, окна сгоревших домов — только рядом с камерой, не больше 8
     let nf = 0; for (const f of fireSpots) { if (nf >= 7) break; if (Math.abs(f.p[0] - camP_[0]) > 700 || Math.abs(f.p[1] - camP_[1]) > 700) continue; const o = objs[f.id]; if (o && (o.dead && !f.win || burning.has(f.id))) continue; nf++;
-      srcs.push({ p: f.p, h: f.win ? f.h : Math.max(10, f.h - 12), s: f.s * (f.win ? 1.1 : 1.45), r: f.win ? 9 : 20, rate: f.win ? 40 : 70 }); }
-    for (const s of srcs) emitFire(s, dt); stepFire(dt, now); fireGlows(srcs.filter(s => s.h < 30), now);
+      srcs.push({ p: f.p, h: f.win ? f.h : Math.max(10, f.h - 12), s: f.s * (f.win ? 1.1 : 1.45), r: f.win ? 9 : 20, rate: f.win ? 40 : 70, smk: 2.5 }); }
+    for (const s of srcs) emitFire(s, dt); stepFire(dt, now); fireGlows(srcs.filter(s => s.h < 30 && s.s > .05), now);
     drawPlumes(now, objs);
     return fi;
   }
@@ -1334,28 +1346,71 @@ void main(){
   // ===== настоящий огонь: частицы (одна отрисовка на все), языки поднимаются и закручиваются, цвет белый → жёлтый → оранжевый → тёмно-красный,
   // искры летят вверх, под огнём мерцает отсвет на земле =====
   const fireTex = cvTex(64, 64, g => { for (let i = 0; i < 6; i++) { const x = 32 + (Math.random() - .5) * 18, y = 34 + (Math.random() - .5) * 18, r = 14 + Math.random() * 12, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,.55)'); gr.addColorStop(.5, 'rgba(255,255,255,.22)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); } });
-  const FPN = lowEnd ? 260 : 420, fpMesh = new T.InstancedMesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ map: fireTex, blending: T.AdditiveBlending, depthWrite: false, transparent: true, fog: false }), FPN);
+  const FPN = lowEnd ? 380 : 640, fpMesh = new T.InstancedMesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ map: fireTex, blending: T.AdditiveBlending, depthWrite: false, transparent: true, fog: false }), FPN);
   fpMesh.setColorAt(0, new T.Color()); fpMesh.count = 0; fpMesh.frustumCulled = false; fpMesh.renderOrder = 8; scene.add(fpMesh);
-  const fglow = new T.InstancedMesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ map: null, blending: T.AdditiveBlending, depthWrite: false, transparent: true, fog: false }), 16);
+  const fglow = new T.InstancedMesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ map: null, blending: T.AdditiveBlending, depthWrite: false, transparent: true, fog: false }), 24);
   fglow.setColorAt(0, new T.Color()); fglow.count = 0; fglow.frustumCulled = false; fglow.renderOrder = 2; scene.add(fglow);
-  const fps = []; for (let i = 0; i < FPN; i++) fps.push({ a: 0, l: 0, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, s: 0, e: 0 });
+  const fps = []; for (let i = 0; i < FPN; i++) fps.push({ a: 0, l: 0, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, s: 0, e: 0, k: 0, dr: 0 });
   let fpi = 0; const _fm = new T.Matrix4(), _fv = new T.Vector3(), _fs = new T.Vector3(), _fc = new T.Color();
+  const fpNext = () => { const p = fps[fpi]; fpi = (fpi + 1) % FPN; p.e = 0; p.k = 0; p.dr = 0; return p; };
   function emitFire(src, dt) { const n = src.s * src.rate * dt; let k = Math.floor(n) + (Math.random() < n % 1 ? 1 : 0);
-    while (k-- > 0) { const p = fps[fpi]; fpi = (fpi + 1) % FPN; const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * src.r * src.s, ember = Math.random() < .1;
-      p.x = src.p[0] + Math.cos(a) * r; p.z = src.p[1] + Math.sin(a) * r; p.y = src.h + Math.random() * 3; p.vx = (Math.random() - .5) * 10; p.vz = (Math.random() - .5) * 10; p.vy = (ember ? 70 : 34) + Math.random() * 34; p.a = 0; p.l = ember ? 1.2 + Math.random() : .55 + Math.random() * .5; p.s = (ember ? 1.8 : 15 + Math.random() * 12) * src.s; p.e = ember ? 1 : 0; } }
+    while (k-- > 0) { const p = fpNext(), a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * src.r * src.s, ember = Math.random() < .1, core = !ember && Math.random() < .3;
+      p.x = src.p[0] + Math.cos(a) * r * (core ? .5 : 1); p.z = src.p[1] + Math.sin(a) * r * (core ? .5 : 1); p.y = src.h + Math.random() * 3; p.vx = (Math.random() - .5) * 10; p.vz = (Math.random() - .5) * 10; p.vy = (ember ? 70 : core ? 20 : 34) + Math.random() * 34; p.a = 0;
+      p.l = ember ? 1.2 + Math.random() : core ? .3 + Math.random() * .2 : .55 + Math.random() * .55; p.s = (ember ? 1.8 : core ? 9 + Math.random() * 6 : 15 + Math.random() * 13) * src.s; p.k = ember ? 1 : 0; p.e = ember ? 1 : 0; p.c = core ? 1 : 0; }
+    if (src.smk && Math.random() < dt * src.smk) { const a = Math.random() * 6.28, sh = .05 + Math.random() * .05; smoke(src.p[0] + Math.cos(a) * src.r * .5, src.h + 26 * src.s, src.p[1] + Math.sin(a) * src.r * .5, (Math.random() - .5) * 14 + 12, 45 + Math.random() * 30, (Math.random() - .5) * 14 + 6, 3.5 + Math.random() * 2, 16 * src.s, (55 + Math.random() * 40) * src.s, sh, sh * .95, sh * .92, .85, .8, 0, .3); }
+    if (src.s > .7 && Math.random() < dt * 2.5 * src.s) { const p = fpNext(); p.k = 2; p.x = src.p[0]; p.z = src.p[1]; p.y = src.h + 10; const a = Math.random() * 6.28, sp = 40 + Math.random() * 90; p.vx = Math.cos(a) * sp; p.vz = Math.sin(a) * sp; p.vy = 120 + Math.random() * 160; p.a = 0; p.l = .8 + Math.random() * .6; p.s = 1.6 + Math.random(); p.dr = .4; } }
   function stepFire(dt, now) { let n = 0; const q = camera.quaternion;
-    for (const p of fps) { if (p.a >= p.l) continue; p.a += dt; if (p.a >= p.l) continue; const k = p.a / p.l;
-      p.vy += (p.e ? -10 : 34) * dt; p.vx += Math.sin(now / 160 + p.y * .12) * 30 * dt; p.vz += Math.cos(now / 190 + p.x * .1) * 26 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
-      const sz = p.e ? p.s : p.s * (.55 + 1.1 * Math.sin(Math.min(1, k * 1.15) * Math.PI * .9)), f = p.e ? (1 - k) : (k < .1 ? k / .1 : 1 - (k - .1) / .9);
-      if (p.e) _fc.setRGB(1.6 * f, .8 * f, .25 * f); else if (k < .22) _fc.setRGB(1 * f, .78 * f, .32 * f); else if (k < .55) _fc.setRGB(.95 * f, .4 * f, .08 * f); else _fc.setRGB(.55 * f, .12 * f, .03 * f);
-      fpMesh.setMatrixAt(n, _fm.compose(_fv.set(p.x, p.y, p.z), q, _fs.set(sz, sz * (p.e ? 1 : 1.25), 1))); fpMesh.setColorAt(n++, _fc); if (n >= FPN) break; }
-    fpMesh.count = n; fpMesh.instanceMatrix.needsUpdate = true; if (n) fpMesh.instanceColor.needsUpdate = true; }
+    for (const p of fps) { if (p.a >= p.l) continue; p.a += dt; if (p.a < 0) continue;
+      if (p.a >= p.l) { if (p.k === 3 && Math.random() < .3) { const sh = .1 + Math.random() * .06; smoke(p.x, p.y, p.z, p.vx * .3, 35, p.vz * .3, 1.8 + Math.random() * 1.4, p.s * .55, p.s * 1.5, sh, sh * .93, sh * .88, .8, 1, 0, .6); } continue; }
+      const k = p.a / p.l;
+      if (p.dr) { const f = Math.exp(-p.dr * dt); p.vx *= f; p.vz *= f; p.vy *= f; }
+      if (p.k === 2) { p.vy -= 520 * dt; if (p.y < 1 && p.vy < 0) { p.y = 1; p.vy *= -.35; p.vx *= .55; p.vz *= .55; } }
+      else if (p.k === 1) p.vy -= 10 * dt;
+      else { p.vy += (p.k === 3 ? 70 : 34) * dt; p.vx += Math.sin(now / 160 + p.y * .12) * 30 * dt; p.vz += Math.cos(now / 190 + p.x * .1) * 26 * dt; }
+      p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; let sz = p.s, sy = 1;
+      if (p.k === 2) { const f = 1 - k; _fc.setRGB(2 * f, 1.45 * f, .55 * f); }
+      else if (p.k === 1) { const f = 1 - k; _fc.setRGB(1.6 * f, .8 * f, .25 * f); }
+      else if (p.k === 3) { const f = (k < .05 ? k / .05 : 1) * (1 - Math.pow(k, 1.6)); sz = p.s * (.55 + .9 * Math.min(1, k * 2.6)); sy = 1.1;
+        if (k < .12) _fc.setRGB(1.15 * f, .95 * f, .6 * f); else if (k < .34) _fc.setRGB(1 * f, .5 * f, .13 * f); else if (k < .64) _fc.setRGB(.72 * f, .22 * f, .04 * f); else _fc.setRGB(.36 * f, .07 * f, .02 * f); }
+      else { const f = k < .1 ? k / .1 : 1 - (k - .1) / .9; sz = p.s * (.55 + 1.1 * Math.sin(Math.min(1, k * 1.15) * Math.PI * .9)); sy = 1.25;
+        if (p.c) _fc.setRGB(1.5 * f, 1.25 * f, .7 * f); else if (k < .22) _fc.setRGB(1 * f, .78 * f, .32 * f); else if (k < .55) _fc.setRGB(.95 * f, .4 * f, .08 * f); else _fc.setRGB(.55 * f, .12 * f, .03 * f); }
+      fpMesh.setMatrixAt(n, _fm.compose(_fv.set(p.x, p.y, p.z), q, _fs.set(sz, sz * sy, 1))); fpMesh.setColorAt(n++, _fc); if (n >= FPN) break; }
+    fpMesh.count = n; fpMesh.instanceMatrix.needsUpdate = true; if (n) fpMesh.instanceColor.needsUpdate = true; stepSmoke(dt); stepShock(dt); }
+  // ===== дым: свои частицы (обычное смешивание, у каждой своя прозрачность), снизу подсвечен огнём =====
+  const smkTex = cvTex(64, 64, g => { for (let i = 0; i < 9; i++) { const x = 18 + Math.random() * 28, y = 18 + Math.random() * 28, r = 10 + Math.random() * 14, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,.75)'); gr.addColorStop(.55, 'rgba(255,255,255,.4)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); } });
+  const SMN = lowEnd ? 150 : 280, smkGeo = new T.PlaneGeometry(1, 1), smkC = new T.InstancedBufferAttribute(new Float32Array(SMN * 4), 4); smkGeo.setAttribute('aC', smkC);
+  const smkMesh = new T.InstancedMesh(smkGeo, new T.ShaderMaterial({ uniforms: { map: { value: smkTex } }, transparent: true, depthWrite: false,
+    vertexShader: 'attribute vec4 aC;varying vec4 vC;varying vec2 vU;void main(){vU=uv;vC=aC;gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.);}',
+    fragmentShader: 'uniform sampler2D map;varying vec4 vC;varying vec2 vU;void main(){float a=texture2D(map,vU).a*vC.a;if(a<.01)discard;gl_FragColor=vec4(vC.rgb,a);}' }), SMN);
+  smkMesh.count = 0; smkMesh.frustumCulled = false; smkMesh.renderOrder = 7; scene.add(smkMesh);
+  const smk = []; for (let i = 0; i < SMN; i++) smk.push({ a: 9, l: 0 }); let smi = 0; const _sq = new T.Quaternion(), _sz = new T.Vector3(0, 0, 1);
+  function smoke(x, y, z, vx, vy, vz, l, s0, s1, r, g, b, al, warm = 0, delay = 0, dr = .4) { const p = smk[smi]; smi = (smi + 1) % SMN; Object.assign(p, { x, y, z, vx, vy, vz, l, s0, s1, r, g, b, al, warm, dr, a: -delay, rot: Math.random() * 6.28, rs: (Math.random() - .5) * .8 }); }
+  function stepSmoke(dt) { let n = 0; const q = camera.quaternion, C = smkC.array;
+    for (const p of smk) { if (p.a >= p.l) continue; p.a += dt; if (p.a < 0 || p.a >= p.l) continue; const k = p.a / p.l, f = Math.exp(-p.dr * dt);
+      p.vx *= f; p.vz *= f; p.vy *= Math.exp(-.35 * dt); p.x += p.vx * dt + 9 * dt; p.y += p.vy * dt; p.z += p.vz * dt + 4 * dt; p.rot += p.rs * dt;
+      const sz = p.s0 + (p.s1 - p.s0) * (1 - Math.pow(1 - k, 2.2)), al = p.al * (k < .12 ? k / .12 : 1) * (1 - Math.pow(k, 1.4)), w = p.warm * Math.pow(Math.max(0, 1 - k * 2.2), 2);
+      smkMesh.setMatrixAt(n, _fm.compose(_fv.set(p.x, p.y, p.z), _sq.copy(q).multiply(new T.Quaternion().setFromAxisAngle(_sz, p.rot)), _fs.set(sz, sz, 1)));
+      C[n * 4] = p.r + (.75 - p.r) * w; C[n * 4 + 1] = p.g + (.32 - p.g) * w; C[n * 4 + 2] = p.b + (.08 - p.b) * w; C[n * 4 + 3] = al; n++; }
+    smkMesh.count = n; smkMesh.instanceMatrix.needsUpdate = true; smkC.needsUpdate = true; }
+  // ударная волна: светящееся кольцо по земле + мгновенный отсвет; свет взрыва на всём вокруг
+  const boomL = new T.PointLight(0xffa050, 0, 560, 2); boomL.position.set(0, -999, 0); scene.add(boomL); let boomT = 9, boomI = 0;
+  const shocks = []; for (let i = 0; i < 6; i++) { const m = new T.Mesh(new T.RingGeometry(.86, 1, 56).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xffb060, transparent: true, blending: T.AdditiveBlending, depthWrite: false, fog: false })); m.visible = false; m.renderOrder = 3; m.userData = { t: 9 }; scene.add(m); shocks.push(m); }
+  const bglow = []; let shI = 0;
+  function shockAt(p, r) { const m = shocks[shI++ % shocks.length]; m.position.set(p[0], 2, p[1]); m.userData = { t: 0, r }; m.visible = true; bglow.push({ p, t: 0, r }); }
+  function stepShock(dt) { boomT += dt; boomL.intensity = boomT < .45 ? boomI * Math.pow(1 - boomT / .45, 2) * (.85 + .15 * Math.random()) : 0;
+    for (const m of shocks) { if (!m.visible) continue; const u = m.userData; u.t += dt; const k = u.t / .42; if (k >= 1) { m.visible = false; continue; } const R = u.r * (.3 + 1.6 * (1 - Math.pow(1 - k, 2.5))); m.scale.set(R, 1, R); m.material.opacity = .9 * (1 - k) * (1 - k); }
+    for (let i = bglow.length - 1; i >= 0; i--) { bglow[i].t += dt; if (bglow[i].t > .9) bglow.splice(i, 1); } }
+  // догорающие пятна: после взрыва и там, куда попал огнемёт
+  const pyres = []; function pyre(p, s, life, r = 12) { if (pyres.length > 14) pyres.shift(); pyres.push({ p: [p[0], p[1]], s, life, r, t: 0 }); }
   function flameJet(from, d, end) { // струя огнемёта: языки летят вдоль ствола, растут и краснеют
     const moving = d[0] || d[1], n = moving ? 4 : 1;
-    for (let i = 0; i < n; i++) { const p = fps[fpi]; fpi = (fpi + 1) % FPN; const life = moving ? .28 + Math.random() * .16 : .5, sp = moving ? end / life * (.75 + Math.random() * .3) : 0, j = (Math.random() - .5) * .22, c = Math.cos(j), sn = Math.sin(j), dx = d[0] * c - d[1] * sn, dz = d[0] * sn + d[1] * c, st = Math.random() * 6;
-      p.x = from[0] + dx * st; p.z = from[1] + dz * st; p.y = moving ? 21 : 12 + Math.random() * 10; p.vx = dx * sp + (moving ? 0 : (Math.random() - .5) * 14); p.vz = dz * sp + (moving ? 0 : (Math.random() - .5) * 14); p.vy = moving ? -6 + Math.random() * 10 : 30; p.a = 0; p.l = life; p.s = moving ? 10 + Math.random() * 10 : 11; p.e = 0; } }
+    for (let i = 0; i < n; i++) { const p = fpNext(); const life = moving ? .28 + Math.random() * .16 : .5, sp = moving ? end / life * (.75 + Math.random() * .3) : 0, j = (Math.random() - .5) * .22, c = Math.cos(j), sn = Math.sin(j), dx = d[0] * c - d[1] * sn, dz = d[0] * sn + d[1] * c, st = Math.random() * 6;
+      p.x = from[0] + dx * st; p.z = from[1] + dz * st; p.y = moving ? 21 : 12 + Math.random() * 10; p.vx = dx * sp + (moving ? 0 : (Math.random() - .5) * 14); p.vz = dz * sp + (moving ? 0 : (Math.random() - .5) * 14); p.vy = moving ? -6 + Math.random() * 10 : 30; p.a = 0; p.l = life; p.s = moving ? 10 + Math.random() * 10 : 11; p.dr = moving ? 1.2 : 0; }
+    if (!moving && Math.random() < .25) smoke(from[0], 30, from[1], 0, 40, 0, 1.4, 6, 22, .1, .09, .08, .6, .6);
+    if (moving && Math.random() < .12) pyre(add(from, d, end * (.75 + Math.random() * .25)), .35 + Math.random() * .2, 1.2 + Math.random(), 8); }
   function fireGlows(srcs, now) { if (!fglow.material.map) { fglow.material.map = glowTex; fglow.material.needsUpdate = true; } let n = 0;
-    for (const s of srcs) { if (n >= 16) break; const f = .8 + .2 * Math.sin(now / 90 + s.p[0]) + .1 * Math.sin(now / 37 + s.p[1]), r = 70 * s.s * f; fglow.setMatrixAt(n, _fm.compose(_fv.set(s.p[0], 1.2, s.p[1]), new T.Quaternion(), _fs.set(r, 1, r))); fglow.setColorAt(n++, _fc.setRGB(.55 * f, .26 * f, .06 * f)); }
+    for (const b of bglow) { if (n >= 24) break; const k = 1 - b.t / .9, r = b.r * 3.2 * (.6 + .4 * k); fglow.setMatrixAt(n, _fm.compose(_fv.set(b.p[0], 1.3, b.p[1]), new T.Quaternion(), _fs.set(r, 1, r))); fglow.setColorAt(n++, _fc.setRGB(1.3 * k * k, .6 * k * k, .18 * k * k)); }
+    for (const s of srcs) { if (n >= 24) break; const f = .8 + .2 * Math.sin(now / 90 + s.p[0]) + .1 * Math.sin(now / 37 + s.p[1]), r = 70 * s.s * f; fglow.setMatrixAt(n, _fm.compose(_fv.set(s.p[0], 1.2, s.p[1]), new T.Quaternion(), _fs.set(r, 1, r))); fglow.setColorAt(n++, _fc.setRGB(.55 * f, .26 * f, .06 * f)); }
     fglow.count = n; fglow.instanceMatrix.needsUpdate = true; if (n) fglow.instanceColor.needsUpdate = true; }
   // ===== постапокалипсис: завалы, мусор, трещины и ямы на асфальте, очаги огня и столбы дыма =====
   const ruinMeshes = []; let fireSpots = [], plumeSrc = [], ruinDecals = [], ruinV = 0;
@@ -2063,5 +2118,5 @@ void main(){
     if (st.extra) st.extra(dt, now);
     renderer.render(scene, camera);
   }
-  return { gunMesh, flameJet, weaponImage, ruin: () => ({ decals: ruinDecals, v: ruinV, fires: fireSpots, plumes: plumeSrc }), scene, camera, MAT, smashWall, flash: (p, h, s) => flashAt(at(p, h), s), puff: (p, h) => puffAt(at(p, h)), hitNear: (objs, p) => hitNear(objs, p), chars, frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt, altarBroken, breakGlass, reviveObj, boom, objState, debris: (p, h, n, col, sp, sz) => debrisAt(at(p, h), n, col, sp, sz) };
+  return { gunMesh, flameJet, pyre, weaponImage, ruin: () => ({ decals: ruinDecals, v: ruinV, fires: fireSpots, plumes: plumeSrc }), scene, camera, MAT, smashWall, flash: (p, h, s) => flashAt(at(p, h), s), puff: (p, h) => puffAt(at(p, h)), hitNear: (objs, p) => hitNear(objs, p), chars, frame, resize, project, screenToGround, killObj, preview, renderer, CAM_F, CAM_R, bloodAt, altarBroken, breakGlass, reviveObj, boom, objState, debris: (p, h, n, col, sp, sz) => debrisAt(at(p, h), n, col, sp, sz) };
 })();
