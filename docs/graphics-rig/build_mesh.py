@@ -64,7 +64,7 @@ def group(name):
         return 0
     if part in ("spine03", "spine04"):
         return 1
-    if part.startswith(("spine", "breast", "clavicle", "shoulder", "special")):
+    if part.startswith(("spine", "breast", "clavicle", "shoulder")):
         return 2
     return 3
 
@@ -109,14 +109,18 @@ for i, record in enumerate(accum):
         groups[bone_id].add([i], min(1, weight), "REPLACE")
 
 decimate = obj.modifiers.new("Mobile mesh budget", "DECIMATE")
-decimate.ratio = .054
+decimate.ratio = .108
 decimate.use_collapse_triangulate = True
 bpy.ops.object.modifier_apply(modifier=decimate.name)
 mesh = obj.data
 mesh.calc_loop_triangles()
-assert len(mesh.loop_triangles) <= 1500
+assert len(mesh.loop_triangles) <= 3000
 joint_ids, joint_weights = [], []
 for vertex in mesh.vertices:
+    if vertex.co.y > 19.5:
+        joint_ids.extend((3, 0, 0, 0))
+        joint_weights.extend((1, 0, 0, 0))
+        continue
     record = sorted(((item.weight, item.group) for item in vertex.groups), reverse=True)[:4]
     record += [(0, 0)] * (4 - len(record))
     total = sum(weight for weight, _ in record)
@@ -125,6 +129,7 @@ for vertex in mesh.vertices:
     joint_weights.extend(round(weight / total, 4) for weight, _ in record)
 
 model = {
+    "eyes": [joint("eye.L"), joint("eye.R")],
     "positions": [round(float(value), 4) for vertex in mesh.vertices for value in vertex.co],
     "indices": [i for tri in mesh.loop_triangles for i in tri.vertices],
     "joints": joint_ids, "weights": joint_weights, "bones": bones,

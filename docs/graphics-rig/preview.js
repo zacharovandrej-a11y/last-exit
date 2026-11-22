@@ -1,4 +1,4 @@
-import { createSuit } from './rig.js';
+import { createSuit, suitStride } from './rig.js';
 
 const T = THREE;
 const canvas = document.querySelector('#scene');
@@ -41,28 +41,39 @@ try {
   }
   const asphalt = new T.CanvasTexture(floorTex);
   asphalt.wrapS = asphalt.wrapT = T.RepeatWrapping;
-  asphalt.repeat.set(13,15);
-  const floor = new T.Mesh(new T.PlaneGeometry(255,240),new T.MeshLambertMaterial({map:asphalt}));
+  asphalt.repeat.set(62,62);
+  const floor = new T.Mesh(new T.PlaneGeometry(1200,1200),new T.MeshLambertMaterial({map:asphalt}));
   floor.rotation.x = -Math.PI/2;
   floor.receiveShadow = true;
   scene.add(floor);
+  const mobileFloor = new T.Mesh(new T.PlaneGeometry(1500, 1500),
+    new T.MeshLambertMaterial({ color: 0x53504b }));
+  mobileFloor.rotation.x = floor.rotation.x;
+  mobileFloor.receiveShadow = true;
+  scene.add(mobileFloor);
   const rig = createSuit(T,data);
   scene.add(rig.mesh,rig.cap);
 
-  const views = [[1,1,1], [.28,.47,1], [1,.35,.03], [-.48,.58,-1]];
-  let view=0, capture=location.search.includes('capture');
-  const cycle = 1.12, advance = 16;
+  const views = [[1,1,1], [.18,.21,1], [1,.35,.03], [-.48,.58,-1]];
+  let view=0;
+  const capture=location.search.includes('capture');
+  const cycle = .86, advance = 16;
   function resize(){
     renderer.setSize(Math.max(1,canvas.clientWidth),Math.max(1,canvas.clientHeight),false);
-    const h=37, w=h*canvas.clientWidth/canvas.clientHeight;
-    Object.assign(camera,{left:-w/2,right:w/2,top:h/2,bottom:-h/2,near:.1,far:400});
-    camera.updateProjectionMatrix();
+
   }
   function render(t, angle=view){
-    const [x,y,z] = views[angle];
-    const phase = t / cycle % 1;
-    const position = phase * advance;
-    floor.position.z = -phase * advance;
+    const [x,y,z] = views[angle === 4 ? 0 : angle];
+    const aspect = canvas.clientWidth / canvas.clientHeight;
+    const shorterSide = angle === 4 ? 470 : 37;
+    const w = shorterSide * Math.max(1, aspect), h = shorterSide / Math.min(1, aspect);
+    Object.assign(camera,{left:-w/2,right:w/2,top:h/2,bottom:-h/2,near:.1,far:2200});
+    camera.updateProjectionMatrix();
+    const phase = suitStride(t / cycle, 1);
+    floor.position.z = -(phase * advance % 240);
+    floor.visible = angle !== 4;
+    mobileFloor.visible = angle === 4;
+    mobileFloor.position.z = -(phase * advance % 240);
     // The camera tracks the body; the ground moves at the same rate as the root.
     camera.position.set(x*75,y*75,z*75);
     camera.lookAt(0,8.8,-1.3);
@@ -70,7 +81,7 @@ try {
     rig.pose(0,{id:1,time:t,walk:phase, yaw:0, z:0});
     rig.upload(1);
     renderer.render(scene,camera);
-    return position;
+
   }
   for(const button of document.querySelectorAll('[data-view]')) button.onclick=()=>{
     view=Number(button.dataset.view);
@@ -80,7 +91,7 @@ try {
   window.addEventListener('resize',resize);
   resize();
   render(.31);
-  window.suitPreview = { render, rig, renderer, cycle };
+  window.suitPreview = { render, rig, renderer, cycle: cycle * 2 / .944 };
   if(!capture) renderer.setAnimationLoop(t=>render(t/1000));
 } catch (err) {
   error.textContent = err.message;
