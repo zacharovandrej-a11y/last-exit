@@ -133,21 +133,15 @@ const ZFX = (() => {
     (z, x, y) => z > 2 && z < 10 && y > 0 ? Math.abs(x) * y * 1.25 : 0);
     const pos = Array.from(geometry.attributes.position.array), colors = Array.from(geometry.attributes.color.array);
     const indices = Array.from(geometry.index.array), trim = Array.from(geometry.attributes.latexTrim.array);
-    // Молния проходит от спины к задней части комбинезона, с бегунком у края.
-    const back = [[-16.95, 2.02], [-16.3, 3.12], [-15, 5.15], [-11, 5.38],
-      [-6, 3.08], [0, 2.68], [4, 3.69], [8, 4.25], [11, 2.81]];
+    // Молния на спине — узкая нитка, вписанная в тот же пакет инстансов.
+    const back = [[-14, 5.1], [-11, 5.38], [-6, 3.08], [0, 2.68], [4, 3.69], [8, 4.25], [11, 2.81]];
     for (const [i, [z, y]] of back.entries()) {
-      const start = pos.length / 3, half = i < 4 ? .24 : .15;
+      const start = pos.length / 3, half = i === 0 ? .24 : .15;
       pos.push(-half, y, z, half, y, z);
       colors.push(.9, .91, .92, .9, .91, .92);
-      trim.push(i < 4 ? .93 : .64, i < 4 ? .93 : .64);
+      trim.push(.75, .75);
       if (i) indices.push(start - 2, start, start - 1, start - 1, start, start + 1);
     }
-    const pull = pos.length / 3;
-    pos.push(-.29, 2.95, -16.49, .29, 2.95, -16.49, -.32, 4.1, -15.76, .32, 4.1, -15.76);
-    colors.push(.91,.91,.94, .91,.91,.94, .91,.91,.94, .91,.91,.94);
-    trim.push(1.07, 1.07, 1.07, 1.07);
-    indices.push(pull, pull + 2, pull + 1, pull + 1, pull + 2, pull + 3);
     if (torn) {
       const start = pos.length / 3;
       pos.push(4.13, 1.88, .6, 5.82, 1.82, 6.2, 4.5, 2.35, 3.5, 4.85, .55, 5, 5.4, .64, 8.5);
