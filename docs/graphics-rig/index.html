@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LAST EXIT · Чёрный костюм</title>
+  <link rel="icon" href="../../assets/icon-192.png">
+<style>
+  *{box-sizing:border-box}body{margin:0;background:#1b1c1e;color:#eee;font:16px system-ui}
+  main{width:min(100%,1000px);margin:auto;padding:14px}h1{font-size:23px;margin:0 0 10px}
+  #scene{display:block;width:100%;aspect-ratio:16/9;background:#323235;border-radius:8px}
+  nav{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  button{background:#353335;color:#fff;border:1px solid #696367;border-radius:6px;padding:8px 10px;font:inherit;cursor:pointer}
+  button[aria-pressed=true]{background:#665042;border-color:#d8b697}
+  #error:empty{display:none}
+</style>
+<main>
+  <h1>LAST EXIT · Чёрный костюм</h1>
+  <canvas id="scene"></canvas>
+  <nav aria-label="Ракурс">
+    <button data-view="0" aria-pressed="true">Игровая камера</button>
+    <button data-view="1">Спереди</button>
+    <button data-view="2">Сбоку</button>
+    <button data-view="3">Со спины</button>
+  </nav>
+  <p id="error" role="alert"></p>
+</main>
+<script src="../../assets/three.min.js"></script>
+<script type="module" src="preview.js"></script>
+</html>
