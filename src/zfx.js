@@ -57,7 +57,7 @@ const ZFX = (() => {
   const zShadow = new T.InstancedMesh(new T.CircleGeometry(1, 12).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0, transparent: true, opacity: .28, depthWrite: false }), ZN); zShadow.frustumCulled = false; scene.add(zShadow);
   const base = new T.Matrix4(), loc = new T.Matrix4(), tmp = new T.Matrix4(), C = new T.Color(), WHITE = new T.Color(1, 1, 1), FIRE = new T.Color(1, .45, .1), ICE = new T.Color(.6, .85, 1);
   const STREET_LOOKS = [
-    { skin: 0xb98162, shirt: 0xef5658, pants: 0x4b76a5, hair: 0x41c7ef, shorts: true, open: true },
+    { skin: 0xb98162, shirt: 0xe96355, pants: 0x3e658e, hair: 0x41c7ef, shorts: true, open: true, coralShirt: true },
     { skin: 0xd49c82, shirt: 0xe9edf4, pants: 0x3a6a9a, hair: 0xff5ba9, shorts: true, crop: true, unicorn: true },
     { skin: 0x815740, shirt: 0x79da57, pants: 0x36638d, hair: 0x9a6ee9, crop: true },
     { skin: 0xc38c68, shirt: 0xffb039, pants: 0x416b98, hair: 0x29b8bc, open: true }
@@ -380,20 +380,27 @@ const ZFX = (() => {
 
   function drawStreetRaider(z, sc, t, fall) {
     const crawl = z.lost & 4, turn = fall ? 0 : (z.backTurn || 0);
-    const stride = Math.sin(z.walk * .85) * (1 - turn * 2);
+    const phase = z.walk * .85;
+    const coral = z.coralShirt;
+    const stride = Math.sin(phase) * (1 - turn * 2);
     const attack = z.fl & 1 ? .5 + .5 * Math.sin(t * 14) : 0;
     const air = z.fl & 4 ? 8 * Math.abs(Math.sin(t * 6)) : 0;
     const lean = .13 + attack * .24 + turn * .21 - (z.kick || 0) * .35;
     const bob = Math.abs(stride);
+    const flourish = coral && !fall && !crawl ? (1 - turn) * (1 - attack) : 0;
+    // The hips lead the next crossing step; the shoulders counter-rotate.
+    const sway = Math.cos(phase) * flourish;
+    const hipX = sway * 1.43, shoulderX = -sway * .72;
+    const hipRoll = sway * .12, shoulderRoll = -sway * .095;
     base.compose(V3.set(z.p[0], air, z.p[1]), Q.setFromEuler(E.set(0, z.yaw + Math.PI * turn, 0)), S3.setScalar(sc));
     if (fall) base.multiply(tmp.makeRotationX(-fall * 1.48));
     else if (crawl) base.multiply(tmp.makeRotationX(1.35)).multiply(tmp.makeTranslation(0, -18, -8));
 
-    if (z.open || z.crop) enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), 0, 26 + bob, 1, 5.8, 7, 4.4, lean);
+    if (z.open || z.crop) enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), shoulderX, 26 + bob + (coral ? 1.2 : 0), 1, 5.8, 7, 4.4, lean, shoulderRoll);
     if (z.open) {
       for (const side of [-1, 1]) {
-        enemyPart(streetCotton, cottonCount++, enemyColor(z.shirt, z, t), side * 3.7, 29 + bob, .3, 3.6, 8, 4.7, lean, side * .08);
-        enemyPart(suit, suitCount++, enemyColor(0xf4d9c2, z, t), side * 2.4, 34.3 + bob, 4.35, 1.05, 2.6, .85, lean + .24, -side * .52);
+        enemyPart(streetCotton, cottonCount++, enemyColor(z.shirt, z, t), shoulderX + side * 3.7, 29 + bob + (coral ? 1.2 : 0), .3, 3.6, coral ? 7 : 8, 4.7, lean, shoulderRoll + side * .08);
+        enemyPart(suit, suitCount++, enemyColor(0xf4d9c2, z, t), shoulderX + side * 2.4, 34.3 + bob, 4.35, 1.05, 2.6, .85, lean + .24, shoulderRoll - side * .52);
       }
     } else {
       enemyPart(streetCotton, cottonCount++, enemyColor(z.shirt, z, t), 0, 29.5 + bob, 1.3, 6.8, z.crop ? 5.2 : 8.4, 4.55, lean);
@@ -402,17 +409,31 @@ const ZFX = (() => {
         enemyPart(prints, printCount++, enemyColor(0xffffff, z, t), 0, 31 + bob, -3.4, 6, 6, 1, -lean, 0, Math.PI);
       }
     }
-    enemyPart(denimWaist, waistCount++, enemyColor(z.pants, z, t), 0, 20, 0, 6.4, 3.9, 4.6);
+    enemyPart(denimWaist, waistCount++, enemyColor(z.pants, z, t), hipX, 20, 0, 6.4, coral ? 3.1 : 3.9, 4.6, 0, hipRoll);
     if (!(z.lost & 16)) {
-      enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), turn, 38 + bob, 2.4, 4.15, 4.75, 4.25, lean, 0, turn * 1.65);
-      enemyPart(suit, suitCount++, enemyColor(z.hair, z, t), turn - .65, 40.7 + bob, 2.15, 4.55, 3.1, 4.5, lean, .29, turn * 1.65);
+      enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), shoulderX + turn, 38 + bob, 2.4, 4.15, 4.75, 4.25, lean, 0, turn * 1.65);
+      enemyPart(suit, suitCount++, enemyColor(z.hair, z, t), shoulderX + turn - .65, 40.7 + bob, 2.15, 4.55, 3.1, 4.5, lean, .29, turn * 1.65);
       enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.hair, z, t).lerp(WHITE, .18),
-        turn + .7, 42.2 + bob, 2.05, 2.15, 2.05, 4.25, lean - .19, -.38, turn * 1.65);
-      enemyPart(raiderMarks, markCount++, enemyColor(0x523d39, z, t), turn * 5, 38.7 + bob, 6.48 - turn * 4.4, 2.7, .57, .44, 0, 0, turn * 1.65);
+        shoulderX + turn + .7, 42.2 + bob, 2.05, 2.15, 2.05, 4.25, lean - .19, -.38, turn * 1.65);
+      enemyPart(raiderMarks, markCount++, enemyColor(0x523d39, z, t), shoulderX + turn * 5, 38.7 + bob, 6.48 - turn * 4.4, 2.7, .57, .44, 0, 0, turn * 1.65);
     }
     for (const side of [-1, 1]) {
       const step = stride * side, lift = Math.max(0, step) * 2.5;
-      if (!crawl) {
+      if (!crawl && coral) {
+        const footX = side * (4.0 - flourish * (1.45 + Math.max(0, step) * 1.55));
+        const kneeX = (side * 3.55 + hipX + footX) * .5;
+        const roll = (kneeX - (side * 3.4 + hipX)) * .095;
+        enemyPart(denimLeg, denimCount++, enemyColor(z.pants, z, t),
+          side * 3.35 + hipX, 17 + lift * .35, step * 2.2, 3.33, 4.1, 3.45, step * .38, roll);
+        enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t),
+          kneeX, 11.65 + lift * .7, step * 3.9, 2.65, 5.45, 2.75, step * .29, roll);
+        enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t),
+          (kneeX + footX) * .5, 6.85 + lift, step * 5.4, 2.13, 4.75, 2.32, -step * .16, (footX - kneeX) * .10);
+        enemyPart(suit, suitCount++, enemyColor(0x37363e, z, t),
+          footX, 2.25 + lift, 1.65 + step * 6, 2.72, 1.95, 4.2, step * .12);
+        enemyPart(suit, suitCount++, enemyColor(0xe0d9ce, z, t),
+          footX, .96 + lift, 1.93 + step * 6, 2.78, .73, 4.26, step * .12);
+      } else if (!crawl) {
         enemyPart(denimLeg, denimCount++, enemyColor(z.pants, z, t), side * 3.4, 15.5 + lift, step * 4, 3.3, z.shorts ? 5 : 7, 3.4, step * .4);
         if (z.shorts) enemyPart(suit, suitCount++, enemyColor(0x9ab4c9, z, t),
           side * 3.45, 12.35 + lift, step * 4.5, 3.07, 1.55, 3.15, step * .4);
@@ -422,10 +443,14 @@ const ZFX = (() => {
         enemyPart(suit, suitCount++, enemyColor(z.shorts ? 0xe1e7f2 : 0x322936, z, t), side * 4, 2.8 + lift, 1.6 + step * 6, 2.8, 2.6, 4.1);
       }
       if (z.lost & (side < 0 ? 1 : 2)) continue;
+      const wrist = Math.sin(phase + .75) * side * flourish;
       const reach = attack * (side === 1 ? 1 : .45);
-      enemyPart(streetCotton, cottonCount++, enemyColor(z.shirt, z, t), side * 7, 31 + bob, 1, 2.75, 3.55, 2.75, .2 * step, side * .2);
-      enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), side * 8.2, 26 + bob + reach * 3, 2 - step * 2.3 + reach * 2.5, 2.05, 5.4, 2.3, -.19 + step * .5 - reach);
-      enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), side * 8.35, 21.7 + bob + reach * 6, 3 - step * 4.8 + reach * 6, 1.85, 4.1, 2.1, -.38 + step * .45 - reach);
+      enemyPart(streetCotton, cottonCount++, enemyColor(z.shirt, z, t), shoulderX + side * 7, 31 + bob, 1, 2.75, coral ? 3.25 : 3.55, 2.75, .2 * step, shoulderRoll + side * .2);
+      enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), shoulderX + side * 8.2, 26 + bob + reach * 3, 2 - step * 2.3 + reach * 2.5, 2.05, 5.4, 2.3, -.19 + step * .5 - reach);
+      enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t), shoulderX + side * 8.35 + wrist * .85, 21.7 + bob + reach * 6, 3 - step * 4.8 + reach * 6, 1.85, coral ? 3.45 : 4.1, 2.1, -.38 + step * .45 - reach, wrist * .22);
+      if (coral) enemyPart(enforcerSkin, enforcerSkinCount++, enemyColor(z.skin, z, t),
+        shoulderX + side * 8.35 + wrist * 1.7, 18.6 + bob + reach * 7,
+        3.55 - step * 5.8 + reach * 7, 1.63, 1.85, 1.72, -.28 - wrist * .42 - reach, wrist * .46);
     }
   }
   function draw(list, now) {
