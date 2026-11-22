@@ -14,12 +14,12 @@ const BruteRig = (() => {
     const bind = data.bones.map(([a, b], i) => { const s = shiftOf(i); return [V(a[0] + s[0], a[1] + s[1], a[2] + s[2]), V(b[0] + s[0], b[1] + s[1], b[2] + s[2])]; });
     // толщина по костям: [x, y, z] для позвоночника, число — радиально для рук и ног
     const FAT = boss ? 1.08 : 1;
-    const thick = (b, t, oy) => {
+    const thick = (b, t, oy, oz) => {
       const k = b >= 10 ? b - 6 : b;
       if (k === 0) return [1.34 * FAT, 1, 1.2 * FAT];
       if (k === 1) return [1.3 * FAT, 1, 1.16 * FAT];
       if (k === 2) return [1.4 * FAT, 1, 1.32 * FAT];
-      if (k === 3) return oy < 20.2 ? [1.62, 1, 1.42] : oy < 21.6 ? [1.16, 1, 1.08] : [1.05, 1, 1.04];
+      if (k === 3) return oy < 18.4 ? (oz > 1.6 ? [1.3, 1, 1] : [1.5, 1, 1.3]) : oy < 21.6 ? [1.08, 1, 1] : [1.05, 1, 1.03]; // шея толще, лицо и челюсть — без раздувания вперёд
       if (k === 4) return 1.72 * FAT;
       if (k === 5) return (t < .55 ? 1.9 : 1.55) * FAT;
       if (k === 6) return 1.32;
@@ -35,7 +35,7 @@ const BruteRig = (() => {
       for (let k = 0; k < 4; k++) { const w = W0[v * 4 + k]; if (w <= 0) continue; const b = J0[v * 4 + k], s = shiftOf(b);
         p_.set(ox + s[0], oy + s[1], oz + s[2]); a_.copy(bind[b][0]); b_.copy(bind[b][1]);
         const ab = b_.clone().sub(a_), t = Math.max(0, Math.min(1, p_.clone().sub(a_).dot(ab) / ab.lengthSq()));
-        c_.copy(a_).addScaledVector(ab, t); o_.subVectors(p_, c_); const f = thick(b, t, oy);
+        c_.copy(a_).addScaledVector(ab, t); o_.subVectors(p_, c_); const f = thick(b, t, oy, oz);
         if (Array.isArray(f)) o_.set(o_.x * f[0], o_.y * f[1], o_.z * f[2]); else o_.multiplyScalar(f);
         acc.addScaledVector(c_.add(o_), w); ws += w; }
       acc.multiplyScalar(1 / Math.max(ws, 1e-4));
