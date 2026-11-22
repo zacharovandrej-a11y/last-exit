@@ -79,20 +79,11 @@ const ZFX = (() => {
     mesh.frustumCulled = false;
     scene.add(mesh);
   }
-  const limb = new T.Vector3(), limbUp = new T.Vector3(0, 1, 0);
   let suitCount = 0, markCount = 0;
   function enemyPart(mesh, i, color, x, y, z, sx, sy, sz, rx = 0, rz = 0, ry = 0) {
     loc.compose(V3.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz)), S3.set(sx, sy, sz));
     mesh.setMatrixAt(i, tmp.multiplyMatrices(base, loc));
     mesh.setColorAt(i, color);
-  }
-  function raiderLimb(x, y0, z0, y1, z1, width) {
-    limb.set(0, y1 - y0, z1 - z0);
-    const length = limb.length();
-    loc.compose(V3.set(x, (y0 + y1) / 2, (z0 + z1) / 2),
-      Q.setFromUnitVectors(limbUp, limb.normalize()), S3.set(width, length / 2 + width * .55, width));
-    suit.setMatrixAt(suitCount, tmp.multiplyMatrices(base, loc));
-    suit.setColorAt(suitCount++, C);
   }
   function enemyColor(hex, z, t) {
     C.setHex(hex);
@@ -101,46 +92,273 @@ const ZFX = (() => {
     if (z.flash > 0) C.lerp(WHITE, z.flash);
     return C;
   }
-  function drawRaider(z, sc, t) {
-    const fall = z.fall || 0, noLegs = z.lost & 4, phase = z.walk / (Math.PI * 2);
-    const air = z.fl & 4 ? 10 * Math.abs(Math.sin(t * 6)) : 0;
-    const lunge = z.fl & 1 ? .5 + .5 * Math.sin(t * 16) : 0;
-    const turn = fall ? 0 : (z.backTurn || 0);
-    const kick = Math.max(0, turn * 2 - 1);
-    const height = noLegs ? 9 : 19 + Math.cos(z.walk * 2) * .8 - lunge * 2 + kick * 3;
-    const recoil = (z.kick || 0) * .2;
-    base.compose(V3.set(z.p[0], air, z.p[1]), Q.setFromEuler(E.set(0, z.yaw + Math.PI * turn, 0)), S3.setScalar(sc));
-    if (fall) {
-      base.multiply(tmp.makeTranslation(0, 6, 0));
-      base.multiply(tmp.makeRotationZ(fall * Math.PI / 2));
-      base.multiply(tmp.makeTranslation(0, -height, 0));
-    }
-    enemyPart(suit, suitCount++, enemyColor(0x625472, z, t), 0, height, 2, 7, 5.6, 14, -.12 + recoil);
-    enemyPart(suit, suitCount++, enemyColor(0x51465b, z, t), 0, height + .5, -10, 6, 4.8, 6);
-    enemyPart(raiderMarks, markCount++, enemyColor(0xe88757, z, t), 0, height + 5.2, 6, 5.3, 1.4, 6.5);
-    if (!(z.lost & 16)) {
-      const headZ = 16 + lunge * 3;
-      enemyPart(suit, suitCount++, enemyColor(0x625770, z, t), turn * 2.8, height + 1, headZ - turn * 3, 4.8, 5.8, 5.4, recoil, 0, turn * 1.25);
-      enemyPart(raiderMarks, markCount++, enemyColor(0xf2af68, z, t), turn * 6.7, height + 2.5, headZ + 4.7 - turn * 6, 3.9, 1.35, 1.2, 0, 0, turn * 1.25);
-    }
-    enemyColor(0x594e64, z, t);
-    for (const side of [-1, 1]) {
-      for (const front of [true, false]) {
-        if (front ? z.lost & (side < 0 ? 1 : 2) : noLegs) continue;
-        // Диагональные пары: опора идёт назад, перенос возвращает кисть или стопу вперёд.
-        const offset = phase + ((side < 0) === front ? .5 : 0);
-        const step = offset - Math.floor(offset);
-        const swing = Math.max(0, (step - .58) / .42);
-        const stride = step < .58 ? 1 - 2 * step / .58 : -Math.cos(swing * Math.PI);
-        const lift = Math.sin(swing * Math.PI) * 7;
-        const jointZ = front ? 11 : -10, endZ = jointZ + stride * 12 + (front ? 3 : -1) - (front ? 0 : kick * 12);
-        const endY = fall ? height - 4 : 2 + lift * (1 - turn) + (front ? 0 : kick * 13);
-        const jointY = height - (front ? 1 : 2);
-        const bendY = (jointY + endY) / 2 + (front ? 2 : 5);
-        const bendZ = (jointZ + endZ) / 2 + (front ? -4 : 6);
-        raiderLimb(side * 6, jointY, jointZ, bendY, bendZ, front ? 2.7 : 3.1);
-        raiderLimb(side * 6, bendY, bendZ, endY, endZ, 2.3);
+  // Латексные костюмы. Геометрия в локальных координатах с продольной осью +Z.
+  function raiderLoft(profile, radial, shape) {
+    const positions = [], colors = [], trim = [], triangles = [];
+    for (const [z, height, width, depth] of profile) {
+      for (let side = 0; side < radial; side++) {
+        const angle = side / radial * Math.PI * 2;
+        const x = Math.sin(angle), y = Math.cos(angle);
+        const detail = shape ? shape(z, x, y) : 0;
+        positions.push(x * width, height + y * depth + detail, z);
+        const tone = .88 + y * .08;
+        colors.push(tone, tone, tone);
+        trim.push(0);
       }
+    }
+    for (let ring = 1; ring < profile.length; ring++) for (let side = 0; side < radial; side++) {
+      const a = (ring - 1) * radial + side, b = (ring - 1) * radial + (side + 1) % radial;
+      const c = a + radial, d = b + radial;
+      if (profile[ring - 1][2]) triangles.push(a, c, b);
+      if (profile[ring][2]) triangles.push(b, c, d);
+    }
+    const geometry = new T.BufferGeometry();
+    geometry.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new T.Float32BufferAttribute(colors, 3));
+    geometry.setAttribute('latexTrim', new T.Float32BufferAttribute(trim, 1));
+    geometry.setIndex(triangles);
+    geometry.computeVertexNormals();
+    return geometry;
+  }
+
+  function taperGeo(r0, r1) {
+    return raiderLoft([[-.5, 0, 0, 0], [-.37, 0, r0, r0],
+      [-.14, 0, r0 * 1.03, r0], [.22, 0, r1, r1], [.41, 0, r1 * .68, r1 * .66], [.5, 0, 0, 0]], 8);
+  }
+
+  function torsoGeo(torn = false) {
+    const geometry = raiderLoft([[-17, 1.7, 0, 0], [-15, 1.8, 4.5, 3.25],
+      [-11, 1.2, 5.25, 4.1], [-6, -.1, 4.15, 3.1], [0, -.6, 3.9, 3.2],
+      [4, -.05, 5.2, 3.65], [8, .15, 6.3, 4.0], [11, -.6, 4.25, 3.3], [13.2, -1.5, 0, 0]], 12,
+    (z, x, y) => z > 2 && z < 10 && y > 0 ? Math.abs(x) * y * 1.25 : 0);
+    const pos = Array.from(geometry.attributes.position.array), colors = Array.from(geometry.attributes.color.array);
+    const indices = Array.from(geometry.index.array), trim = Array.from(geometry.attributes.latexTrim.array);
+    // Молния на спине — узкая нитка, вписанная в тот же пакет инстансов.
+    const back = [[-14, 5.1], [-11, 5.38], [-6, 3.08], [0, 2.68], [4, 3.69], [8, 4.25], [11, 2.81]];
+    for (const [i, [z, y]] of back.entries()) {
+      const start = pos.length / 3, half = i === 0 ? .24 : .15;
+      pos.push(-half, y, z, half, y, z);
+      colors.push(.9, .91, .92, .9, .91, .92);
+      trim.push(.75, .75);
+      if (i) indices.push(start - 2, start, start - 1, start - 1, start, start + 1);
+    }
+    if (torn) {
+      const start = pos.length / 3;
+      pos.push(4.13, 1.88, .6, 5.82, 1.82, 6.2, 4.5, 2.35, 3.5, 4.85, .55, 5, 5.4, .64, 8.5);
+      colors.push(.85,.85,.85, .85,.85,.85, .85,.85,.85, .85,.85,.85, .85,.85,.85);
+      trim.push(1.7, 1.95, 1.5, 2.2, 1.75);
+      indices.push(start, start + 2, start + 1, start + 3, start, start + 1, start + 3, start + 1, start + 4);
+    }
+    geometry.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+    geometry.setAttribute('color', new T.Float32BufferAttribute(colors, 3));
+    geometry.setAttribute('latexTrim', new T.Float32BufferAttribute(trim, 1));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    return geometry;
+  }
+
+  function headGeo() {
+    return raiderLoft([[-8, 1.5, 0, 0], [-6.7, .7, 2.1, 1.8], [-4, 0, 2.05, 1.75],
+      [-2.5, .15, 2.8, 2.95], [-.7, .45, 3.25, 3.6], [1.9, .25, 3.1, 3.15],
+      [3.5, -.07, 2.6, 2.65], [4.6, -.2, 1.8, 1.95], [5.7, -.4, 0, 0]], 12, (z, x, y) => {
+      if (y > .995 && z < 3.1) return .17; // тонкий шов капюшона
+      if (z < 1.5) return 0;
+      if (y > .9 && z > 3.1) return .55;
+      return y > .28 && y < .86 ? -.47 : 0;
+    });
+  }
+
+  const latex = new T.MeshPhongMaterial({
+    color: 0xffffff, emissive: 0x060608, specular: 0x8a8a96, shininess: 104, vertexColors: true
+  });
+  const latexGrade = /real/.test(location.hash) ? '.62)*vec3(1.03,1.,.88)'
+    : /bright|toonall/.test(location.hash) ? '1.18)*vec3(1.03,1.02,.98)' : '.84)*vec3(1.06,.97,.88)';
+  latex.onBeforeCompile = shader => {
+    shader.uniforms.latexRim = { value: new T.Color(0x5a6a8a) };
+    shader.vertexShader = 'attribute float latexTrim; varying float vLatexTrim;\n' +
+      shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvLatexTrim=latexTrim;');
+    shader.fragmentShader = 'uniform vec3 latexRim; varying float vLatexTrim;\n' + shader.fragmentShader.replace('#include <dithering_fragment>', `
+      #include <dithering_fragment>
+      float edge = 1.0-max(dot(normal,normalize(vViewPosition)),0.0);
+      gl_FragColor.rgb+=latexRim*(edge*edge*edge*.43);
+      float tear=smoothstep(1.1,1.5,vLatexTrim);
+      gl_FragColor.rgb+=vec3(.12,.115,.13)*min(vLatexTrim,.9)*(1.0-tear);
+      gl_FragColor.rgb=mix(gl_FragColor.rgb,mix(vec3(.39,.31,.27),vec3(.21,.046,.042),
+        smoothstep(1.76,2.2,vLatexTrim)),tear*.68);
+      float lum=dot(gl_FragColor.rgb,vec3(.299,.587,.114));
+      gl_FragColor.rgb=mix(vec3(lum),gl_FragColor.rgb,${latexGrade};
+    `);
+  };
+  function latexBatch(name, geometry, capacity, shadow = false) {
+    const mesh = new T.InstancedMesh(geometry, latex, capacity);
+    mesh.name = name;
+    mesh.setColorAt(0, WHITE);
+    mesh.count = 0;
+    mesh.frustumCulled = false;
+    mesh.castShadow = shadow;
+    mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
+    mesh.instanceColor.setUsage(T.DynamicDrawUsage);
+    scene.add(mesh);
+    return mesh;
+  }
+  const latexBody = latexBatch('Черный костюм · торс', torsoGeo(), ZN, true);
+  const tornLatexBody = latexBatch('Черный костюм · потертость', torsoGeo(true), ZN, true);
+  const latexHood = latexBatch('Черный костюм · капюшон', headGeo(), ZN);
+  const latexLimbs = latexBatch('Черный костюм · конечности', taperGeo(1, .77), ZN * 8);
+  const latexHands = latexBatch('Черный костюм · кисти', raiderLoft([
+    [-2.65, 0, 0, 0], [-1.35, 0, 1.25, .85], [.5, -.06, 1.75, .62], [2.15, -.15, 1.35, .43], [3, -.2, 0, 0]
+  ], 8, (z, x, y) => z < 1 && z > -.2 ? x * y * .43 : 0), ZN * 2);
+  const latexFeet = latexBatch('Черный костюм · стопы', raiderLoft([
+    [-2.75, .6, 0, 0], [-1.65, .42, 1.25, 1.15], [.25, .1, 1.55, .85], [2.2, -.08, 1.35, .58], [3.45, -.15, 0, 0]
+  ], 8), ZN * 2);
+  const latexBatches = [latexBody, tornLatexBody, latexHood, latexLimbs, latexHands, latexFeet];
+  const raiderA = new T.Vector3(), raiderB = new T.Vector3(), raiderJoint = new T.Vector3();
+  const raiderDir = new T.Vector3(), raiderBend = new T.Vector3(), axisZ = new T.Vector3(0, 0, 1);
+  const raiderRig = new T.Quaternion();
+  const BLACK = 0x0b0b0e, RAIDER_BLOOD = 0x2a0606, BOOT_DIRT = new T.Color(0x443329);
+
+  function latexPart(mesh, color, x, y, z, sx, sy, sz, rx = 0, rz = 0, ry = 0) {
+    enemyPart(mesh, mesh.count++, color, x, y, z, sx, sy, sz, rx, rz, ry);
+  }
+  function latexSegment(a, b, width, color) {
+    raiderDir.subVectors(b, a);
+    const distance = raiderDir.length();
+    if (distance < .01) return;
+    loc.compose(V3.copy(a).lerp(b, .5), Q.setFromUnitVectors(axisZ, raiderDir.multiplyScalar(1 / distance)),
+      S3.set(width, width, distance + width * 1.95));
+    const i = latexLimbs.count++;
+    latexLimbs.setMatrixAt(i, tmp.multiplyMatrices(base, loc));
+    latexLimbs.setColorAt(i, color);
+  }
+  function solveRaiderLimb(a, b, side, front, radius, color) {
+    raiderDir.subVectors(b, a);
+    const upper = front ? 11.4 : 12.4, lower = front ? 11.9 : 12.2;
+    const distance = Math.max(.01, raiderDir.length());
+    raiderDir.multiplyScalar(1 / distance);
+    const reach = Math.min(distance, upper + lower - .1);
+    const along = (reach * reach + upper * upper - lower * lower) / (2 * reach);
+    raiderBend.set(side * .88, front ? .23 : .64, front ? -.62 : .72);
+    raiderBend.addScaledVector(raiderDir, -raiderBend.dot(raiderDir)).normalize();
+    raiderJoint.copy(a).addScaledVector(raiderDir, along)
+      .addScaledVector(raiderBend, Math.sqrt(Math.max(0, upper * upper - along * along)));
+    if (reach < distance) b.copy(a).addScaledVector(raiderDir, reach);
+    latexSegment(a, raiderJoint, radius, color);
+    latexSegment(raiderJoint, b, radius * .83, color);
+  }
+
+  function drawRaider(z, sc, time) {
+    let pose = z.latexPose;
+    if (!pose) {
+      const id = z.id || Math.round((z.seed || 0) * 133);
+      pose = z.latexPose = { id, feet: new Float32Array(8), planted: 0, walk: z.walk, time,
+        turn: z.backTurn || 0, yaw: z.yaw, recoil: 0, force: 0, dx: 0, dz: 0, x: z.p[0], y: z.p[1], attack: -1, air: -1, hold: false };
+    }
+    const fall = z.fall || 0, frozen = !!(z.fl & 8) && !fall, burning = !!(z.fl & 2) && !fall;
+    if (!frozen) {
+      const dt = Math.min(.08, Math.max(0, time - pose.time));
+      pose.clock = (pose.clock || 0) + dt;
+      if (z.fl & 1) { if (pose.attack < 0) pose.attack = pose.clock; } else pose.attack = -1;
+      if (z.fl & 4) { if (pose.air < 0) pose.air = pose.clock; } else pose.air = -1;
+      const hold = (pose.clock + pose.id * .713) % (6.5 + pose.id % 4 * .81) < .42;
+      if (!hold || pose.attack >= 0 || pose.air >= 0) pose.walk = z.walk;
+      if (hold !== pose.hold) { pose.planted = 0; pose.hold = hold; }
+      pose.turn = z.backTurn || 0;
+      const dx = z.p[0] - pose.x, dz = z.p[1] - pose.y, speed = Math.hypot(dx, dz);
+      pose.force = Math.max(0, pose.force - dt * 3.6);
+      if (dt && speed > dt * 132 + .5 && speed < 75) {
+        pose.force = Math.min(1, (speed / dt - 132) / 115);
+        pose.dx = dx / speed; pose.dz = dz / speed;
+      }
+      pose.recoil = Math.max(z.kick || 0, pose.force);
+      pose.yaw = z.yaw;
+    }
+    pose.time = time; pose.x = z.p[0]; pose.y = z.p[1];
+    const t = pose.clock || 0, turn = fall ? 0 : pose.turn, noLegs = z.lost & 4;
+    const attackTime = !fall && pose.attack >= 0 ? t - pose.attack : -1;
+    const jumpTime = !fall && pose.air >= 0 ? t - pose.air : -1;
+    const lunge = attackTime < .12 ? 0 : Math.max(0, 1 - Math.abs((attackTime - .2) / .08));
+    const crouch = attackTime < 0 || attackTime >= .12 ? 0 : Math.sin(attackTime / .12 * Math.PI * .5);
+    const jump = jumpTime < 0 ? 0 : Math.sin(Math.min(1, jumpTime / .4) * Math.PI);
+    const kick = Math.max(0, turn * 2 - 1);
+    const phase = pose.walk * (.331 + pose.id % 7 * .004) + pose.id * .173;
+    const wave = fall ? 0 : phase * Math.PI * 2;
+    const flail = burning ? Math.sin(t * 22 + pose.id) : 0;
+    const twitchPhase = (t + pose.id * .313) % (3.2 + pose.id % 7 * .38);
+    const twitch = twitchPhase < .3 ? (1 - twitchPhase / .3) ** 2 * (pose.id % 2 ? -.58 : .58) : 0;
+    const recoil = pose.recoil;
+    const h = fall ? 18 * (1 - fall) ** 2 + 3.9 : noLegs ? 8.8 : 17.7 + Math.sin(wave * 2) * .7 - crouch * 2.5 + kick * 1.8;
+    const yaw = pose.yaw + Math.PI * turn, sn = Math.sin(yaw), cs = Math.cos(yaw);
+    const sideOfImpact = z.d ? z.d[0] * cs - z.d[1] * sn : pose.force ? pose.dx * cs - pose.dz * sn : (pose.id % 2 ? -1 : 1);
+    const roll = fall ? (sideOfImpact < 0 ? -1 : 1) * fall * 1.49 : Math.sin(wave) * .105 + flail * .1 + recoil * sideOfImpact * .23;
+    const pitch = fall ? fall * .19 : Math.cos(wave) * .085 + recoil * .32 - jump * .27;
+    const rootZ = lunge * 8.7 - recoil * 2.4;
+    base.compose(V3.set(z.p[0], jump * 13, z.p[1]), Q.setFromEuler(E.set(0, yaw, 0)), S3.setScalar(sc));
+
+    raiderRig.setFromEuler(E.set(pitch, 0, roll));
+    const baseColor = burning ? 0x1a1410 : BLACK + (pose.id % 3) * 0x020202;
+    C.setHex(baseColor);
+    if (frozen) C.lerp(ICE, .62);
+    if (z.flash > 0) C.lerp(WHITE, z.flash);
+    const tintR = C.r, tintG = C.g, tintB = C.b;
+    latexPart(pose.id % 11 === 1 && !frozen && !burning ? tornLatexBody : latexBody, C, 0, h, rootZ, 1, 1, 1, pitch, roll);
+    if (!(z.lost & 16)) {
+      const bounce = fall ? Math.max(0, 1 - Math.abs(((z.t || 0) - .31) / .07)) * 1.8 : 0;
+      raiderA.set(turn * 2, -1.7, 13.5 - turn * 1.9).applyQuaternion(raiderRig);
+      latexPart(latexHood, C, raiderA.x, h + raiderA.y + bounce + recoil, raiderA.z + rootZ,
+        1, 1, 1, -.065 + pitch * .3, roll * .65 + twitch * .38, twitch + turn * 1.18 + flail * .13);
+    } else {
+      raiderA.set(0, -1.6, 10).applyQuaternion(raiderRig);
+      latexPart(latexHood, C.setHex(RAIDER_BLOOD), raiderA.x, h + raiderA.y, raiderA.z + rootZ, .58, .56, .43, pitch, roll);
+    }
+    const stable = !fall && attackTime < 0 && jumpTime < 0 && !turn && !burning && recoil < .15 && !pose.hold;
+    for (let i = 0; i < 4; i++) {
+      const front = i < 2, side = i % 2 ? 1 : -1, bit = 1 << i;
+      const missing = front ? z.lost & (side < 0 ? 1 : 2) : noLegs;
+      const jointX = side * (front ? 5.55 : 4.5), jointZ = front ? 7.9 : -10.8;
+      raiderA.set(jointX, front ? -.9 : .9, jointZ).applyQuaternion(raiderRig);
+      raiderA.y += h;
+      raiderA.z += rootZ;
+      if (missing) {
+        pose.planted &= ~bit;
+        raiderB.set(jointX + side * 1.15, raiderA.y - 1.7, raiderA.z + (front ? .6 : -.55));
+        latexSegment(raiderA, raiderB, front ? 2.07 : 2.5, C.setHex(RAIDER_BLOOD));
+        continue;
+      }
+      const offset = phase + ((side < 0) === front ? .5 : 0), step = offset - Math.floor(offset);
+      const swing = Math.max(0, (step - .57) / .43), footLift = Math.sin(swing * Math.PI) * (front ? 6.3 : 5.2);
+      const stride = step < .57 ? 6.9 - step / .57 * 13.8 : -6.9 * Math.cos(swing * Math.PI);
+      const twitchLeg = fall && i === 3 ? Math.sin((z.t || 0) * 31) * Math.max(0, 1 - (z.t || 0)) * 3 : 0;
+      raiderB.set(side * (front ? 9.3 : 8.1),
+        fall ? 1.15 + h * .23 + Math.max(0, sideOfImpact * side) * 2.8 + twitchLeg : 1.05 + footLift * (1 - turn) + jump * 3 + (front ? lunge * 3.5 : kick * 11),
+        jointZ + (front ? 3.3 : -1.55) + stride * (fall ? .26 : 1) + (front ? lunge * 12 : -kick * 11));
+      if (fall) {
+        raiderB.x += (sideOfImpact < 0 ? -1 : 1) * fall * 3;
+        raiderB.z += side * fall * 3;
+      } else if (pose.force > .2) {
+        raiderB.x += side * pose.force * 4;
+        raiderB.y += pose.force * (front ? 4.5 : 5.8);
+      } else if (burning && front) {
+        raiderB.x -= side * (2 + flail * 2);
+        raiderB.y += 4 + Math.abs(flail) * 5;
+      }
+      if (stable && step < .57) {
+        const j = i * 2;
+        if (!(pose.planted & bit)) {
+          pose.feet[j] = z.p[0] + (cs * raiderB.x + sn * raiderB.z) * sc;
+          pose.feet[j + 1] = z.p[1] + (-sn * raiderB.x + cs * raiderB.z) * sc;
+          pose.planted |= bit;
+        }
+        const dx = (pose.feet[j] - z.p[0]) / sc, dz = (pose.feet[j + 1] - z.p[1]) / sc;
+        if (dx * dx + dz * dz < 31 * 31) {
+          raiderB.x = dx * cs - dz * sn;
+          raiderB.z = dx * sn + dz * cs;
+        } else if (!frozen) pose.planted &= ~bit;
+      } else pose.planted &= ~bit;
+      C.setRGB(tintR, tintG, tintB);
+      solveRaiderLimb(raiderA, raiderB, side, front, front ? 2.05 : 2.48, C);
+      if (!frozen && !burning && (pose.id + i) % 4 === 0) C.lerp(BOOT_DIRT, .45);
+      latexPart(front ? latexHands : latexFeet, C, raiderB.x, raiderB.y, raiderB.z + (front ? .85 : .55), 1, 1, 1,
+        (front ? -.12 : .11) * footLift - kick * (front ? 0 : .55), fall * side * .6, side * .17);
     }
   }
   // Двусторонний радужный флаг. Складки заданы в общей геометрии.
@@ -408,13 +626,14 @@ const ZFX = (() => {
   function draw(list, now) {
     let shadowCount = 0;
     const t = now / 1000;
+    for (const mesh of latexBatches) mesh.count = 0;
     suitCount = markCount = bannerCount = enforcerSkinCount = printCount = supportCount = denimCount = waistCount = cottonCount = 0;
     for (const z of list) {
       if (shadowCount >= ZN) break;
       const Tz = ZT[z.ty], sc = Tz.sc, fall = z.fall || 0;
       zShadow.setMatrixAt(shadowCount++, M4.compose(V3.set(z.p[0], .6, z.p[1]),
         Q.setFromEuler(E.set(0, z.ty === RAIDER ? z.yaw : 0, 0)),
-        S3.set(Tz.r * 1.1, 1, Tz.r * (z.ty === RAIDER ? 2 : 1.1))));
+        S3.set(Tz.r * (z.ty === RAIDER ? 1.23 : 1.1), 1, Tz.r * (z.ty === RAIDER ? 2.08 : 1.1))));
       if (z.ty === RAIDER) drawRaider(z, sc, t);
       else if (z.ty === STANDARD_BEARER || z.ty === RAIDER_SUPPORT) {
         if (z.ty === RAIDER_SUPPORT && !fall) {
@@ -440,6 +659,13 @@ const ZFX = (() => {
       supportRings.instanceMatrix.updateRange.count = supportCount * 16;
       supportRings.instanceMatrix.needsUpdate = true;
     }
+    for (const mesh of latexBatches) {
+      if (!mesh.count) continue;
+      mesh.instanceMatrix.updateRange.count = mesh.count * 16;
+      mesh.instanceColor.updateRange.count = mesh.count * 3;
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.instanceColor.needsUpdate = true;
+    }
     for (const mesh of [suit, raiderMarks, banners, enforcerSkin, prints, denimLeg, denimWaist, streetCotton]) {
       if (!mesh.count) continue;
       mesh.instanceMatrix.updateRange.count = mesh.count * 16;
@@ -449,14 +675,19 @@ const ZFX = (() => {
     }
   }
   // ===== попадание и смерть =====
-  function hit(p, d, gore, z) { spray(p, 20, d, 4 + gore * 3, 90 + gore * 40); if (Math.random() < .5) bloodAt(add(p, d, 12 + Math.random() * 20), 14 + gore * 5, .8); if (z) z.flash = .9; }
+  function raiderBlood(p, size, alpha) {
+    decal(p, size, 'b1', RAIDER_BLOOD, alpha);
+    wet(p, size * .4, alpha);
+  }
+  function hit(p, d, gore, z) { spray(p, 20, d, 4 + gore * 3, 90 + gore * 40); if (Math.random() < .5) (z?.ty === RAIDER ? raiderBlood : bloodAt)(add(p, d, 12 + Math.random() * 20), 14 + gore * 5, .8); if (z) z.flash = .9; }
   const dying = [];
   function kill(p, d, g, ty, lost, z) {
     const sc = ZT[ty].sc;
-    const L = ty === RAIDER ? { skin: 0x625770, shirt: 0x625472 } : ty === STANDARD_BEARER ? { skin: 0xbb8970, shirt: 0x713343 } : (ty === ENFORCER || ZT[ty].boss) ? { skin: enforcerTone(z?.seed), shirt: LEATHER } : z || look(Math.floor(Math.random() * 999), ty);
-    spray(p, 20 * sc, d, 10 + g * 10, 120 + g * 50, 1.6 + g * .3); bloodAt(p, 30 * sc + g * 8, 1);
-    for (let i = 0; i < 2 + g; i++) bloodAt(add(p, d, 15 + Math.random() * 40 * (g * .4 + .6)), 10 + Math.random() * 16, .9);
-    if (g >= 5) { for (let i = 0; i < 14; i++) gib(p, 18 * sc, d, [3 + Math.random() * 5, 3 + Math.random() * 5, 3 + Math.random() * 5].map(v => v * sc), Math.random() < .4 ? L.skin : Math.random() < .5 ? L.shirt : 0x7a0a0a, 230); bloodAt(p, 70 * sc, 1); return; }
+    const L = ty === RAIDER ? { skin: 0xa49188, shirt: BLACK } : ty === STANDARD_BEARER ? { skin: 0xbb8970, shirt: 0x713343 } : (ty === ENFORCER || ZT[ty].boss) ? { skin: enforcerTone(z?.seed), shirt: LEATHER } : z || look(Math.floor(Math.random() * 999), ty);
+    const stain = ty === RAIDER ? raiderBlood : bloodAt;
+    spray(p, 20 * sc, d, 10 + g * 10, 120 + g * 50, 1.6 + g * .3); stain(p, 30 * sc + g * 8, 1);
+    for (let i = 0; i < 2 + g; i++) stain(add(p, d, 15 + Math.random() * 40 * (g * .4 + .6)), 10 + Math.random() * 16, .9);
+    if (g >= 5) { for (let i = 0; i < 14; i++) gib(p, 18 * sc, d, [3 + Math.random() * 5, 3 + Math.random() * 5, 3 + Math.random() * 5].map(v => v * sc), Math.random() < .4 ? L.skin : Math.random() < .5 ? L.shirt : 0x7a0a0a, 230); stain(p, 70 * sc, 1); return; }
     if (g >= 3) { if (!(lost & 1) && Math.random() < .6) { gib(p, 26 * sc, d, [4 * sc, 14 * sc, 4 * sc], L.skin, 160); lost |= 1; } if (!(lost & 2) && Math.random() < .6) { gib(p, 26 * sc, d, [4 * sc, 14 * sc, 4 * sc], L.skin, 160); lost |= 2; } if (Math.random() < .55) { gib(p, 32 * sc, d, [9 * sc, 9 * sc, 9 * sc], L.skin, 200); lost |= 16; } }
     dying.push({ ...(z || look(1)), p: [...p], d, yaw: z ? z.yaw : Math.atan2(-d[0], -d[1]), ty, lost, t: 0, seed: z?.seed ?? 1, kb: 4 + g * 7 });
   }
@@ -484,8 +715,8 @@ const ZFX = (() => {
     gibs.instanceMatrix.needsUpdate = true;
     const all = zl.slice();
     for (let i = dying.length - 1; i >= 0; i--) { const z = dying[i]; z.t += dt;
-      if (z.t > 2.4) { decal(add(z.p, z.d, 14 * ZT[z.ty].sc), 34 * ZT[z.ty].sc, 'body', 0x3a1812, .95, -z.yaw + Math.PI); bloodAt(z.p, 26 * ZT[z.ty].sc, .7); dying.splice(i, 1); continue; }
-      const k = Math.min(1, z.t / .35); all.push({ ...z, p: add(z.p, z.d, k * 10 + Math.min(1, z.t / .25) * (z.kb || 0)), walk: 0, fl: 0, flash: 0, fall: Math.max(.01, k) }); }
+      if (z.t > 2.4) { decal(add(z.p, z.d, 14 * ZT[z.ty].sc), 34 * ZT[z.ty].sc, 'body', 0x3a1812, .95, -z.yaw + Math.PI); (z.ty === RAIDER ? raiderBlood : bloodAt)(z.p, 26 * ZT[z.ty].sc, .7); dying.splice(i, 1); continue; }
+      const k = Math.min(1, z.t / (z.ty === RAIDER ? .25 : .35)); all.push({ ...z, p: add(z.p, z.d, k * 10 + Math.min(1, z.t / .25) * (z.kb || 0)), walk: 0, fl: 0, flash: 0, fall: Math.max(.01, k) }); }
     draw(all, now);
     for (const s of sps) { if (!s.visible) continue; const u = s.userData; u.t += dt; if (u.t > u.life) { s.visible = false; continue; } const k = u.t / u.life; s.scale.setScalar(u.s0 + (u.s1 - u.s0) * k); s.material.opacity = 1 - k; s.position.x += u.v[0] * dt; s.position.y += u.v[1] * dt; s.position.z += u.v[2] * dt; }
   }
