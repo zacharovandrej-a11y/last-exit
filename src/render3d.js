@@ -1552,9 +1552,13 @@ void main(){
   const gcyl = {}; const cg = (seg, top = 1) => gcyl[seg + '|' + top] || (gcyl[seg + '|' + top] = new T.CylinderGeometry(top, 1, 1, seg, 1));
   const gtor = {}; const tg = (t) => gtor[t] || (gtor[t] = new T.TorusGeometry(1, t, 5, 16));
   const GMUZ = {}, gunGeos = {};
+  // скруглённый куб для оружия: рёбра со скосом, чтобы детали ловили блики, а не были «кубиками»
+  const gunBox = (() => { const g = new T.BoxGeometry(1, 1, 1, 3, 3, 3), P = g.attributes.position, r = .09, k = .5 - r, v = new T.Vector3(), q = new T.Vector3();
+    for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); q.set(Math.max(-k, Math.min(k, v.x)), Math.max(-k, Math.min(k, v.y)), Math.max(-k, Math.min(k, v.z))); const d = v.clone().sub(q); if (d.lengthSq() > 1e-9) v.copy(q).addScaledVector(d.normalize(), r); P.setXYZ(i, v.x, v.y, v.z); }
+    g.computeVertexNormals(); return g; })();
   function gunGeo(w) {
     const L = [], H = Math.PI / 2;
-    const box = (c, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0) => L.push([geo.box, RX(x, y, z, sx, sy, sz, rx, ry, rz), c]);
+    const box = (c, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0) => L.push([gunBox, RX(x, y, z, sx, sy, sz, rx, ry, rz), c]);
     const tube = (c, x, y, z, r, l, seg = 12, top = 1) => L.push([cg(seg, top), RX(x, y, z, r, l, r, H), c]); // вдоль z, top — радиус спереди
     const post = (c, x, y, z, r, l, seg = 10) => L.push([cg(seg), RX(x, y, z, r, l, r), c]); // вертикальный цилиндр
     const side = (c, x, y, z, r, l, seg = 12) => L.push([cg(seg), RX(x, y, z, r, l, r, 0, 0, H), c]); // цилиндр поперёк (ось x)
@@ -1700,37 +1704,70 @@ void main(){
   // Один снимок на пушку. Лента показывает обычные картинки, без 3D-рендера при свайпе.
   const weaponImages = new Map(), weaponImageMaterials = new Map();
   let weaponImageScene, weaponImageCamera, weaponImageTarget;
-  function weaponImage(id) { // иконка оружия: студийный свет, металл с бликами, суперсэмплинг ×3, тень и светлый контур
+  // иконка оружия (рендер один раз): физический материал (металл отражает студийное окружение, дерево с волокнами,
+  // пластик и краска матовые), мягкий студийный свет, лёгкая перспектива, суперсэмплинг ×3, тень и светлый контур
+  let weaponEnv = null;
+  function weaponEnvMap() {
+    if (weaponEnv) return weaponEnv;
+    const es = new T.Scene(), sg = new T.SphereGeometry(50, 32, 16), cols = [], P = sg.attributes.position;
+    for (let i = 0; i < P.count; i++) { const y = P.getY(i) / 50, c = new T.Color().setRGB(.06, .06, .07).lerp(new T.Color(.55, .52, .48), Math.max(0, y) ** .7).lerp(new T.Color(.18, .14, .1), Math.max(0, -y) * .6); cols.push(c.r, c.g, c.b); }
+    sg.setAttribute('color', new T.Float32BufferAttribute(cols, 3)); es.add(new T.Mesh(sg, new T.MeshBasicMaterial({ vertexColors: true, side: T.BackSide })));
+    const panel = (w, h, x, y, z, c) => { const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ color: c, side: T.DoubleSide })); m.position.set(x, y, z); m.lookAt(0, 0, 0); es.add(m); };
+    panel(40, 18, -20, 34, 18, new T.Color(4, 3.7, 3.3)); panel(8, 50, 34, 8, -20, new T.Color(2.2, 2.4, 2.8)); panel(30, 6, 0, -20, 40, new T.Color(1.4, 1.1, .8)); panel(14, 14, -40, 4, -10, new T.Color(1.5, 1.5, 1.6));
+    const pm = new T.PMREMGenerator(renderer); weaponEnv = pm.fromScene(es, .02).texture; pm.dispose(); return weaponEnv;
+  }
+  function weaponIconMat() {
+    let m = weaponImageMaterials.get('pbr'); if (m) return m;
+    m = new T.MeshStandardMaterial({ vertexColors: true, metalness: 1, roughness: 1, envMap: weaponEnvMap(), envMapIntensity: 1.15 });
+    m.onBeforeCompile = sh => {
+      sh.vertexShader = 'varying vec3 vLP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvLP = position;');
+      sh.fragmentShader = 'varying vec3 vLP;\n' + sh.fragmentShader
+        .replace('#include <color_fragment>', `
+          vec3 vc = vColor.rgb; float gl = max(max(vc.r, vc.g), vc.b), mn = min(min(vc.r, vc.g), vc.b), sat = gl > .001 ? (gl - mn) / gl : 0.;
+          float n = sin(vLP.x * 9.1 + vLP.y * 5.3) * sin(vLP.y * 7.7 - vLP.z * 3.9) * sin(vLP.z * 6.1 + vLP.x * 2.3);
+          float gM = 0., gR = .6; vec3 gE = vec3(0.), base = vc;
+          if (gl > 1.05) { gE = vc * .9; base = vc * .3; gR = .4; }
+          else if (vc.b > vc.r * 1.25 && sat > .25 && gl < .8) { gM = .1; gR = .05; base = vc * .6; } // линза
+          else if (sat < .2) { float bright = gl; // металл: воронёная сталь, хром; тёмный пластик — чуть шероховатее
+            gM = bright < .3 ? .78 : .95; gR = (bright < .3 ? .34 : .2) + n * .03; base = mix(vec3(.3, .31, .34), vec3(.86, .88, .9), smoothstep(.3, .75, bright)) * (.9 + .04 * n); }
+          else if (vc.r > vc.g && vc.g > vc.b && sat > .35 && gl < .75) { // дерево: волокна вдоль ствола, лак
+            float grain = sin(vLP.y * 7.5 + vLP.x * 2. + sin(vLP.z * .55 + vLP.y * 1.3) * 2.6), fine = sin(vLP.y * 31. + sin(vLP.z * 1.7) * 3.); base = vc * (.84 + .14 * grain + .05 * fine) * vec3(.92, .78, .66); gR = .4 + .08 * grain; }
+          else { gR = .55 + n * .05; base = vc * (.74 + .05 * n); } // краска, ткань, резина
+          diffuseColor.rgb *= base;`)
+        .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = clamp(gR, .04, 1.);')
+        .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = gM;')
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += gE;');
+    };
+    weaponImageMaterials.set('pbr', m); return m;
+  }
+  function weaponImage(id) {
     if (weaponImages.has(id)) return weaponImages.get(id);
     const OW = 384, OH = 192, SS = 3, width = OW * SS, height = OH * SS;
     if (!weaponImageTarget) {
       weaponImageTarget = new T.WebGLRenderTarget(width, height, { depthBuffer: true });
       weaponImageScene = new T.Scene();
-      weaponImageScene.add(new T.HemisphereLight(0xfff1e0, 0x3a4050, .5));
-      const key = new T.DirectionalLight(0xfff2e0, .95); key.position.set(-5, 7, 4); weaponImageScene.add(key);
-      const fill = new T.DirectionalLight(0x9fb4d0, .3); fill.position.set(-4, -2, -5); weaponImageScene.add(fill);
-      const rim = new T.DirectionalLight(0xffd6a0, .8); rim.position.set(6, 4, -2); weaponImageScene.add(rim);
-      weaponImageCamera = new T.OrthographicCamera(-1, 1, 1, -1, .1, 400);
+      weaponImageScene.add(new T.HemisphereLight(0xfff1e0, 0x30343c, .25));
+      const key = new T.DirectionalLight(0xfff0dc, 1.6); key.position.set(-5, 8, 4); weaponImageScene.add(key);
+      const rim = new T.DirectionalLight(0xffd6a0, 1.2); rim.position.set(6, 3, -3); weaponImageScene.add(rim);
+      weaponImageCamera = new T.PerspectiveCamera(16, OW / OH, 1, 2000);
     }
-    const gun = gunMesh(ZW[id].m, 0), mesh = gun.children[0];
-    { const gg = mesh.geometry.clone(), C = gg.attributes.color; for (let i = 0; i < C.count; i++) { const r = C.getX(i), g = C.getY(i), b = C.getZ(i); if (r > 1.2 || g > 1.2 || b > 1.2) continue; const l = Math.max(r, g, b), k = l < .2 ? 1.35 : 1; C.setXYZ(i, Math.min(1, r * k + .03), Math.min(1, g * k + .03), Math.min(1, b * k + .035)); }
-      mesh.geometry = gg; mesh.material = weaponImageMaterials.get(0) || (weaponImageMaterials.set(0, new T.MeshPhongMaterial({ vertexColors: true, shininess: 60, specular: 0x5a5a5a })), weaponImageMaterials.get(0)); }
+    const gun = gunMesh(ZW[id].m, 0), mesh = gun.children[0]; mesh.material = weaponIconMat();
     gun.rotation.set(0, 0, 0); gun.updateMatrixWorld(true);
     const bounds = new T.Box3().setFromObject(gun), center = bounds.getCenter(new T.Vector3()), size = bounds.getSize(new T.Vector3());
-    const half = Math.max(8, Math.max(size.z * .56, size.y * 1.12));
-    weaponImageCamera.left = -half; weaponImageCamera.right = half; weaponImageCamera.top = half / 2; weaponImageCamera.bottom = -half / 2;
-    weaponImageCamera.position.copy(center).add(new T.Vector3(-90, 30, 26)); weaponImageCamera.lookAt(center); weaponImageCamera.updateProjectionMatrix();
+    const half = Math.max(8, Math.max(size.z * .55, size.y * 1.1)), dist = (half / 2) / Math.tan(8 * Math.PI / 180) * 1.02;
+    const dir = new T.Vector3(-90, 30, 26).normalize(); weaponImageCamera.position.copy(center).addScaledVector(dir, dist); weaponImageCamera.lookAt(center); weaponImageCamera.updateProjectionMatrix();
     const currentTarget = renderer.getRenderTarget(), clear = renderer.getClearColor(new T.Color()), alpha = renderer.getClearAlpha(), pixels = new Uint8Array(width * height * 4);
     weaponImageScene.add(gun);
     try { renderer.setRenderTarget(weaponImageTarget); renderer.setClearColor(0, 0); renderer.clear(); renderer.render(weaponImageScene, weaponImageCamera); renderer.readRenderTargetPixels(weaponImageTarget, 0, 0, width, height, pixels); }
     finally { weaponImageScene.remove(gun); renderer.setRenderTarget(currentTarget); renderer.setClearColor(clear, alpha); }
     const big = document.createElement('canvas'); big.width = width; big.height = height; const bp = big.getContext('2d'), image = bp.createImageData(width, height);
-    for (let y = 0; y < height; y++) { const row = (height - 1 - y) * width * 4; image.data.set(pixels.subarray(row, row + width * 4), y * width * 4); }
+    const G = new Uint8Array(256); for (let i = 0; i < 256; i++) G[i] = Math.round(255 * Math.pow(i / 255, 1 / 1.4)); // линейный рендер → экран
+    for (let y = 0; y < height; y++) { const row = (height - 1 - y) * width * 4, dst = y * width * 4; for (let x = 0; x < width * 4; x += 4) { image.data[dst + x] = G[pixels[row + x]]; image.data[dst + x + 1] = G[pixels[row + x + 1]]; image.data[dst + x + 2] = G[pixels[row + x + 2]]; image.data[dst + x + 3] = pixels[row + x + 3]; } }
     bp.putImageData(image, 0, 0);
     const canvas = document.createElement('canvas'); canvas.width = OW; canvas.height = OH; const paint = canvas.getContext('2d'); paint.imageSmoothingQuality = 'high';
-    paint.save(); paint.shadowColor = 'rgba(0,0,0,.75)'; paint.shadowBlur = 10; paint.shadowOffsetY = 5; paint.drawImage(big, 0, 0, OW, OH); paint.restore(); // мягкая тень
+    paint.save(); paint.shadowColor = 'rgba(0,0,0,.75)'; paint.shadowBlur = 10; paint.shadowOffsetY = 5; paint.drawImage(big, 0, 0, OW, OH); paint.restore();
     const sil = document.createElement('canvas'); sil.width = OW; sil.height = OH; const sp = sil.getContext('2d'); sp.drawImage(big, 0, 0, OW, OH); sp.globalCompositeOperation = 'source-in'; sp.fillStyle = '#ffe9c8'; sp.fillRect(0, 0, OW, OH);
-    paint.save(); paint.globalCompositeOperation = 'destination-over'; paint.filter = 'blur(1.5px)'; paint.globalAlpha = .55; for (const [dx, dy] of [[-1.6, 0], [1.6, 0], [0, -1.6], [0, 1.6]]) paint.drawImage(sil, dx, dy); paint.restore(); // светлый ореол-контур
+    paint.save(); paint.globalCompositeOperation = 'destination-over'; paint.filter = 'blur(1.5px)'; paint.globalAlpha = .5; for (const [dx, dy] of [[-1.6, 0], [1.6, 0], [0, -1.6], [0, 1.6]]) paint.drawImage(sil, dx, dy); paint.restore();
     paint.drawImage(big, 0, 0, OW, OH);
     const url = canvas.toDataURL(); weaponImages.set(id, url); return url;
   }
