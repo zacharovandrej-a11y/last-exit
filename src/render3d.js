@@ -19,7 +19,7 @@ function planStreets(objs) {
     if (!best || bd > 420) { missed.push(b.id); continue; }
     const [sg, q] = best, end = bd > 4 ? add(q, norm(sub(gate, q)), sg[2] / 2 - 6) : gate;
     // дорожка не должна проходить сквозь дома (задние двери — без дорожки)
-    let ok = true; for (let t = .08; t <= 1 && ok; t += .04) { const p = lerp(gate, end, t); if (bldAt(objs.blds, p) >= 0) ok = false; }
+    let ok = true; for (let i = 8; i <= 100 && ok; i++) { const p = lerp(gate, end, i / 100); if (bldAt(objs.blds, p) >= 0) ok = false; }
     if (!ok) continue;
     walks.push({ bid: b.id, points: b.yard ? [lerp(d.i, d.o, .5), d.o, gate, end] : [lerp(d.i, d.o, .5), d.o, end] });
   }
@@ -483,6 +483,36 @@ void main(){
   // у каждого дерева свой оттенок: в основном зелёные, часть желтеет, редкие — рыжие (конец лета)
   const LEAFC = [0x8c9c5c, 0x80965a, 0x98a462, 0x7e8e50, 0x8a9a56, 0xb0a24e, 0xa89846, 0xb8763c];
   const leafOf = id => { const r = rh(id, 41); return LEAFC[r < .72 ? Math.floor(rh(id, 42) * 5) : r < .92 ? 5 + Math.floor(rh(id, 43) * 2) : 7]; };
+  // ===== мебель по назначению: модель в своих осях — W вдоль стены, D в глубину, спинка у -z, лицом к +z =====
+  const WD = 0x6b4a2e, WDD = 0x4a3220, WHT = 0xd8d4c8, MET = 0x7a7e80, DRK = 0x26282a, BK = [0x8a2a24, 0x2a4a6a, 0x5a6a3a, 0xb8a060, 0x4a3a5a, 0xa86a3a];
+  const legs4 = (W, D, h, c, inset = .42) => [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([x, z]) => [geo.box, c, M(x * W * inset, h / 2, z * D * inset, 2, h, 2)]);
+  const FURN = {
+    bed: (W, D, o) => [[geo.box, WDD, M(0, 5, 0, W, 10, D)], [geo.box, WD, M(0, 14, -D / 2 + 2, W, 20, 3)], [geo.box, 0xe0dace, M(0, 12, 1, W * .92, 4, D * .9)], [geo.box, [0x6b7a5a, 0x7a5a5a, 0x5a6a7a][o.id % 3], M(0, 14.5, D * .14, W * .94, 2.4, D * .6, rh(o.id, 3) * .2 - .1)], [geo.box, 0xf0ece2, M(-W * .22, 15.5, -D * .36, W * .36, 3.5, D * .14)], [geo.box, 0xf0ece2, M(W * .22, 15.5, -D * .36, W * .36, 3.5, D * .14)]],
+    bedL: (W, D, o) => [[geo.box, WDD, M(0, 5, 0, W, 10, D)], [geo.box, WD, M(-W / 2 + 2, 14, 0, 3, 20, D)], [geo.box, 0xe0dace, M(1, 12, 0, W * .9, 4, D * .92)], [geo.box, [0x6b7a5a, 0x7a5a5a, 0x5a6a7a][o.id % 3], M(W * .14, 14.5, 0, W * .6, 2.4, D * .96)], [geo.box, 0xf0ece2, M(-W * .36, 15.5, 0, W * .14, 3.5, D * .7)]],
+    tv: (W, D) => [[geo.box, WDD, M(0, 6, 0, W, 12, D)], [geo.box, 0x3a2a1c, M(0, 6, D / 2, W * .9, 8, .4)], [geo.box, DRK, M(0, 13.5, -D * .1, 8, 3, 6)], [geo.box, 0x111214, M(0, 24, -D * .1, W * .8, 19, 2)], [geo.box, 0x1c2a30, M(0, 24, -D * .1 + 1.1, W * .74, 15, .3)]],
+    bookcase: (W, D, o) => { const r = [[geo.box, WD, M(0, 26, -D / 2 + 1, W, 52, 2)], [geo.box, WD, M(-W / 2 + 1, 26, 0, 2, 52, D)], [geo.box, WD, M(W / 2 - 1, 26, 0, 2, 52, D)], [geo.box, WD, M(0, 51, 0, W, 2, D)]];
+      for (let i = 0; i < 4; i++) { const y = 2 + i * 12.5; r.push([geo.box, WDD, M(0, y, 0, W - 2, 1.6, D)]); let x = -W / 2 + 3; while (x < W / 2 - 4) { const bw = 2 + rh(o.id + i * 13 + x, 7) * 2.5, bh = 7 + rh(o.id + x, 8) * 3.5; if (rh(o.id * 3 + i + x, 9) > .2) r.push([geo.box, BK[Math.floor(rh(o.id + x * 7, i) * 6)], M(x + bw / 2, y + .8 + bh / 2, 0, bw, bh, D * .8)]); x += bw + .4; } }
+      return r; },
+    armchair: (W, D) => [[geo.box, 0x4a5a6a, M(0, 6, 1, W, 10, D - 2)], [geo.box, 0x3e4c5a, M(0, 14, -D / 2 + 3, W, 18, 6)], [geo.box, 0x3e4c5a, M(-W / 2 + 2.5, 11, 1, 5, 10, D - 2)], [geo.box, 0x3e4c5a, M(W / 2 - 2.5, 11, 1, 5, 10, D - 2)], [geo.box, 0x56687a, M(0, 11.5, 3, W - 10, 3, D - 10)]],
+    ctable: (W, D, o) => [[geo.box, WD, M(0, 8, 0, W, 2, D)], ...legs4(W, D, 7, WDD), [geo.box, 0xe8e4da, M(-W * .2, 9.3, 0, 8, .4, 10, .3)], [geo.cyl10, 0xd8d4c8, M(W * .25, 10.5, D * .1, 2.2, 3, 2.2)]],
+    counter: (W, D) => { const r = [[geo.box, 0xc8c0b0, M(0, 12, 0, W, 24, D)], [geo.box, 0x4a4844, M(0, 24.8, 0, W + 1, 1.6, D + 1)], [geo.box, 0x2a2826, M(0, .8, D / 2 - 1, W, 1.6, 1)]];
+      for (let x = -W / 2 + 7; x < W / 2 - 4; x += 14) { r.push([geo.box, 0xb0a898, M(x + 7, 12, D / 2 + .2, .5, 20, .3)]); r.push([geo.box, MET, M(x + 3, 20, D / 2 + .5, 4, .8, .8)]); }
+      r.push([geo.box, 0x8a9294, M(-W * .2, 25, 1, 14, .6, 10)], [geo.box, 0x5a6264, M(-W * .2, 24.8, 1, 11, .6, 7)], [geo.cyl10, MET, M(-W * .2, 28, -D / 2 + 4, .7, 7, .7)]); // мойка и кран
+      r.push([geo.box, 0xc8c0b0, M(0, 46, -D / 2 + 5, W, 16, 10)], [geo.box, 0x9a9080, M(0, 38, -D / 2 + 10.1, W, .4, .4)]); // навесные шкафы
+      return r; },
+    stove: (W, D) => [[geo.box, 0xe2ded6, M(0, 12, 0, W, 24, D)], [geo.box, 0x2a2a2a, M(0, 24.6, 0, W - 1, 1, D - 1)], ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => [geo.cyl10, 0x111111, M(x * W * .22, 25.4, z * D * .22, 3.4, .8, 3.4)]), [geo.box, 0x1a1a1a, M(0, 10, D / 2 + .2, W * .8, 11, .4)], [geo.box, MET, M(0, 17, D / 2 + .8, W * .7, .8, .8)], [geo.box, 0xd8d4cc, M(0, 28, -D / 2 + 1.5, W, 8, 3)]],
+    fridge: (W, D, o) => [[geo.box, 0xe8e6e0, M(0, 28, 0, W, 56, D)], [geo.box, 0xb8b6b0, M(0, 38, D / 2 + .1, W - 1, .4, .4)], [geo.box, MET, M(W * .36, 46, D / 2 + .8, 1, 8, 1)], [geo.box, MET, M(W * .36, 26, D / 2 + .8, 1, 10, 1)], [geo.box, 0xd8a838, M(-W * .15, 44, D / 2 + .2, 3, 3, .3)], [geo.box, 0x4a9ad8, M(W * .05, 50, D / 2 + .2, 2.5, 2.5, .3)], [geo.box, 0xe8e4da, M(-W * .1, 32, D / 2 + .2, 5, 6, .2)]],
+    chair: (W, D, o) => { const tip = rh(o.id, 12) < .35, P = [[geo.box, WD, M(0, 11, 0, W * .9, 1.6, D * .9)], ...legs4(W, D, 11, WDD), [geo.box, WD, M(0, 18, -D * .42, W * .9, 12, 1.4)]];
+      return tip ? P.map(([g, c, m]) => [g, c, new T.Matrix4().makeTranslation(0, 0, -D * .45).multiply(new T.Matrix4().makeRotationX(-Math.PI / 2)).multiply(new T.Matrix4().makeTranslation(0, 0, D * .45)).multiply(m)]) : P; }, // часть стульев опрокинута
+    wardrobe: (W, D, o) => [[geo.box, 0x5e4228, M(0, 29, 0, W, 58, D)], [geo.box, 0x4a3420, M(0, 58.5, 0, W + 2, 1.6, D + 1)], [geo.box, 0x3a2818, M(0, 29, D / 2 + .1, .6, 54, .4)], [geo.box, 0xc8b070, M(-2.5, 32, D / 2 + .7, .8, 5, .8)], [geo.box, 0xc8b070, M(2.5, 32, D / 2 + .7, .8, 5, .8)], ...(rh(o.id, 13) < .4 ? [[geo.box, 0x5e4228, M(W * .45, 29, D / 2 + W * .22, 1, 52, W * .44, 0, 0)], [geo.box, 0x8a6a8a, M(-W * .1, 12, D * .2, 10, 4, 8, .5)]] : [])], // иногда дверца распахнута, вещи на полу
+    dresser: (W, D) => [[geo.box, WD, M(0, 11, 0, W, 22, D)], ...[5, 11, 17].map(y => [geo.box, WDD, M(0, y, D / 2 + .1, W - 3, .5, .4)]), ...[5, 11, 17].map(y => [geo.box, 0xc8b070, M(0, y + 2.5, D / 2 + .6, 5, .8, .8)]), [geo.box, 0xa8b8c0, M(0, 32, -D / 2 + 1, W * .6, 18, .6)], [geo.box, WDD, M(0, 32, -D / 2 + .6, W * .64, 19.5, .4)]],
+    bath: (W, D) => [[geo.box, 0xe8e6e2, M(0, 8, 0, W, 16, D)], [geo.box, 0x8a8a7e, M(0, 15.6, 0, W - 5, 1, D - 5)], [geo.box, 0x5a6a5a, M(W * .1, 15.8, 0, W * .5, .6, D * .5)], [geo.cyl10, MET, M(W / 2 - 4, 24, -D / 2 + 2, .7, 14, .7)], [geo.box, 0xd8e0e4, M(0, 40, -D / 2 + .5, W, 50, .4)]],
+    toilet: (W, D) => [[geo.cyl10, 0xeeece8, M(0, 6, D * .1, W * .4, 12, D * .38)], [geo.cyl10, 0xd8d6d2, M(0, 12.4, D * .1, W * .42, 1, D * .4)], [geo.box, 0xeeece8, M(0, 16, -D / 2 + 3, W, 14, 6)], [geo.box, 0xd8d6d2, M(0, 23.4, -D / 2 + 3, W + 1, 1, 7)]],
+    sink: (W, D) => [[geo.cyl10, 0xeeece8, M(0, 11, -D * .1, 2.4, 22, 2.4)], [geo.box, 0xeeece8, M(0, 22, 0, W, 4, D)], [geo.box, 0x8a9294, M(0, 23.8, 1, W - 5, .6, D - 6)], [geo.cyl10, MET, M(0, 27, -D / 2 + 2, .6, 6, .6)], [geo.box, 0xa8b8c0, M(0, 40, -D / 2 + .5, W * .8, 16, .5)], [geo.box, MET, M(0, 40, -D / 2 + .2, W * .84, 17, .3)]],
+    filing: (W, D, o) => { const op = Math.floor(rh(o.id, 14) * 4); return [[geo.box, 0x7a8084, M(0, 18, 0, W, 36, D)], ...[0, 1, 2].flatMap(i => { const y = 6 + i * 11.5, ex = i === op ? 9 : 0; return [[geo.box, 0x8a9094, M(0, y, D / 2 + ex / 2, W - 2, 10, ex + .6)], [geo.box, 0x3a3c3e, M(0, y + 2, D / 2 + ex + .6, 6, 1, .8)], ...(ex ? [[geo.box, 0xe8e4da, M(0, y + 4, D / 2 + ex / 2, W - 5, 2, ex)]] : [])]; })]; },
+    locker: (W, D) => [[geo.box, 0x55603a, M(0, 27, 0, W, 54, D)], [geo.box, 0x3e4628, M(0, 27, D / 2 + .1, .5, 50, .4)], ...[-1, 1].flatMap(s => [[geo.box, 0x2e3420, M(s * W * .25, 46, D / 2 + .2, W * .3, 4, .3)], [geo.box, MET, M(s * 2.5, 30, D / 2 + .6, .8, 5, .8)]])],
+    gunrack: (W, D) => [[geo.box, WD, M(0, 3, 0, W, 6, D)], [geo.box, WD, M(0, 38, -D / 2 + 1, W, 4, 2)], [geo.box, WDD, M(0, 22, -D / 2 + .5, W, 40, 1)], ...[-1, 0, 1].flatMap(i => [[geo.box, 0x2a2a28, M(i * W * .3, 21, -D / 2 + 3, 2.2, 34, 2)], [geo.box, 0x4a3624, M(i * W * .3, 9, -D / 2 + 3, 3, 10, 2.4)]])],
+  };
   const CARK = ['sedan', 'sedan', 'hatch', 'hatch', 'suv', 'van', 'pickup'], TRUCKK = ['box', 'army', 'bus', 'bus'];
   const VEH = { sedan: makeCar('sedan'), hatch: makeCar('hatch'), suv: makeCar('suv'), van: makeCar('van'), pickup: makeCar('pickup'), box: makeTruck('box'), army: makeTruck('army'), bus: makeTruck('bus') };
   // приглушённые реальные цвета; у каждого экземпляра свой оттенок
@@ -578,7 +608,7 @@ void main(){
     car: (w, h, o) => { const sx = w / 120, sz = h / 52, kind = CARK[Math.floor(rh(o ? o.id : 0, 60) * CARK.length)];
       if (kind !== 'sedan') { const V = VEH[kind]; /* кузов-лофт */ return [[V.paint, 'car', M(0, 0, 0, sx, 1, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1, sz)], ...V.wheels.map(([x, z, k]) => [geo.wheel, 0xffffff, M(x * sx, 9.4 * k, z * sz, k, k, k)])]; }
       const V = VEH.sedan; return [[V.paint, 'car', M(0, 0, 0, sx, 1, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1, sz)], ...V.wheels.map(([x, z, k]) => [geo.wheel, 0xffffff, M(x * sx, 9.4 * k, z * sz, k, k, k)])]; },
-    truck: (w, h, o) => { const kind = TRUCKK[Math.floor(rh(o ? o.id : 0, 61) * TRUCKK.length)], V = VEH[kind], sx = w / 170, sz = h / 62;
+    truck: (w, h, o) => { const kind = o && dist(o.p, BIOMES[1].c) < BIOMES[1].r + 150 ? 'army' : TRUCKK[Math.floor(rh(o ? o.id : 0, 61) * TRUCKK.length)], /* на базе — только армейские */ V = VEH[kind], sx = w / 170, sz = h / 62;
       return [[V.paint, kind === 'bus' ? 'bus' : kind === 'army' ? 0x4a5233 : 'cab', M(0, 0, 0, sx, 1, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1, sz)], ...V.wheels.map(([x, z, k]) => [geo.wheel, 0xffffff, M(x * sx, 9.4 * k, z * sz, k, k, k)])]; },
     bus: (w, h, o) => { const V = VEH.bus, sx = w / 170, sz = h / 62; return [[V.paint, 'bus', M(0, 0, 0, sx, 1.08, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1.08, sz)], ...[55, -46, -64].flatMap(x => [-1, 1].map(sd => [geo.wheel, 0xffffff, M(x * sx, 12.7, sd * 25 * sz, 1.35, 1.35, 1.35)]))]; }, // большой городской автобус
     crate: (w, h, o) => { const vk = o.vk !== undefined ? o.vk : (o.id * 7) % 5 < 3 ? 0 : (o.id * 7) % 5 === 3 ? 1 : 2, g = [PROP.crateW, PROP.crateA, PROP.crateB][vk], ht = [26, 17, 30][vk], r = []; let y = 0;
@@ -586,6 +616,8 @@ void main(){
       for (let i = 0; i < (o.lv || 1); i++) { const tw = i ? (((o.id + i) * 13) % 7 - 3) * .05 : 0, sx = i ? (((o.id + i) * 5) % 5 - 2) * .6 : 0; r.push([g, 0xffffff, M(sx, y, sx * .5, 1, 1, 1, tw)]); y += ht; }
       if (vk === 1 && !o.lv) r.push([g, 0xffffff, M(2, ht, -1, .92, .92, .92, .4)]); return r; },
     furn: (w, h, o) => { const k = o.fk;
+      if (FURN[k]) { const fs = o.fs || 0, side = fs >= 2, W = side ? h : w, D = side ? w : h, ry = [0, Math.PI, Math.PI / 2, -Math.PI / 2][fs], R = new T.Matrix4().makeRotationY(ry);
+        return FURN[k](W, D, o).map(([g, c, m]) => [g, c, R.clone().multiply(m)]); }
       if (k === 'bed') return [[geo.box, 0x5a4632, M(0, 5, 0, w, 10, h)], [geo.box, 0xcfc8b8, M(0, 11, h * .05, w * .9, 3, h * .8)], [geo.box, 0x6b7a5a, M(0, 11.5, h * .12, w * .92, 3, h * .5)], [geo.box, 0xe8e4da, M(0, 12.5, -h * .38, w * .7, 3, h * .14)]];
       if (k === 'bunk') return [[geo.box, 0x4a4f4a, M(0, 6, 0, w, 3, h)], [geo.box, 0x55603a, M(0, 8, 0, w * .9, 2, h * .9)], [geo.box, 0x4a4f4a, M(0, 24, 0, w, 3, h)], [geo.box, 0x55603a, M(0, 26, 0, w * .9, 2, h * .9)], [geo.box, 0x3a3d3a, M(w * .45, 14, h * .45, 1.6, 28, 1.6)], [geo.box, 0x3a3d3a, M(-w * .45, 14, -h * .45, 1.6, 28, 1.6)], [geo.box, 0x3a3d3a, M(w * .45, 14, -h * .45, 1.6, 28, 1.6)], [geo.box, 0x3a3d3a, M(-w * .45, 14, h * .45, 1.6, 28, 1.6)]];
       if (k === 'table') return [[geo.box, 0x6b4a2e, M(0, 13, 0, w, 2.5, h)], [geo.box, 0x4a3624, M(w * .4, 6, h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(-w * .4, 6, h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(w * .4, 6, -h * .35, 2, 12, 2)], [geo.box, 0x4a3624, M(-w * .4, 6, -h * .35, 2, 12, 2)], [geo.box, 0xe8e4da, M(w * .15, 15, 0, 6, 1.5, 5)]];

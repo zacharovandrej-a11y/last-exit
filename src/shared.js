@@ -226,8 +226,33 @@ function genWorld() {
     });
     // 3) мебель по комнатам — у стен, не перекрывая двери
     const doorPts = b.idoors.concat(b.doors.map(d => { const r = sub(lerp(d.i, d.o, .5), p); return [dot(r, u), dot(r, v)]; }));
-    const fu = (fk, x, y, w, h) => { const lp = [x, y]; if (doorPts.some(d => dist(d, lp) < Math.max(w, h) / 2 + 30)) return null; const o = putA(fk === 'crate' ? 'crate' : fk === 'hay' ? 'hay' : fk === 'barrel' ? 'barrel' : 'furn', L(x, y), w, h, a); o.fk = fk; o.bid = b.id; b.furn.push(o.id); return o; };
+    const placed = [], fu = (fk, x, y, w, h, fs) => { const lp = [x, y]; if (doorPts.some(d => Math.abs(d[0] - x) < w / 2 + 18 && Math.abs(d[1] - y) < h / 2 + 18) || placed.some(q => Math.abs(q[0] - x) < (q[2] + w) / 2 + 3 && Math.abs(q[1] - y) < (q[3] + h) / 2 + 3)) return null; placed.push([x, y, w, h]); const o = putA(fk === 'crate' ? 'crate' : fk === 'hay' ? 'hay' : fk === 'barrel' ? 'barrel' : 'furn', L(x, y), w, h, a); o.fk = fk; o.lx = x; o.ly = y; if (fs !== undefined) o.fs = fs; o.bid = b.id; b.furn.push(o.id); return o; };
+    // мебель у стены: side 0 — стена y0 (смотрит в +y), 1 — y1, 2 — x0, 3 — x1; t — место вдоль стены; W — вдоль стены, D — глубина
+    // проход: глубины мебели у противоположных стен + ширина человека не больше комнаты
+    const dep = new Map(), PASS = PR * 2 + 16;
+    const atWall = (r, fk, W, D, side, t) => { const rw = r.x1 - r.x0, rh = r.y1 - r.y0, L_ = side < 2 ? rw : rh; if (W + 8 > L_) return null; const q = W / 2 + 4 + t * (L_ - W - 8);
+      const dp = dep.get(r) || [0, 0, 0, 0]; if (D + 3 + dp[side ^ 1] + PASS > (side < 2 ? rh : rw)) return null;
+      const o = side === 0 ? fu(fk, r.x0 + q, r.y0 + D / 2 + 3, W, D, 0) : side === 1 ? fu(fk, r.x0 + q, r.y1 - D / 2 - 3, W, D, 1) : side === 2 ? fu(fk, r.x0 + D / 2 + 3, r.y0 + q, D, W, 2) : fu(fk, r.x1 - D / 2 - 3, r.y0 + q, D, W, 3);
+      if (o) { dp[side] = Math.max(dp[side], D + 3); dep.set(r, dp); } return o; };
+    const wallTry = (r, fk, W, D) => { const s0 = Math.floor(rnd() * 4), t0 = rnd(); for (let i = 0; i < 4; i++) for (let j = 0; j < 5; j++) { const o = atWall(r, fk, W, D, (s0 + i) % 4, (t0 + j * .25) % 1.0001); if (o) return o; } return null; }; // все стены по кругу, 5 мест на каждой
+    const mid = (r, fk, W, D, fs = 0) => Math.min(r.x1 - r.x0 - W, r.y1 - r.y0 - D) < PASS * 2 + 30 ? null : fu(fk, (r.x0 + r.x1) / 2 + (rnd() - .5) * 10, (r.y0 + r.y1) / 2 + (rnd() - .5) * 10, W, D, fs);
+    // наборы по назначению комнаты (размеры близки к настоящим: 34 ед. ≈ 1 м)
+    const ROOM = {
+      living: r => { wallTry(r, 'sofa', 62, 26); wallTry(r, 'tv', 36, 14); wallTry(r, 'bookcase', 34, 12); if (rnd() < .6) wallTry(r, 'armchair', 26, 26); mid(r, 'ctable', 30, 18); },
+      kitchen: r => { const sd = Math.floor(rnd() * 4); atWall(r, 'counter', 56, 20, sd, rnd() * .5) || wallTry(r, 'counter', 44, 20); wallTry(r, 'stove', 20, 20); wallTry(r, 'fridge', 22, 22); const tb = mid(r, 'table', 30, 24); if (tb) for (const [dx, dy] of [[-23, 0], [23, 0]]) fu('chair', tb.lx + dx, tb.ly + dy, 12, 12, dx < 0 ? 2 : 3); },
+      bedroom: r => { const sd = Math.floor(rnd() * 4); atWall(r, 'bed', 44, 62, sd, .2 + rnd() * .6) || wallTry(r, 'bed', 44, 62) || wallTry(r, 'bedL', 62, 40) || wallTry(r, 'bedL', 58, 30); /* в тесной комнате — боком к стене */ wallTry(r, 'wardrobe', 38, 18); if (rnd() < .6) wallTry(r, 'dresser', 28, 14); },
+      bath: r => { wallTry(r, 'bath', 50, 22); wallTry(r, 'toilet', 14, 18); wallTry(r, 'sink', 18, 14); },
+      office: r => { for (let i = 0; i < 2; i++) { const d = wallTry(r, 'desk', 40, 22); if (d) fu('chair', d.lx + (d.fs === 2 ? 22 : d.fs === 3 ? -22 : 0), d.ly + (d.fs === 0 ? 22 : d.fs === 1 ? -22 : 0), 12, 12, d.fs); } wallTry(r, 'filing', 18, 16); if (rnd() < .6) wallTry(r, 'filing', 18, 16); wallTry(r, 'bookcase', 34, 12); },
+      barracks: r => { for (let i = 0; i < 3; i++) wallTry(r, 'bunk', 28, 60); for (let i = 0; i < 2; i++) wallTry(r, 'locker', 30, 14); if (rnd() < .5) wallTry(r, 'gunrack', 36, 10); },
+      store: r => { for (let i = 0; i < 2; i++) wallTry(r, 'shelf', 50, 14); wallTry(r, 'crate', 30, 30); if (rnd() < .5) wallTry(r, 'barrel', 18, 18); },
+      barn: r => { wallTry(r, 'hay', 30, 30); wallTry(r, 'crate', 30, 30); if (rnd() < .5) wallTry(r, 'hay', 30, 30); },
+    };
+
     const SETS = { home: [['bed', 24, 40], ['table', 30, 20], ['sofa', 40, 16], ['shelf', 34, 10], ['desk', 28, 14]], office: [['desk', 30, 16], ['desk', 30, 16], ['shelf', 40, 10], ['table', 40, 22]], barracks: [['bunk', 20, 40], ['bunk', 20, 40], ['shelf', 30, 10], ['crate', 30, 30]], store: [['shelf', 50, 12], ['crate', 30, 30], ['barrel', 18, 18]], barn: [['hay', 30, 30], ['crate', 30, 30], ['hay', 30, 30]] };
+    // жилые дома: самая большая комната — гостиная, дальше кухня, спальни; маленькая — ванная
+    const homeUse = []; if (K.furn === 'home' && kind !== 'house') { const order = b.rooms.map((r, i) => [i, (r.x1 - r.x0) * (r.y1 - r.y0)]).sort((m, n) => n[1] - m[1] || m[0] - n[0]);
+      order.forEach(([i, ar], k) => { homeUse[i] = k === 0 ? 'living' : k === 1 ? 'kitchen' : k === order.length - 1 && ar < 9500 && order.length > 2 ? 'bath' : k % 2 ? 'kitchen' : 'bedroom'; });
+      if (order.length >= 3 && !homeUse.includes('bedroom')) homeUse[order[2][0]] = 'bedroom'; }
     for (const r of b.rooms) {
       const set = SETS[K.furn], rw = r.x1 - r.x0, rh = r.y1 - r.y0;
       if (kind === 'house') {
@@ -243,23 +268,26 @@ function genWorld() {
         continue; }
       if (r.hall) { // зал: ряды стеллажей
         const rowsY = Math.floor((rh - 60) / 56); for (let i = 0; i < rowsY; i++) { const y = r.y0 + 45 + i * 56; for (let x = r.x0 + 50; x < r.x1 - 50; x += 90) fu(K.furn === 'barn' ? 'hay' : rnd() < .7 ? 'shelf' : 'crate', x, y, K.furn === 'barn' ? 30 : 60, K.furn === 'barn' ? 30 : 12); } continue; }
-      const n = 1 + Math.floor(rnd() * 2.5);
-      for (let i = 0; i < n; i++) { const [fk, fw, fh] = set[Math.floor(rnd() * set.length)], side = Math.floor(rnd() * 4);
-        const x = side < 2 ? r.x0 + fw / 2 + 4 + rnd() * Math.max(0, rw - fw - 8) : side === 2 ? r.x0 + fh / 2 + 3 : r.x1 - fh / 2 - 3;
-        const y = side >= 2 ? r.y0 + fw / 2 + 4 + rnd() * Math.max(0, rh - fw - 8) : side === 0 ? r.y0 + fh / 2 + 3 : r.y1 - fh / 2 - 3;
-        if (side >= 2) fu(fk, x, y, fh, fw); else fu(fk, x, y, fw, fh); }
+      if (K.furn === 'home') { r.use = r.use || homeUse[b.rooms.indexOf(r)]; ROOM[r.use](r); continue; }
+      ROOM[K.furn] ? ROOM[K.furn](r) : null;
     }
     // граф комнат: какие комнаты соединяет каждая дверь
     const rIn = (r, q, m) => q[0] > r.x0 - m && q[0] < r.x1 + m && q[1] > r.y0 - m && q[1] < r.y1 + m;
     b.adj = []; for (const dp of b.idoors) { const rs = b.rooms.map((r, i) => rIn(r, dp, t + 2) ? i : -1).filter(i => i >= 0); if (rs.length >= 2) b.adj.push({ a: rs[0], b: rs[1], p: dp }); }
     for (const d of b.doors) { const r_ = sub(d.i, p), lp = [dot(r_, u), dot(r_, v)]; d.room = Math.max(0, b.rooms.findIndex(r => rIn(r, lp, 4))); }
     // проверка: во все комнаты можно зайти; если мебель мешает — убираем её
-    const allOk = () => { const S = 6, X = b.w / 2 + 30, Y = b.h / 2 + 30, nx = Math.ceil(2 * X / S), ny = Math.ceil(2 * Y / S), ob = b.walls.map(i => objs[i]).concat(b.furn.map(i => objs[i]).filter(o => !o.gone));
-      const ok = new Uint8Array(nx * ny), seen = new Uint8Array(nx * ny);
-      for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const x = -X + i * S, y = -Y + j * S; if (Math.abs(x) > b.w / 2 + 2 || Math.abs(y) > b.h / 2 + 2) { ok[j * nx + i] = 1; continue; } const q = L(x, y); ok[j * nx + i] = ob.some(o => Math.abs(o.p[0] - q[0]) < o.rad + PR + 4 && Math.abs(o.p[1] - q[1]) < o.rad + PR + 4 && objPush(o, q, PR + 3)) ? 0 : 1; }
+    let wallGrid = null; // стены не меняются — их сетку считаем один раз на здание
+    const allOk = () => { const S = 6, X = b.w / 2 + 30, Y = b.h / 2 + 30, nx = Math.ceil(2 * X / S), ny = Math.ceil(2 * Y / S);
+      const stamp = (ok, ob) => { for (const o of ob) { const r_ = sub(o.p, p), lx = dot(r_, u), ly = dot(r_, v), e = o.rad + PR + 4; // каждое препятствие закрывает только клетки рядом с собой
+        for (let j = Math.max(0, Math.floor((ly - e + Y) / S)); j <= Math.min(ny - 1, Math.ceil((ly + e + Y) / S)); j++) for (let i = Math.max(0, Math.floor((lx - e + X) / S)); i <= Math.min(nx - 1, Math.ceil((lx + e + X) / S)); i++) { const k = j * nx + i; if (!ok[k]) continue; const x = -X + i * S, y = -Y + j * S; if (Math.abs(x) > b.w / 2 + 2 || Math.abs(y) > b.h / 2 + 2) continue; if (objPush(o, L(x, y), PR + 3)) ok[k] = 0; } } };
+      if (!wallGrid) { wallGrid = new Uint8Array(nx * ny).fill(1); stamp(wallGrid, b.walls.map(i => objs[i])); }
+      const ok = wallGrid.slice(), seen = new Uint8Array(nx * ny); stamp(ok, b.furn.map(i => objs[i]).filter(o => !o.gone));
       const Q = [0]; seen[0] = 1; while (Q.length) { const k = Q.pop(), i = k % nx, j = (k / nx) | 0; for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a2 = i + di, c = j + dj; if (a2 < 0 || c < 0 || a2 >= nx || c >= ny) continue; const q = c * nx + a2; if (!seen[q] && ok[q]) { seen[q] = 1; Q.push(q); } } }
       return b.rooms.every(r => { for (let j = Math.ceil((r.y0 + Y) / S); -Y + j * S < r.y1; j++) for (let i = Math.ceil((r.x0 + X) / S); -X + i * S < r.x1; i++) if (seen[j * nx + i]) return true; return false; }); };
-    for (let k = b.furn.length - 1; k >= 0 && !allOk(); k--) { const o = objs[b.furn[k]]; o.gone = 1; }
+    if (!allOk()) { const F = b.furn.map(i => objs[i]); F.forEach(o => o.gone = 1);
+      if (!allOk()) F.forEach(o => delete o.gone); // комната недоступна и без мебели — дело не в мебели
+      else for (const r of b.rooms) { const G_ = F.filter(o => o.lx > r.x0 && o.lx < r.x1 && o.ly > r.y0 && o.ly < r.y1); if (!G_.length) continue; G_.forEach(o => delete o.gone); // сначала всю комнату разом
+        if (!allOk()) { G_.forEach(o => o.gone = 1); for (const o of G_) { delete o.gone; if (!allOk()) o.gone = 1; } } } } // не вышло — по одной вещи
     blds.push(b); if (K.yard) { b.yard = K.yard; housePlots.push(b);
       // За калитками тоже нужен свободный подход, иначе случайный объект запирает двор.
       for (const d of b.doors) hqApproaches.push([d.o, add(d.o, norm(sub(d.o, d.i)), Math.max(...K.yard) / 2 + 80 - dist(d.o, p))]);
