@@ -36,9 +36,9 @@ button.alt{background:#2a1212;border:2px solid #ff3b3b;box-shadow:none}
 .start-title h1{font-size:clamp(34px,7vw,60px);line-height:1;letter-spacing:.1em;color:#f6e5cc;text-shadow:0 3px 20px #0008}
 .start-title .sub{margin:6px 0 0;color:#ccbba9}
 .hero-select{width:min(100%,620px);padding:12px;box-sizing:border-box;border:1px solid #655749;border-radius:17px;background:#151717d9;box-shadow:0 14px 36px #0005}
-.hero-heading{display:grid;grid-template-columns:42px minmax(0,1fr) 42px;align-items:center;text-align:center;margin-bottom:10px}
+.hero-heading{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;text-align:center;margin-bottom:10px}
 .hero-heading h2{font-size:19px;margin:0;font-weight:750;color:#f6e5cc}
-.hero-heading button{width:38px;height:38px;padding:0;font-size:22px;border:1px solid #776454;border-radius:9px;background:#302925;color:#ffddb3;box-shadow:none}
+.hero-heading button{width:44px;height:44px;padding:0;font-size:22px;border:1px solid #776454;border-radius:9px;background:#302925;color:#ffddb3;box-shadow:none}
 .hero-stage{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .hero-visual{position:relative;min-width:0;margin:0;overflow:hidden;border:1px solid #5c4d42;border-radius:10px;aspect-ratio:1;max-height:clamp(145px,35vh,280px);background:radial-gradient(ellipse at 50% 66%,#58483b,#1c2021 72%)}
 .hero-visual img,#skin{width:100%;height:100%;display:block;object-fit:contain}
@@ -50,6 +50,8 @@ button.alt{background:#2a1212;border:2px solid #ff3b3b;box-shadow:none}
 #hero-roster{position:relative;display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x proximity;overscroll-behavior-x:contain;padding-bottom:4px;scrollbar-width:thin;touch-action:pan-x pan-y}
 #hero-roster button{flex:1 0 clamp(66px,12vw,86px);min-width:0;padding:3px;display:grid;gap:3px;justify-items:center;font-size:11px;line-height:1.15;border-radius:7px;border:1px solid #645647;-webkit-tap-highlight-color:transparent;color:#ede2d4;background:#322a25;box-shadow:none;scroll-snap-align:start}
 #hero-roster button[aria-pressed="true"]{border-color:#ffbc7a;background:#5a3e2b;color:#fff5e2}
+#hero-roster button:focus-visible,.hero-heading button:focus-visible{outline:2px solid #ffcb95;outline-offset:-2px}
+@media (min-width:650px) and (min-height:521px){#hero-roster button{flex:1 1 0}}
 #hero-roster img{width:100%;aspect-ratio:4/3;object-fit:cover;object-position:center 29%;border-radius:4px}
 .start-actions{width:min(100%,620px);display:flex;justify-content:center;flex-wrap:wrap;gap:8px}
 .start-actions input,.start-actions button{box-sizing:border-box;min-height:44px;font-size:16px;border-radius:8px;padding:8px 12px}

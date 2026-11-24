@@ -2479,6 +2479,8 @@ void main(){
   // ===== превью персонажа на старте =====
   let pvR = null, pvScene = null, pvCam = null, pvChar = null, pvCh = -1, pvLast = 0;
   const previewHeroes = new Map();
+  let pvStill = false;
+  const previewMotion = matchMedia('(prefers-reduced-motion: reduce)');
   function preview(canvas, ch) {
     if (!pvR) {
       pvR = new T.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -2494,7 +2496,8 @@ void main(){
       pvCam.position.set(0, 36, 116); pvCam.lookAt(0, 29, 0);
     }
     const now = performance.now();
-    if (pvCh === ch && now - pvLast < 32) return;
+    const still = previewMotion.matches;
+    if (pvCh === ch && pvStill === still && (still || now - pvLast < 32)) return;
     if (pvCh !== ch) {
       if (pvChar) pvScene.remove(pvChar);
       if (!previewHeroes.has(ch)) {
@@ -2506,7 +2509,8 @@ void main(){
       pvChar = previewHeroes.get(ch);
       pvScene.add(pvChar); pvCh = ch;
     }
-    pvChar.rotation.y = .31 + Math.sin(now / 1150) * .56;
+    pvChar.rotation.y = still ? .31 : .31 + Math.sin(now / 1150) * .56;
+    pvStill = still;
     pvR.render(pvScene, pvCam); pvLast = now;
   }
   // ===== кадр =====
