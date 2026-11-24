@@ -144,7 +144,8 @@ export class World {
   spawnPoint() {
     const al = this.players.filter(p => p.st < 2); const c = al.length ? [al.reduce((s, p) => s + p.p[0], 0) / al.length, al.reduce((s, p) => s + p.p[1], 0) / al.length] : ZSPAWN;
     for (let k = 0; k < 20; k++) {
-      const a = this.rnd() * 6.283, d = 650 + this.rnd() * 300, q = [c[0] + Math.cos(a) * d, c[1] + Math.sin(a) * d];
+      const a = this.rnd() * 6.283, d = 650 + this.rnd() * 300; let q = [c[0] + Math.cos(a) * d, c[1] + Math.sin(a) * d];
+      if (k < 12 && this.rnd() < .6) q = this.roadPt(q, 1); // чаще — на дорогах и у брошенных машин
       if (!inMap(q, 80) || bldAt(this.objs.blds, q) >= 0) continue;
       const cq = collide(this.objs, q); if (dist(cq, q) > 3) continue;
       if (al.some(p => dist(p.p, q) < 550)) continue;
@@ -156,7 +157,7 @@ export class World {
     const p = this.spawnPoint(); if (!p) return null;
     const T = ZT[type], hm = zHpMul(this.wave, this.players.length, this.cyc) * (type === 5 ? this.players.length * .6 + .4 : 1);
     const hp = raiderHealth(type, this.wave) * hm;
-    const z = { id: this.zid, ty: type, p, hp, mhp: hp, sp: T.sp * (.85 + this.rnd() * .3) * (1 + this.cyc * .12), r: T.r, ab: zAbil(type, this.wave), atkT: 0, lost: 0, burn: 0, burnBy: null, tg: null, atk: 0, air: 0, smT: 0, stuck: 0, side: this.rnd() < .5 ? 1 : -1, bi: -1, navB: -1, navR: -1 };
+    const z = { id: this.zid, ty: type, p, hp, mhp: hp, sp: T.sp * (.85 + this.rnd() * .3) * (1 + this.cyc * .12), r: T.r, ab: zAbil(type, this.wave), atkT: 0, lost: 0, burn: 0, burnBy: null, tg: null, atk: 0, air: 0, smT: 0, stuck: 0, side: this.rnd() < .5 ? 1 : -1, bi: -1, navB: -1, navR: -1, awT: type === 5 || this.rnd() < .35 ? this.t + 25 : 0, wg: null, wT: 0, idle: 0 }; // awT — до какого времени «знает» о людях; остальные бродят
     this.zid = this.zid % 65000 + 1; this.zs.set(z.id, z); return z;
   }
   // ===== ввод игрока: позиция (доверяем, но ограничиваем скорость), оружие, попадания =====
@@ -168,7 +169,7 @@ export class World {
         break;
       }
     }
-    z.hp -= damage;
+    z.hp -= damage; z.awT = Math.max(z.awT || 0, this.t + 20);
   }
   input(p, m) {
     const now = this.t, el = Math.min(.5, now - (p.lastT || now)) || DT; p.lastT = now;
@@ -194,6 +195,7 @@ export class World {
     if (Array.isArray(m.o)) for (const [oid, dmg] of m.o.slice(0, 10)) { const o = this.objs[oid | 0]; if (!o || o.dead || !(o.hp > 0) || dist(o.p, p.p) > W.range + 150) continue; if (!['car', 'truck', 'bus', 'barrel', 'crate'].includes(o.type)) continue; o.hp -= Math.min(maxD, +dmg || 0); this.objHurt(o, p); }
     if (Array.isArray(m.g)) for (const oid of m.g.slice(0, 10)) { const o = this.objs[oid | 0]; if (o && o.win && !o.broken) { o.broken = 1; this.sendAll({ t: 'gl', id: o.id }, p.c); } }
     if (Array.isArray(m.s) && m.s.length) this.shots.push([p.id, p.w, m.s.slice(0, 30)]);
+    if (Array.isArray(m.s) && m.s.length && !(now < (p.noiseT || 0))) { p.noiseT = now + .4; this.noise(p.p, W.proj === 2 ? 260 : W.fire ? 450 : W.boom ? 1000 : W.pel > 1 ? 950 : 880, p); } // выстрел слышно далеко, арбалет — почти нет
     if (Array.isArray(m.b)) for (const b of m.b.slice(0, 4)) { this.shots.push([p.id, -1, [[+b[0] | 0, +b[1] | 0]]]); }
   }
   killZ(z, by, gore) {
@@ -223,6 +225,7 @@ export class World {
   }
   explode(c, by, R, dmg) {
     this.sendAll({ t: 'boom', p: [Math.round(c[0]), Math.round(c[1])], r: R });
+    this.noise(c, 1300, by && by.c ? by : null);
     for (const z of this.zs.values()) { const d = dist(z.p, c); if (d < R + z.r) { const k = 1 - Math.min(1, d / R); this.damageRaider(z, dmg * (.3 + k * k)); z.lastDir = norm(sub(z.p, c)); if (z.hp <= 0) this.killZ(z, by, 5); } }
     for (const o of nearObjs(this.objs, c, R)) { if (o.dead || !(o.hp > 0) || dist(o.p, c) > R * .8) continue; if (o.type === 'barrel' || o.type === 'crate') { o.hp = 0; this.later.push([this.t + .15 + this.rnd() * .2, o, by]); } else if ((o.type === 'car' || o.type === 'truck' || o.type === 'bus') && !o.burnt) { o.hp -= dmg * .8; this.later.push([this.t + .3, o, by]); } }
   }
@@ -246,6 +249,52 @@ export class World {
     this.st = 'over'; this.phase = 0;
     this.sendAll({ t: 'over', w: this.wave, cyc: this.cyc, kills: this.kills, pl: this.players.map(p => [p.name, p.kills, p.lvl]) });
     this.zs.clear(); this.items.clear(); this.overT = this.t + 9; this.report();
+  }
+  // тайник: бонус кладётся у подходящей мебели в доме недалеко от команды (аптечка — у холодильника и раковины, патроны — у оружейной стойки…)
+  stash() {
+    const al = this.players.filter(p => p.st === 0); if (!al.length) return;
+    if ([...this.items.values()].filter(it => it.home).length >= 1 + al.length) return;
+    const LOOT = { fridge: [0], counter: [0], sink: [0], bath: [0], locker: [6, 1], gunrack: [6, 1], wardrobe: [5, 2], dresser: [5, 2], desk: [2, 6, 5], filing: [6, 2], shelf: [0, 6], crate: [0, 6] };
+    const c = al[Math.floor(this.rnd() * al.length)].p, cand = this.objs.filter(o => o.fk && LOOT[o.fk] && !o.gone && !o.dead && o.bid >= 0 && dist(o.p, c) > 260 && dist(o.p, c) < 1000);
+    if (!cand.length) return; const o = cand[Math.floor(this.rnd() * cand.length)], b = this.objs.blds[o.bid], fs = o.fs || 0;
+    const n = fs === 0 ? b.v : fs === 1 ? mul(b.v, -1) : fs === 2 ? b.u : mul(b.u, -1), dep = fs >= 2 ? o.w : o.h, p = add(o.p, n, dep / 2 + 16);
+    if (bldAt(this.objs.blds, p) !== o.bid || dist(collide(this.objs, p), p) > 2) return;
+    const ks = LOOT[o.fk], it = { id: this.iid++, p, k: ks[Math.floor(this.rnd() * ks.length)], T: this.t + 30, home: 1 };
+    this.items.set(it.id, it); this.sendAll({ t: 'it', id: it.id, x: Math.round(p[0]), y: Math.round(p[1]), k: it.k });
+  }
+  // ===== слух и бродяжничество =====
+  // шум (выстрел, взрыв): все в радиусе узнают, откуда он, и идут туда; стрелявший становится целью
+  noise(c, R, by) {
+    for (const z of this.zs.values()) { if (dist(z.p, c) > R) continue; z.awT = Math.max(z.awT || 0, this.t + 14); z.hn = [c[0], c[1]]; if (by) z.tg = by; z.idle = 0; }
+  }
+  // точка на ближайшей дороге (или у машины на ней), с разбросом поперёк
+  roadPt(q, jam) {
+    const R = this.objs.roads || []; let best = null, bd = 1e9;
+    for (const r of R) for (let i = 1; i < r.pts.length; i++) { const a = r.pts[i - 1], ab = sub(r.pts[i], a), t = Math.max(0, Math.min(1, dot(sub(q, a), ab) / dot(ab, ab))), p = add(a, ab, t), d = dist(p, q); if (d < bd) { bd = d; best = [p, perp(norm(ab)), r.w]; } }
+    if (!best || bd > 700) return q;
+    let p = add(best[0], best[1], (this.rnd() - .5) * best[2] * 1.3);
+    if (jam) { const v = nearObjs(this.objs, p, 260).find(o => (o.type === 'car' || o.type === 'truck' || o.type === 'bus') && !o.burnt); if (v) { const a = this.rnd() * 6.283; p = add(v.p, [Math.cos(a) * (v.rad + 30), Math.sin(a) * (v.rad + 30)]); } }
+    return clampMap(p, 60);
+  }
+  // бродит: от точки к точке по улицам, медленно стягиваясь к людям; у машин и перекрёстков толпится и стоит
+  wander(z, dt, c) {
+    const t = this.t;
+    if (z.idle > t) return;
+    if (!z.wg || dist(z.p, z.wg) < 26 || t > z.wT) {
+      if (z.wg && dist(z.p, z.wg) < 26 && this.rnd() < .6) { z.idle = t + 2 + this.rnd() * 6; z.wg = null; return; } // постоять, покачаться
+      const toC = c ? Math.atan2(c[1] - z.p[1], c[0] - z.p[0]) : this.rnd() * 6.283, a = toC + (this.rnd() - .5) * 2.4, d = 220 + this.rnd() * 300;
+      z.wg = this.roadPt([z.p[0] + Math.cos(a) * d, z.p[1] + Math.sin(a) * d], this.rnd() < .45); z.wT = t + 14;
+    }
+    const goal = this.around(z.p, z.wg), sp = z.sp * (z.ty === 1 ? .3 : .45), np = this.zCollide(z, add(z.p, norm(sub(goal, z.p)), sp * dt));
+    if (dist(np, z.p) < sp * dt * .2) z.wT = Math.min(z.wT, t + .5); // упёрся — выбрать другую точку
+    z.p = np;
+  }
+  // расталкивают друг друга; встревоженный сосед будит остальных (стая)
+  zPush(z, G) {
+    const gx = Math.floor(z.p[0] / 48), gy = Math.floor(z.p[1] / 48), t = this.t;
+    for (let ix = -1; ix <= 1; ix++) for (let iy = -1; iy <= 1; iy++) { const a = G.get((gx + ix + 100) * 1000 + gy + iy + 100); if (a) for (const o of a) { if (o === z) continue; const dd = dist(o.p, z.p), m = o.r + z.r;
+      if (o.awT > t + 3 && z.awT < t && dd < 110) { z.awT = o.awT - 3; z.tg = o.tg; z.idle = 0; }
+      if (dd < m && dd > .01) { const push = (m - dd) * ZT[o.ty].sc / (ZT[z.ty].sc + ZT[o.ty].sc); z.p = add(z.p, norm(sub(z.p, o.p)), Math.min(push, 5)); } } }
   }
   // ===== движение зомби по городу =====
   around(a, t) {
@@ -317,6 +366,7 @@ export class World {
     if (this.later.length) { const now_ = this.later.filter(l => l[0] <= t); this.later = this.later.filter(l => l[0] > t); for (const [, o, by] of now_) this.objHurt(o, by); }
     if (this.tick % (5 * TICK) === 0) for (const o of this.objs) { if (!o.fixT || t < o.fixT) continue; if (this.players.some(p => dist(p.p, o.p) < o.rad + PR + 4)) continue;
       o.fixT = 0; o.hp = OT[o.type].hp; if (o.dead) { o.dead = false; this.sendAll({ t: 'rv', id: o.id }); } if (o.burnt || o.smoke) { o.burnt = o.smoke = 0; this.sendAll({ t: 'ob', id: o.id, s: 0 }); } }
+    if (this.phase && this.tick % (TICK * 12) === 0) this.stash(); // тайники в домах
     if (this.tick % TICK === 0) for (const it of this.items.values()) if (t > it.T) { this.items.delete(it.id); this.sendAll({ t: 'itx', id: it.id, by: -1 }); }
     // игроки: упавший ползёт и ждёт помощи
     for (const p of this.players) {
@@ -336,14 +386,21 @@ export class World {
     const G = new Map(), key = (x, y) => (Math.floor(x / 48) + 100) * 1000 + Math.floor(y / 48) + 100;
     for (const z of this.zs.values()) { const k = key(z.p[0], z.p[1]); let a = G.get(k); if (!a) G.set(k, a = []); a.push(z); }
     const targets = this.players.filter(p => p.st < 2), B = this.objs.blds;
+    const tc = targets.length ? [targets.reduce((q, p) => q + p.p[0], 0) / targets.length, targets.reduce((q, p) => q + p.p[1], 0) / targets.length] : null, hunt = this.toSpawn <= 0 && this.zs.size <= 10;
     for (const z of this.zs.values()) {
       if (z.burn > 0) { z.burn -= dt; this.damageRaider(z, 14 * dt); if (z.hp <= 0) { this.killZ(z, z.burnBy, 1); continue; } }
       z.air = Math.max(0, z.air - dt); z.block = null;
       if (z.kbv) { const m = mul(z.kbv, Math.min(1, dt * 14)); z.p = this.zCollide(z, add(z.p, m)); z.kbv = sub(z.kbv, m); if (len(z.kbv) < .5) z.kbv = null; } // отлетает от пуль
       z.stag = Math.max(0, (z.stag || 0) - dt);
       if (t < this.frzT) { z.atk = 0; z.backKickAt = 0; continue; } // заморозка: стоят как статуи
-      if (!z.tg || z.tg.st === 2 || !this.players.includes(z.tg) || this.tick % 15 === z.id % 15) { let bd = 1e9; z.tg = null; for (const p of targets) { const d = dist(p.p, z.p) * (p.st === 1 ? 1.3 : 1); if (d < bd) { bd = d; z.tg = p; } } }
+      if (!z.tg || z.tg.st === 2 || !this.players.includes(z.tg) || this.tick % 15 === z.id % 15) { let bd = 1e9; z.tg = null; for (const p of targets) { const d = dist(p.p, z.p) * (p.st === 1 ? 1.3 : 1); if (d < bd) { bd = d; z.tg = p; } }
+        // видит: на улице ~13 м, человека в доме — только вблизи; последние на волне и босс охотятся всегда
+        if (z.tg && bd < (z.tg.bi >= 0 && z.bi !== z.tg.bi ? 240 : 460)) z.awT = Math.max(z.awT, t + 12); }
+      if (hunt) z.awT = Math.max(z.awT, t + 5);
       const T = z.tg; z.atk = 0; if (!T) continue;
+      if (z.awT < t) { this.wander(z, dt, tc); this.zPush(z, G); continue; } // не знает о людях — бродит
+      // ломится в окна дома, где прячется цель: бьёт стёкла
+      if (T.bi >= 0 && z.bi < 0 && this.tick % 8 === z.id % 8 && dist(z.p, T.p) < 420) for (const o of nearObjs(this.objs, z.p, z.r + 34)) if (o.win && !o.broken && !o.dead && o.bid === T.bi) { o.broken = 1; this.sendAll({ t: 'gl', id: o.id }); z.atk = 1; z.idle = 0; break; }
       if (this.tick % 4 === z.id % 4) z.bi = bldAt(B, z.p);
       const support = z.ty === RAIDER_SUPPORT;
       const d = dist(T.p, z.p), reach = support ? 105 : z.r + PR + 5;
@@ -374,9 +431,7 @@ export class World {
           if (t > T.inv) this.hurt(T, ZT[z.ty].dmg * earlyHeavy * (1 + this.cyc * .3) * ((z.lost & 3) === 3 ? .4 : 1));
         }
       }
-      // расталкивают друг друга
-      const gx = Math.floor(z.p[0] / 48), gy = Math.floor(z.p[1] / 48);
-      for (let ix = -1; ix <= 1; ix++) for (let iy = -1; iy <= 1; iy++) { const a = G.get((gx + ix + 100) * 1000 + gy + iy + 100); if (a) for (const o of a) { if (o === z) continue; const dd = dist(o.p, z.p), m = o.r + z.r; if (dd < m && dd > .01) { const push = (m - dd) * ZT[o.ty].sc / (ZT[z.ty].sc + ZT[o.ty].sc); z.p = add(z.p, norm(sub(z.p, o.p)), Math.min(push, 5)); } } }
+      this.zPush(z, G);
     }
     if (this.shots.length) { this.sendAll({ t: 'sh', s: this.shots }); this.shots = []; }
   }
