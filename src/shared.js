@@ -134,7 +134,32 @@ function genWorld() {
     const v = sub(b, a), t = Math.max(0, Math.min(1, dot(sub(p, a), v) / dot(v, v)));
     return dist(p, add(a, v, t)) < 60 + m;
   });
-  const free = (p, m) => { if (blocksApproach(p, m) || housePlots.some(b => { const r = sub(p, b.p); return Math.hypot(Math.max(0, Math.abs(dot(r, b.u)) - b.yard[0] / 2), Math.max(0, Math.abs(dot(r, b.v)) - b.yard[1] / 2)) < m; })) return false; for (const o of objs) if (o.bid === undefined && !o.gone && dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + (b.kind === 'ch0' ? 370 : b.kind === 'ch3' ? 330 : b.rad)) return false; return true; };
+  // ===== дорожная сеть (с 24.11): сначала дороги, потом дома фасадом к ним. Ширины под масштаб игрока (~34 ед. = 1 м):
+  // main — трасса через посёлок, 2 полосы (~6 м + обочины); street — улица (~4.5 м); dirt — грунтовка (~3.5 м).
+  const roads = [], RW = { main: 200, street: 150, dirt: 110 };
+  const road = (k, pts) => roads.push({ k, w: RW[k], pts });
+  road('main', [[-2000, -40], [-1300, -15], [-560, -45], [40, -20], [760, 15], [1400, -25], [2000, 0]]); // трасса запад—восток
+  road('main', [[30, -2000], [10, -1300], [50, -560], [40, -20], [70, 640], [20, 1260], [40, 2000]]); // трасса север—юг
+  // город (северо-запад): сетка кварталов ~720×720, улицы выходят на обе трассы
+  road('street', [[-1900, -1450], [-1720, -1450], [-900, -1450], [13, -1450]]); road('street', [[-1900, -760], [-1720, -760], [-900, -760], [45, -760]]);
+  road('street', [[-1720, -1900], [-1720, -1450], [-1720, -760], [-1720, -28]]); road('street', [[-900, -1900], [-900, -1450], [-900, -760], [-900, -40], [-900, 340]]);
+  road('street', [[-900, 340], [56, 340], [620, 345]]); // южная улица от центра
+  { const c = BIOMES[1].c; road('street', [[20, c[1]], [c[0] - 300, c[1] + 20], [c[0] + 300, c[1]]]); road('street', [[c[0], c[1] - 380], [c[0], c[1] + 360]]); } // военная база: подъезд от трассы и плац
+  { const c = BIOMES[2].c; road('dirt', [[c[0] + 60, -40], [c[0], c[1] - 200], [c[0] - 20, c[1] + 420]]); road('dirt', [[c[0] - 420, c[1] + 60], [c[0] + 420, c[1] + 40], [30, c[1] + 90]]); } // ферма: грунтовки
+  { const c = BIOMES[4].c; road('dirt', [[55, c[1] - 40], [c[0] - 200, c[1] - 10], [c[0] + 160, c[1] + 10]]); } // лес
+  const rsegs = []; for (const r of roads) for (let i = 1; i < r.pts.length; i++) rsegs.push([r.pts[i - 1], r.pts[i], r.w, r.k]);
+  const segD = (p, [a, b]) => { const ab = sub(b, a), t = Math.max(0, Math.min(1, dot(sub(p, a), ab) / Math.max(1e-6, dot(ab, ab)))); return dist(p, add(a, ab, t)); };
+  const onRoad = (p, m) => rsegs.some(s => segD(p, s) < s[2] / 2 + m);
+  // точка вдоль полилинии по длине s: [точка, направление]
+  const alongR = (r, s) => { for (let i = 1; i < r.pts.length; i++) { const L = dist(r.pts[i - 1], r.pts[i]); if (s <= L || i === r.pts.length - 1) { const d = norm(sub(r.pts[i], r.pts[i - 1])); return [add(r.pts[i - 1], d, Math.min(s, L)), d]; } s -= L; } };
+  const rLen = r => { let L = 0; for (let i = 1; i < r.pts.length; i++) L += dist(r.pts[i - 1], r.pts[i]); return L; };
+  // место под здание у дороги: фасадом к улице, отступ от края дороги
+  const roadSpot = (cen, R, depth, kinds = ['main', 'street', 'dirt']) => { const c = rsegs.filter(s => kinds.includes(s[3]) && (!cen || segD(cen, s) < R)); if (!c.length) return null;
+    const s = c[Math.floor(rnd() * c.length)], q = lerp(s[0], s[1], .1 + rnd() * .8), d = norm(sub(s[1], s[0])), side = rnd() < .5 ? 1 : -1, n = perp(d);
+    const p = add(q, n, side * (s[2] / 2 + 46 + depth / 2)), v = [-n[0] * side, -n[1] * side]; return [p, Math.atan2(-v[0], v[1])]; };
+  // прямоугольник (здание с двором) не должен залезать на дорогу: проверяем точки по контуру и внутри
+  const rectOnRoad = (p, a, W, H) => { const u = [Math.cos(a), Math.sin(a)], v = perp(u); for (let x = -W / 2; x <= W / 2 + 1; x += Math.max(30, W / 8)) for (let y = -H / 2; y <= H / 2 + 1; y += Math.max(30, H / 8)) if (onRoad(add(add(p, u, x), v, y), 14)) return true; return false; };
+  const free = (p, m, rect) => { if (blocksApproach(p, m) || (rect ? rectOnRoad(p, rect[0], rect[1], rect[2]) : onRoad(p, Math.max(8, m * .8))) || housePlots.some(b => { const r = sub(p, b.p); return Math.hypot(Math.max(0, Math.abs(dot(r, b.u)) - b.yard[0] / 2), Math.max(0, Math.abs(dot(r, b.v)) - b.yard[1] / 2)) < m; })) return false; for (const o of objs) if (o.bid === undefined && !o.gone && dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + (b.kind === 'ch0' ? 370 : b.kind === 'ch3' ? 330 : b.rad)) return false; return true; };
   function putA(type, p, w, h, a) {
     const u = [Math.cos(a), Math.sin(a)];
     const o = { id: objs.length, type, p, a, u, v: perp(u), w, h, rad: Math.hypot(w, h) / 2, sh: OT[type].s };
@@ -144,11 +169,11 @@ function genWorld() {
   function many(type, cen, r, w, h, n, gap = 30, tries = 1) {
     for (let i = 0; i < n; i++) for (let k = 0; k < tries; k++) { const p = cen ? nearPt(rnd, cen, r) : rndMap(rnd, 80); if (inMap(p, 60) && free(p, Math.max(w, h) / 2 + gap)) { put(type, p, w, h); break; } }
   }
-  function building(kind, p) {
+  function building(kind, p, ang) {
     const K = BKIND[kind], W2 = K.w / 2, H2 = K.h / 2, t = WALLT, D = DOOR, ED = K.door || DOOR;
     const randomAngle = Math.floor(rnd() * 4) * 1.5708 + (rnd() - .5) * .3;
     // Вход церкви находится на локальной стороне -X; сохраняем оба вызова rnd для угла.
-    const a = K.church !== undefined ? Math.atan2(p[1], p[0]) + (K.church === 2 ? -.32 : .32) : randomAngle, u = [Math.cos(a), Math.sin(a)], v = perp(u);
+    const a = K.church !== undefined ? Math.atan2(p[1], p[0]) + (K.church === 2 ? -.32 : .32) : ang !== undefined ? ang : randomAngle, u = [Math.cos(a), Math.sin(a)], v = perp(u);
     const b = { id: blds.length, kind, p, a, u, v, w: K.w, h: K.h, rad: Math.hypot(K.w, K.h) / 2, walls: [], furn: [], doors: [], rooms: [], idoors: [] };
     const L = (x, y) => add(add(p, u, x), v, y);
     const seg = (x0, y0, x1, y1, win) => { const ln = Math.hypot(x1 - x0, y1 - y0); if (ln < 3) return; const hor = Math.abs(y1 - y0) < 1e-6;
@@ -240,13 +265,14 @@ function genWorld() {
       for (const d of b.doors) hqApproaches.push([d.o, add(d.o, norm(sub(d.o, d.i)), Math.max(...K.yard) / 2 + 80 - dist(d.o, p))]);
     } return b;
   }
-  function manyB(kinds, cen, r, n, tries = 30) { for (let i = 0; i < n; i++) { const kind = kinds[Math.floor(rnd() * kinds.length)], K = BKIND[kind], m = Math.hypot(...(K.yard || [K.w, K.h])) / 2 + 30;
-    for (let k = 0; k < tries; k++) { const p = cen ? nearPt(rnd, cen, r) : rndMap(rnd, m); if (inMap(p, m) && free(p, m) && blds.every(b => BKIND[b.kind].church === undefined || dist(p, b.p) >= 250 + m)) { building(kind, p); break; } } } }
+  function manyB(kinds, cen, r, n, tries = 70) { for (let i = 0; i < n; i++) { const kind = kinds[Math.floor(rnd() * kinds.length)], K = BKIND[kind], m = Math.hypot(...(K.yard || [K.w, K.h])) / 2 + 30;
+    for (let k = 0; k < tries; k++) { const rs = k < tries * .8 ? roadSpot(cen, cen ? r + 200 : 0, (K.yard ? K.yard[1] : K.h), cen ? ['main', 'street', 'dirt'] : ['main', 'dirt']) : null, p = rs ? rs[0] : cen ? nearPt(rnd, cen, r) : rndMap(rnd, m);
+      if (inMap(p, m) && free(p, rs ? m * .6 : m, rs ? [rs[1], ...(K.yard || [K.w + 40, K.h + 40])] : null) && blds.every(b => BKIND[b.kind].church === undefined || dist(p, b.p) >= 250 + m) && (!rs || blds.every(b => dist(p, b.p) > (b.yard ? Math.hypot(...b.yard) / 2 : b.rad) * .72 + m * .62))) { building(kind, p, rs ? rs[1] : undefined); break; } } } }
   const B = BIOMES;
-  building('market', B[3].c);
+  building('market', [380, -330], 0); // рынок — на углу центрального перекрёстка, фасадом к трассе
   // церкви сект (ставим первыми, чтобы нашлось место)
-  const CHP = [[-1400, -1400], [-1400, 1400], [1400, -1400], [1400, 1400]], churches = [];
-  CHP.forEach((c, i) => { const K = BKIND['ch' + i], m = Math.hypot(K.w, K.h) / 2 + 40; for (let k = 0; k < 60; k++) { const p = k ? nearPt(rnd, c, 40 + k * 6) : c; if (inMap(p, m) && free(p, m)) { const b = building('ch' + i, p); b.sect = i; churches.push(b.id); break; } } });
+  const CHP = [[-1420, 300], [-1560, 1520], [1620, -470], [1560, 1560]], churches = []; // бывшие церкви — на окраинах, не в кварталах
+  CHP.forEach((c, i) => { const K = BKIND['ch' + i], m = Math.hypot(K.w, K.h) / 2 + 40; for (let k = 0; k < 140; k++) { const p = k ? nearPt(rnd, c, 40 + k * 4) : c; if (inMap(p, m) && free(p, m)) { const b = building('ch' + i, p); b.sect = i; churches.push(b.id); break; } } });
   for (const id of churches) { const d = blds[id].doors[0]; hqApproaches.push([d.o, add(d.o, norm(sub(d.o, d.i)), 260)]); }
   // кладбище вокруг обители Ордена: могилы рядами, мёртвые деревья, ограда с проходами
   { const ob = blds[churches[1]], R = 290;
@@ -258,22 +284,59 @@ function genWorld() {
   // у собора Плаката: билборды вокруг
   { const pb = blds[churches[3]]; for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283 + .3, p = add(pb.p, [Math.cos(a) * (pb.rad + 55), Math.sin(a) * (pb.rad + 55)]); if (free(p, 36)) putA('billboard', p, 70, 8, a + 1.5708); } }
   // Два жилых участка размещаем до случайной плотной застройки: образцы не должны исчезать.
-  for (const p of [[740, 260], [-1530, 215]]) { const m = Math.hypot(...BKIND.house.yard) / 2 + 30;
-    if (inMap(p, m) && free(p, m)) building('house', p); }
-  manyB(['apart', 'office', 'apart', 'villa', 'house'], B[0].c, 520, 11); manyB(['house', 'villa'], B[0].c, 560, 6);
-  manyB(['barracks', 'hangar', 'barracks'], B[1].c, 440, 5); manyB(['bunker'], B[1].c, 460, 5);
-  manyB(['barn'], B[2].c, 470, 3); manyB(['house', 'villa'], B[2].c, 500, 4);
-  manyB(['office', 'house'], B[3].c, 380, 3);
-  manyB(['lodge'], B[4].c, 480, 4); manyB(['adobe'], B[5].c, 380, 5);
-  manyB(['house', 'villa', 'house', 'adobe', 'lodge'], null, 0, 16, 10); // одиночные дома по карте
+  for (const [p, a] of [[[1070, 590], Math.PI], [[-700, 730], Math.PI]]) { const Y = BKIND.house.yard;
+    if (inMap(p, Y[0] / 2) && free(p, 220, [a, Y[0], Y[1]])) building('house', p, a); }
+  // застройка вдоль улиц: идём по каждой дороге и ставим дома подряд с обеих сторон, фасадом к дороге, с просветами и пустыми участками
+  // пересечение двух прямоугольников (SAT): [центр, ось u, полуразмеры]
+  const obbHit = (p, u, hw, hh, q, u2, hw2, hh2, pad) => { const v = perp(u), v2 = perp(u2), r = sub(q, p);
+    for (const ax of [u, v, u2, v2]) { const ra = hw * Math.abs(dot(u, ax)) + hh * Math.abs(dot(v, ax)), rb = hw2 * Math.abs(dot(u2, ax)) + hh2 * Math.abs(dot(v2, ax)); if (Math.abs(dot(r, ax)) > ra + rb + pad) return false; } return true; };
+  const footHit = (p, ang, W, H, pad) => { const u = [Math.cos(ang), Math.sin(ang)]; return blds.some(b => { const bw = (b.yard ? b.yard[0] : b.w + 20) / 2, bh = (b.yard ? b.yard[1] : b.h + 20) / 2; return obbHit(p, u, W / 2, H / 2, b.p, b.u, bw, bh, pad); }); };
+  function lineB(kinds, filt, opt = {}) { const gap = opt.gap ?? 30, skip = opt.skip ?? .18, setback = opt.setback ?? 40;
+    for (const sg of rsegs) { if (!filt(sg)) continue; const [a0, a1, w] = sg, L = dist(a0, a1), d = norm(sub(a1, a0)), n = perp(d);
+      for (const side of [-1, 1]) { let s = opt.start ?? 40; while (s < L - 60) { const k0 = Math.floor(rnd() * kinds.length);
+        if (rnd() < skip) { s += 160; continue; }
+        let placed = 0; // пробуем все типы по кругу, начиная со случайного: в узкий просвет встанет дом поменьше
+        for (let j = 0; j < kinds.length && !placed; j++) { const kind = kinds[(k0 + j) % kinds.length], K = BKIND[kind], fw = K.yard ? K.yard[0] : K.w + 20, fd = K.yard ? K.yard[1] : K.h + 20;
+          if (s + fw > L + 40) continue; const q = add(a0, d, s + fw / 2), p = add(q, n, side * (w / 2 + setback + fd / 2)), v = [-n[0] * side, -n[1] * side], ang = Math.atan2(-v[0], v[1]), m = Math.hypot(fw, fd) / 2;
+          if (inMap(p, m * .8) && free(p, m * .45, [ang, fw, fd]) && !footHit(p, ang, fw, fd, 12)) { building(kind, p, ang); s += fw + gap; placed = 1; } }
+        if (!placed) s += 30; } } } }
+  const near = (c, R) => sg => segD(c, sg) < R, cen = [40, -20];
+  lineB(['apart', 'office', 'apart', 'villa', 'apart'], sg => sg[3] === 'street' && segD(B[0].c, sg) < 900 && Math.max(sg[0][1], sg[1][1]) < -100, { setback: 34, skip: .08, gap: 24 }); // город
+  lineB(['office', 'apart', 'villa', 'house'], sg => (sg[3] === 'street' && near(B[3].c, 700)(sg)) || (sg[3] === 'main' && near(cen, 900)(sg)), { skip: .25 }); // центр у перекрёстка
+  lineB(['barracks', 'hangar', 'barracks'], sg => sg[3] === 'street' && near(B[1].c, 520)(sg), { gap: 70 }); manyB(['bunker'], B[1].c, 460, 4);
+  lineB(['house', 'barn', 'villa', 'house'], sg => sg[3] === 'dirt' && near(B[2].c, 760)(sg), { skip: .3, gap: 90 }); // ферма
+  lineB(['lodge', 'lodge', 'villa'], sg => sg[3] === 'dirt' && near(B[4].c, 900)(sg), { skip: .3, gap: 120 }); // лесные домики
+  lineB(['adobe', 'adobe', 'house'], sg => sg[3] === 'main' && near(B[5].c, 520)(sg), { skip: .25 }); // юг
+  lineB(['house', 'villa', 'lodge'], sg => sg[3] === 'main' && !near(cen, 900)(sg) && !near(B[5].c, 520)(sg), { skip: .55, gap: 160 }); // хутора вдоль трасс
+  // ===== машины по смыслу: брошенная пробка на выездах, припаркованные у обочин, авария на перекрёстке, автобусы на остановках =====
+  { const rv = mkRng(9090), clearOf = (p, m) => inMap(p, 80) && !blds.some(b => dist(b.p, p) < b.rad + m) && !objs.some(o => !o.gone && o.bid === undefined && (o.type === 'car' || o.type === 'truck' || o.type === 'bus') && dist(o.p, p) < m + o.rad * .8);
+    const veh = (type, p, d, jit = .1) => { const W = type === 'bus' ? [300, 86] : type === 'truck' ? [220, 80] : [150, 60], a = Math.atan2(d[1], d[0]) + (rv() - .5) * jit * 2;
+      if (!clearOf(p, W[0] * .45) || blocksApproach(p, W[0] * .45)) return null; return putA(type, p, W[0], W[1], a); };
+    const pick = () => { const r = rv(); return r < .08 ? 'bus' : r < .16 ? 'truck' : 'car'; };
+    // пробка: обе полосы, люди бежали — машины вкривь, двери нараспашку, просветы для прохода
+    for (const [ri, s0, s1, dirSign] of [[0, 350, 1150, 1], [1, 2650, 3350, -1], [0, 3000, 3500, -1], [1, 400, 900, 1]]) { const r = roads[ri];
+      for (const lane of [-1, 1]) { let s = s0 + rv() * 120; while (s < s1) { const [q, d] = alongR(r, s), n = perp(d), ty = pick();
+        if (rv() > .22) veh(ty, add(q, n, lane * r.w / 4 + (rv() - .5) * 18), lane * dirSign > 0 ? d : [-d[0], -d[1]], rv() < .12 ? .7 : .12);
+        s += (ty === 'bus' ? 340 : ty === 'truck' ? 260 : 185) + rv() * 90; } } }
+    // припаркованные у обочин улиц
+    for (const r of roads) { if (r.k === 'main') continue; const L = rLen(r); for (let s = 120; s < L - 120; s += 230 + rv() * 120) { if (rv() > .42) continue; const [q, d] = alongR(r, s), side = rv() < .5 ? 1 : -1;
+      veh(r.k === 'dirt' && rv() < .5 ? 'truck' : 'car', add(q, perp(d), side * (r.w / 2 - 34)), rv() < .5 ? d : [-d[0], -d[1]], .05); } }
+    // авария на центральном перекрёстке и у въезда в город
+    for (const [c, k] of [[[40, -20], 3], [[-840, -40], 2]]) for (let i = 0; i < k; i++) { const a = rv() * 6.28; veh('car', add(c, [Math.cos(a) * (70 + rv() * 60), Math.sin(a) * (70 + rv() * 60)]), [Math.cos(a + 1.2), Math.sin(a + 1.2)], .3); }
+    // автобусы на остановках трассы
+    for (const [ri, s] of [[0, 1500], [0, 2500], [1, 1600], [1, 2300]]) { const r = roads[ri], [q, d] = alongR(r, s); veh('bus', add(q, perp(d), r.w / 2 - 46), d, .03); }
+    // армейские грузовики на подъезде к базе
+    { const r = roads.find(x => x.k === 'street' && Math.abs(x.pts[0][1] - B[1].c[1]) < 60 && x.pts[0][0] < 100); if (r) for (let s = 500; s < 1100; s += 240) { const [q, d] = alongR(r, s); veh('truck', add(q, perp(d), r.w / 2 - 44), d, .04); } }
+  }
+
   // улица: машины, бочки, заборы, кусты
-  many('car', B[0].c, 620, 120, 52, 14, 12, 6); many('car', B[3].c, 440, 120, 52, 14, 12, 6); many('car', null, 0, 120, 52, 12, 20, 4); many('truck', B[1].c, 520, 170, 62, 6, 14, 6); many('truck', B[2].c, 520, 170, 62, 3, 14, 6); many('barrel', B[1].c, 520, 18, 18, 24, 12, 3); many('barrel', B[3].c, 380, 18, 18, 10);
+  many('barrel', B[1].c, 520, 18, 18, 24, 12, 3); many('barrel', B[3].c, 380, 18, 18, 10);
   many('wall', B[1].c, 480, 90, 18, 12); many('tent', B[1].c, 480, 60, 50, 8);
   many('hay', B[2].c, 500, 30, 30, 26); many('fence', B[2].c, 500, 90, 6, 18);
   many('pine', B[4].c, 520, 40, 40, 80); many('snowman', B[4].c, 500, 24, 24, 14);
   many('cactus', B[5].c, 420, 26, 26, 50); many('rock', B[5].c, 420, 40, 40, 26);
   many('crate', null, 0, 34, 34, 90, 40);
-  many('tree', null, 0, 44, 44, 420); many('rock', null, 0, 36, 36, 110); many('bush', null, 0, 34, 34, 260, 10);
+  many('tree', null, 0, 44, 44, 420, 30, 3); many('rock', null, 0, 36, 36, 110); many('bush', null, 0, 34, 34, 260, 10);
   // У каждого участка два выхода и свободные дорожки от дверей к калиткам.
   for (const b of housePlots) {
     const local = (x, y) => add(add(b.p, b.u, x), b.v, y), [w, h] = b.yard;
@@ -294,13 +357,12 @@ function genWorld() {
     const P = (ty, p, a, x, y, w, h, da = 0, ex) => { const o = putA(ty, at(p, a, x, y), w, h, a + da); if (ex) Object.assign(o, ex); return o; };
     const spot = (cen, R, m, tries = 400) => { for (let t = 0; t < tries; t++) { const p = cen ? nearPt(r3, cen, R) : rndMap(r3, 200); if (inMap(p, 120) && free(p, m)) return p; } return null; };
     const beside = (b, m) => { const dirs = [b.u, b.v, [-b.u[0], -b.u[1]], [-b.v[0], -b.v[1]]]; const s0 = Math.floor(r3() * 4); for (let i = 0; i < 4; i++) { const d = dirs[(s0 + i) % 4], p = add(b.p, d, b.rad + m + 8); if (inMap(p, 100) && free(p, m)) return [p, Math.atan2(d[1], d[0])]; } return null; };
-    // 1) блокпосты: мешки буквой П, бетонные блоки поперёк, ящики с патронами, бочка-костёр
-    const cens = [B[3].c, B[0].c, B[1].c, null];
-    for (let k = 0; k < 12; k++) { const p = spot(cens[k % 4], 700, 78); if (!p) continue; const a = r3() * 6.2832;
-      P('sandbag', p, a, 0, -40, 84, 14); for (const sd of [-1, 1]) P('sandbag', p, a, sd * 48, -8, 56, 14, 1.5708);
-      for (let i = -1; i <= 1; i++) if (r3() < .85) P('jersey', p, a, i * 64 + J(8), 72 + J(10), 58, 16, J(i ? .5 : .2));
-      P('crate', p, a, -22, -14, 30, 18, J(.6), { vk: 1 }); if (r3() < .6) P('crate', p, a, 24, -18, 30, 18, J(.6), { vk: 1 });
-      P('barrel', p, a, 4, 16, 18, 18, 0, { fire: 1 }); }
+    // 1) блокпосты на дорогах: бетонные блоки поперёк проезжей части (с проходом), мешки буквой П на обочине, армейские ящики, бочка-костёр
+    for (const [ri, f] of [[0, .3], [0, .72], [1, .3], [1, .72], [4, .45], [2, .55], [6, .3], [8, .5]]) { const r = roads[ri]; if (!r) continue; const [q, d] = alongR(r, rLen(r) * f), n = perp(d), a = Math.atan2(n[1], n[0]), sd = r3() < .5 ? 1 : -1;
+      const nb = Math.ceil(r.w / 64), gap = Math.floor(r3() * nb); for (let i = 0; i < nb; i++) if (i !== gap) { const o = putA('jersey', add(add(q, n, (i - (nb - 1) / 2) * 64 + J(6)), d, J(10)), 58, 16, a + J(.25)); }
+      const c = add(q, n, sd * (r.w / 2 + 62)), A = Math.atan2(-n[1] * sd, -n[0] * sd) + Math.PI / 2;
+      if (free(c, 50)) { P('sandbag', c, A, 0, 36, 84, 14); for (const e of [-1, 1]) P('sandbag', c, A, e * 48, 4, 56, 14, 1.5708);
+        P('crate', c, A, -22, -14, 30, 18, J(.6), { vk: 1 }); if (r3() < .6) P('crate', c, A, 24, -18, 30, 18, J(.6), { vk: 1 }); P('barrel', c, A, 4, 14, 18, 18, 0, { fire: 1 }); } }
     // 2) лагеря выживших: палатка, бочка-костёр в центре, ящики, мешки, пара бочек
     for (let k = 0; k < 8; k++) { const p = spot(k < 4 ? [B[0].c, B[2].c, B[3].c, B[4].c][k] : null, 760, 92); if (!p) continue; const a = r3() * 6.2832;
       P('tent', p, a, 0, -52, 60, 50); if (r3() < .5) P('tent', p, a, -64, -10, 60, 50, 1.2 + J(.3));
@@ -321,13 +383,11 @@ function genWorld() {
     // 5) баррикады у домов: мешки вдоль стены, ящики рядом — тут кто-то держал оборону
     for (const b of blds) { if (!/^(apart|office|villa|lodge)$/.test(b.kind) || r3() > .3) continue; const q = beside(b, 30); if (!q) continue; const [p, d] = q, a = d + 1.5708;
       P('sandbag', p, a, J(20), 0, 70, 14, J(.15)); P('crate', p, a, 48, 6, 26, 26, J(.5), { vk: 0 }); if (r3() < .5) P('crate', p, a, -46, 4, 30, 18, J(.5), { vk: 1 }); }
-    // одиночные бетонные блоки на дорогах-пустырях (их было много — оставляем меньше)
-    for (let k = 0; k < 12; k++) { const p = spot(null, 0, 50, 30); if (!p) continue; const a = r3() * 6.2832; P('jersey', p, a, 0, 0, 58, 16); if (r3() < .6) P('jersey', p, a, 64, J(8), 58, 16, J(.4)); }
-    for (let k = 0; k < 9; k++) for (let t = 0; t < 250; t++) { const p = k < 5 ? nearPt(r2, [B[0].c, B[3].c][k % 2], 560) : rndMap(r2, 260); if (!inMap(p, 160) || !free(p, 55) || blds.some(b => dist(b.p, p) < b.rad + 150) || objs.some(o => (o.type === 'car' || o.type === 'truck' || o.type === 'bus' || o.type === 'wall') && dist(o.p, p) < 170)) continue; putA('bus', p, 250, 66, r2() * 6.2832); break; } // брошенные автобусы
+    // автобусы теперь ставятся вместе с остальным транспортом на дорогах
   }
   // Убираем бункер №17 (мешал улицам) после расстановки карты — остальные здания и объекты сохраняют координаты.
   // Его стены и мебель помечаем gone: ниже они удаляются при перенумерации, как лишняя мебель.
-  const bunkerId = 17, removedBunker = blds[bunkerId]?.kind === 'bunker' ? blds[bunkerId] : null;
+  const bunkerId = -1, removedBunker = blds[bunkerId]?.kind === 'bunker' ? blds[bunkerId] : null;
   if (removedBunker) {
     for (const id of [...removedBunker.walls, ...removedBunker.furn]) objs[id].gone = 1;
     blds.splice(bunkerId, 1);
@@ -338,7 +398,7 @@ function genWorld() {
   // убираем «лишнюю» мебель и перенумеровываем
   const keep = objs.filter(o => !o.gone), idm = new Map(); objs.length = 0; keep.forEach((o, i) => { idm.set(o.id, i); o.id = i; objs.push(o); });
   for (const b of blds) { b.walls = b.walls.map(i => idm.get(i)); b.furn = b.furn.filter(i => idm.has(i)).map(i => idm.get(i)); if (b.altar !== undefined) b.altar = idm.get(b.altar); if (b.box !== undefined) b.box = idm.get(b.box); }
-  objs.blds = blds; objs.churches = churches; gridBuild(objs);
+  objs.blds = blds; objs.churches = churches; objs.roads = roads.map(r => ({ k: r.k, w: r.w, pts: r.pts })); gridBuild(objs);
   return objs;
 }
 // сетка для быстрых проверок (какие объекты рядом)

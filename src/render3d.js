@@ -1,110 +1,29 @@
 // ===== LAST EXIT — 3D-мир (Three.js, low-poly), изометрическая камера над плоской картой =====
-// Визуальные улицы строятся по реальным препятствиям, без вмешательства в генератор мира.
+// Визуальные улицы: дороги берём из генератора мира (objs.roads — трассы, улицы, грунтовки с реальной шириной),
+// от дверей к ближайшей дороге ведут короткие дорожки; перекрёстки ищем, чтобы не рисовать разметку поверх них.
 function planStreets(objs) {
-  const step = 30, radius = 28, size = Math.floor((HALF * 2 - 160) / step), origin = -HALF + 80;
-  const point = k => [origin + k % size * step, origin + Math.floor(k / size) * step];
-  const clear = (p, r, publicRoad = true) => {
-    if (!inMap(p, r + 50)) return false;
-    for (const b of objs.blds) {
-      const q = sub(p, b.p), x = Math.abs(dot(q, b.u)), y = Math.abs(dot(q, b.v));
-      const w = publicRoad && b.yard ? b.yard[0] : b.w, h = publicRoad && b.yard ? b.yard[1] : b.h;
-      if (x < w / 2 + r && y < h / 2 + r) return false;
-    }
-    return !nearObjs(objs, p, r).some(o => !o.nc && objPush(o, p, r));
-  };
-  const segment = (a, b, r, road = true) => {
-    const n = Math.ceil(dist(a, b) / 6);
-    for (let i = 0; i <= n; i++) if (!clear(lerp(a, b, i / Math.max(1, n)), r, road)) return false;
-    return true;
-  };
-  const free = new Uint8Array(size * size);
-  for (let k = 0; k < free.length; k++) free[k] = clear(point(k), radius) ? 1 : 0;
-  const ends = [];
+  const segs = [];
+  (objs.roads || []).forEach((r, ri) => { for (let i = 1; i < r.pts.length; i++) segs.push([r.pts[i - 1], r.pts[i], r.w, r.k, ri]); });
+  const proj = (p, [a, b]) => { const ab = sub(b, a), t = Math.max(0, Math.min(1, dot(sub(p, a), ab) / Math.max(1e-6, dot(ab, ab)))); return add(a, ab, t); };
+  // перекрёстки: пересечения отрезков разных дорог и концы дорог, упирающиеся в другую дорогу
+  const junctions = [], addJ = (p, r) => { const j = junctions.find(q => dist(q.p, p) < 40); if (j) j.r = Math.max(j.r, r); else junctions.push({ p, r }); };
+  for (let i = 0; i < segs.length; i++) for (let k = i + 1; k < segs.length; k++) { const A = segs[i], B = segs[k]; if (A[4] === B[4]) continue;
+    const r = Math.max(A[2], B[2]) / 2 + 8, d1 = sub(A[1], A[0]), d2 = sub(B[1], B[0]), den = d1[0] * d2[1] - d1[1] * d2[0];
+    if (Math.abs(den) > 1e-6) { const w = sub(B[0], A[0]), t = (w[0] * d2[1] - w[1] * d2[0]) / den, u = (w[0] * d1[1] - w[1] * d1[0]) / den;
+      if (t > -.02 && t < 1.02 && u > -.02 && u < 1.02) { addJ(add(A[0], d1, t), r); continue; } }
+    for (const [S, O] of [[A, B], [B, A]]) for (const e of [S[0], S[1]]) { const q = proj(e, O); if (dist(e, q) < O[2] / 2 + 12) addJ(q, r); } }
+  const walks = [], missed = [];
   for (const b of objs.blds) for (const d of b.doors) {
-    const outward = norm(sub(d.o, d.i)), threshold = lerp(d.i, d.o, .5);
-    const start = b.yard ? add(b.p, outward, b.yard[1] / 2 + 65) : d.o;
-    ends.push({ bid: b.id, points: b.yard ? [threshold, d.o, start] : [threshold, d.o], start });
+    const out = norm(sub(d.o, d.i)), gate = b.yard ? add(b.p, out, b.yard[1] / 2 + 6) : d.o;
+    let best = null, bd = 1e9; for (const sg of segs) { const q = proj(gate, sg), dd = dist(gate, q) - sg[2] / 2; if (dd < bd) { bd = dd; best = [sg, q]; } }
+    if (!best || bd > 420) { missed.push(b.id); continue; }
+    const [sg, q] = best, end = bd > 4 ? add(q, norm(sub(gate, q)), sg[2] / 2 - 6) : gate;
+    // дорожка не должна проходить сквозь дома (задние двери — без дорожки)
+    let ok = true; for (let t = .08; t <= 1 && ok; t += .04) { const p = lerp(gate, end, t); if (bldAt(objs.blds, p) >= 0) ok = false; }
+    if (!ok) continue;
+    walks.push({ bid: b.id, points: b.yard ? [lerp(d.i, d.o, .5), d.o, gate, end] : [lerp(d.i, d.o, .5), d.o, end] });
   }
-  const closest = (p, reachable = null) => {
-    let best = -1, distance = 200;
-    const cx = Math.round((p[0] - origin) / step), cy = Math.round((p[1] - origin) / step);
-    for (let y = Math.max(0, cy - 5); y < Math.min(size, cy + 6); y++) for (let x = Math.max(0, cx - 5); x < Math.min(size, cx + 6); x++) {
-      const k = y * size + x; if (!free[k] || reachable && !Number.isFinite(reachable[k])) continue;
-      const q = point(k), d = dist(p, q); if (d < distance && segment(p, q, PR + 2, false)) { best = k; distance = d; }
-    }
-    return best;
-  };
-  const root = closest(ends[0].start), distance = new Float64Array(free.length).fill(Infinity), parent = new Int32Array(free.length).fill(-1);
-  if (root < 0) return { roads: [], walks: [], missed: ends.map(e => e.bid) };
-  const heap = [];
-  const push = (k, d) => { let i = heap.length; heap.push([k, d]); while (i > 0) { const p = (i - 1) >> 1; if (heap[p][1] <= d) break; heap[i] = heap[p]; i = p; } heap[i] = [k, d]; };
-  const pop = () => { const first = heap[0], last = heap.pop(); if (heap.length) { let i = 0; while (i * 2 + 1 < heap.length) { let c = i * 2 + 1; if (c + 1 < heap.length && heap[c + 1][1] < heap[c][1]) c++; if (heap[c][1] >= last[1]) break; heap[i] = heap[c]; i = c; } heap[i] = last; } return first; };
-  distance[root] = 0; push(root, 0);
-  while (heap.length) {
-    const [k, cost] = pop(); if (cost !== distance[k]) continue;
-    const x = k % size, y = Math.floor(k / size);
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const xx = x + dx, yy = y + dy, next = yy * size + xx;
-      if (xx < 0 || yy < 0 || xx >= size || yy >= size || !free[next]) continue;
-      const nd = cost + step; if (nd >= distance[next] || !segment(point(k), point(next), radius)) continue;
-      distance[next] = nd; parent[next] = k; push(next, nd);
-    }
-  }
-  // Узкий выход возле забора или берега может требовать обхода, а не прямого отрезка.
-  const detour = start => {
-    const fine = 20, n = Math.ceil((HALF * 2 - 160) / fine), key = (x, y) => y * n + x;
-    const pos = k => [origin + k % n * fine, origin + Math.floor(k / n) * fine];
-    const cx = Math.round((start[0] - origin) / fine), cy = Math.round((start[1] - origin) / fine), prev = new Map(), queue = [];
-    for (let y = cy - 1; y <= cy + 1; y++) for (let x = cx - 1; x <= cx + 1; x++) {
-      if (x < 0 || y < 0 || x >= n || y >= n) continue;
-      const k = key(x, y); if (segment(start, pos(k), PR + 2, false)) { prev.set(k, -1); queue.push(k); }
-    }
-    for (let i = 0; i < queue.length && i < 5000; i++) {
-      const k = queue[i], p = pos(k), gx = Math.round((p[0] - origin) / step), gy = Math.round((p[1] - origin) / step);
-      for (let yy = gy - 1; yy <= gy + 1; yy++) for (let xx = gx - 1; xx <= gx + 1; xx++) {
-        const target = yy * size + xx;
-        if (xx < 0 || yy < 0 || xx >= size || yy >= size || !Number.isFinite(distance[target]) || !segment(p, point(target), PR + 2, false)) continue;
-        const route = []; for (let a = k; a >= 0; a = prev.get(a)) route.push(pos(a));
-        return { target, points: route.reverse() };
-      }
-      const x = k % n, y = Math.floor(k / n);
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const xx = x + dx, yy = y + dy, next = key(xx, yy);
-        if (xx < 0 || yy < 0 || xx >= n || yy >= n || prev.has(next) || dist(start, pos(next)) > 500 || !segment(p, pos(next), PR + 2, false)) continue;
-        prev.set(next, k); queue.push(next);
-      }
-    }
-    return null;
-  };
-  const edges = new Map(), walks = [], missed = [];
-  for (const e of ends) {
-    let k = closest(e.start, distance), extra = [];
-    if (k < 0) { const route = detour(e.start); if (!route) { missed.push(e.bid); continue; } k = route.target; extra = route.points; }
-    walks.push({ bid: e.bid, points: e.points.concat(extra, [point(k)]) });
-    for (let i = k; parent[i] >= 0; i = parent[i]) { const j = parent[i], key = Math.min(i, j) + ':' + Math.max(i, j); edges.set(key, [point(i), point(j)]); }
-  }
-  // Убираем ступеньки сетки между развилками, сохраняя подключения всех дверей.
-  const graph = new Map(), coordinates = new Map(), key = p => p.join(','), used = new Set();
-  for (const [a, b] of edges.values()) for (const [p, q] of [[a, b], [b, a]]) {
-    const k = key(p); coordinates.set(k, p); if (!graph.has(k)) graph.set(k, []); graph.get(k).push(key(q));
-  }
-  const stops = new Set(walks.map(w => key(w.points[w.points.length - 1])));
-  for (const [k, next] of graph) if (next.length !== 2) stops.add(k);
-  const roads = [], edgeKey = (a, b) => a < b ? a + ':' + b : b + ':' + a;
-  for (const start of stops) for (const neighbor of graph.get(start) || []) {
-    if (used.has(edgeKey(start, neighbor))) continue;
-    const chain = [coordinates.get(start)]; let previous = start, current = neighbor;
-    used.add(edgeKey(previous, current)); chain.push(coordinates.get(current));
-    while (!stops.has(current)) {
-      const next = graph.get(current).find(k => k !== previous); used.add(edgeKey(current, next));
-      previous = current; current = next; chain.push(coordinates.get(current));
-    }
-    for (let i = 0; i < chain.length - 1;) {
-      let next = chain.length - 1; while (next > i + 1 && !segment(chain[i], chain[next], radius)) next--;
-      roads.push([chain[i], chain[next]]); i = next;
-    }
-  }
-  return { roads, walks, missed };
+  return { roads: segs.map(sg => [sg[0], sg[1]]), segs, junctions, walks, missed };
 }
 const G3 = (() => {
   const T = THREE;
@@ -1289,18 +1208,30 @@ void main(){
       for (const q of nodes.values()) { cm.setMatrixAt(i, M(q[0], y, q[1], width, 1, width)); cm.setColorAt(i++, new T.Color(color)); }
       cm.receiveShadow = true; cm.frustumCulled = false; scene.add(cm); streetMeshes.push(cm);
     };
-    layer(plan.roads, 56, .04, 'paving', 0x8e8a7b);
-    layer(plan.roads, 50, .08, 'asphalt', 0x565b62);
-    const dashes = [];
-    for (const [a, b] of plan.roads) {
-      const length = dist(a, b);
-      if (length < 113) continue;
-      const dir = norm(sub(b, a));
-      for (let t = 37; t + 18 < length - 37; t += 45) dashes.push([add(a, dir, t), add(a, dir, t + 18)]);
-    }
-    layer(dashes, 2.1, .12, 'asphaltMark', 0xb7ad91, false);
+    // дороги по типам: трасса — асфальт с гравийной обочиной и полной разметкой, улица — асфальт, бордюр и тротуары, грунтовка — колея
+    const bySeg = k => plan.segs.filter(sg => sg[3] === k), SW = { main: [44, 0, 'gravel', 0x8a8172], street: [64, 10, 'paving', 0x9a958a], dirt: [26, 0, 'gravel', 0x7d6d58] };
+    for (const k of ['main', 'street', 'dirt']) { const ss = bySeg(k); if (!ss.length) continue; const w = ss[0][2], [side, curb, stx, scol] = SW[k];
+      layer(ss.map(sg => [sg[0], sg[1]]), w + side, .03, stx, scol);
+      if (curb) layer(ss.map(sg => [sg[0], sg[1]]), w + curb, .05, 'concrete', 0xb4b0a6);
+      layer(ss.map(sg => [sg[0], sg[1]]), w, .08, k === 'dirt' ? 'dirt' : 'asphalt', k === 'dirt' ? 0x8a7458 : k === 'main' ? 0x4c5056 : 0x585c62); }
+    // разметка: прерывистая ось (на трассе ещё сплошные края), разрывы на перекрёстках; на грунтовке — две колеи
+    const inJ = (p, pad = 0) => plan.junctions.some(j => dist(p, j.p) < j.r + pad), dashes = [], edges = [], ruts = [], zebra = [];
+    for (const [a, b, w, k] of plan.segs) { const L = dist(a, b), d = norm(sub(b, a)), n = perp(d);
+      if (k === 'dirt') { for (let t = 0; t < L; t += 40) { const p = add(a, d, t), q = add(a, d, Math.min(L, t + 40)); if (inJ(p, -10)) continue; for (const o of [-24, 24]) ruts.push([add(p, n, o), add(q, n, o)]); } continue; }
+      const dash = k === 'main' ? 56 : 34, gap = k === 'main' ? 44 : 40;
+      for (let t = 10; t + dash < L; t += dash + gap) { const p = add(a, d, t), q = add(a, d, t + dash); if (!inJ(p, 14) && !inJ(q, 14)) dashes.push([p, q]); }
+      if (k === 'main') for (let t = 0; t < L; t += 30) { const p = add(a, d, t), q = add(a, d, Math.min(L, t + 30)); if (inJ(p, 4) || inJ(q, 4)) continue; for (const o of [-1, 1]) edges.push([add(p, n, o * (w / 2 - 12)), add(q, n, o * (w / 2 - 12))]); } }
+    // «зебры» перед перекрёстками на всех городских ветках: полосы вдоль дороги, шагом поперёк
+    for (const j of plan.junctions) for (const [a, b, w, k] of plan.segs) { if (k === 'dirt') continue; const L = dist(a, b), d = norm(sub(b, a)), n = perp(d), t0 = dot(sub(j.p, a), d);
+      if (Math.abs(dot(sub(j.p, a), n)) > w / 2 + 4) continue;
+      for (const sgn of [-1, 1]) { const t = t0 + sgn * (j.r + 26); if (t < 20 || t > L - 20) continue; const c = add(a, d, t); if (inJ(c, 2)) continue;
+        for (let o = -w / 2 + 18; o <= w / 2 - 18; o += 22) zebra.push([add(add(c, n, o), d, -20), add(add(c, n, o), d, 20)]); } }
+    layer(ruts, 14, .1, 'dirt', 0x5e4c3a, false);
+    layer(dashes, 3.2, .12, 'asphaltMark', 0xd8d2bf, false);
+    layer(edges, 3.2, .12, 'asphaltMark', 0xd8d2bf, false);
+    layer(zebra, 11, .12, 'asphaltMark', 0xdedad0, false);
     layer(paths, 28, .16, 'paving', 0xb1a995);
-    if (GROUNDED) buildGrassMask(objs, plan.roads, paths);
+    if (GROUNDED) buildGrassMask(objs, plan.segs, paths);
 
   }
   // пучок травы: 9 изогнутых травинок, тёмные у земли и светлые к кончикам; качаются на ветру (в шейдере)
@@ -1327,7 +1258,7 @@ void main(){
     const m = new Uint8Array(GN * GN).fill(1), ci = v => Math.floor((v + HALF) / GCELL), paved = BIOMES.filter(b => b.n === 'city' || b.n === 'market' || b.n === 'base');
     const markSeg = ([a, b], rad) => { const x0 = ci(Math.min(a[0], b[0]) - rad), x1 = ci(Math.max(a[0], b[0]) + rad), y0 = ci(Math.min(a[1], b[1]) - rad), y1 = ci(Math.max(a[1], b[1]) + rad), ab = sub(b, a), L2 = Math.max(1, dot(ab, ab));
       for (let y = Math.max(0, y0); y <= Math.min(GN - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(GN - 1, x1); x++) { const p = [-HALF + (x + .5) * GCELL, -HALF + (y + .5) * GCELL], t = Math.max(0, Math.min(1, dot(sub(p, a), ab) / L2)); if (dist(p, add(a, ab, t)) < rad) m[y * GN + x] = 0; } };
-    for (const s of roads) markSeg(s, 34); for (const s of paths) markSeg(s, 18);
+    for (const s of roads) markSeg(s, s[2] / 2 + (s[3] === 'street' ? 34 : 24)); for (const s of paths) markSeg(s, 18);
     for (const o of objs) { if (o.nc || o.type === 'tree' || o.type === 'deadtree' || o.type === 'cactus') continue; const r = o.rad + 4; for (let y = Math.max(0, ci(o.p[1] - r)); y <= Math.min(GN - 1, ci(o.p[1] + r)); y++) for (let x = Math.max(0, ci(o.p[0] - r)); x <= Math.min(GN - 1, ci(o.p[0] + r)); x++) { const p = [-HALF + (x + .5) * GCELL, -HALF + (y + .5) * GCELL]; if (!objPush(o, p, 6)) continue; m[y * GN + x] = 0; } }
     for (let y = 0; y < GN; y++) for (let x = 0; x < GN; x++) { if (!m[y * GN + x]) continue; const p = [-HALF + (x + .5) * GCELL, -HALF + (y + .5) * GCELL];
       if (Math.max(Math.abs(p[0]), Math.abs(p[1])) > HALF - 70 || paved.some(b => dist(p, b.c) < b.r * 1.02) || bldAt(objs.blds, p) >= 0) m[y * GN + x] = 0; }
@@ -1589,14 +1520,14 @@ void main(){
     const junk = p => { const r = R(); if (r < .3) add_('paper', p, .4, 6 + R() * 4, .3, 7 + R() * 4); else if (r < .5) add_('bag', p, 3, 5, 4, 6); else if (r < .64) add_('tire', p, 1.6, 6, 3, 6, 0, R() < .3 ? 1.2 : 0); else if (r < .82) add_('plank', p, 1, 18 + R() * 10, 1.5, 4); else { add_('brick', p, 1.5, 6, 3, 3); add_('brick', add(p, [3, 4]), 1.5, 6, 3, 3); } };
     const pile = (c, n, rad) => { for (let i = 0; i < n; i++) { const q = add(c, [(R() - .5) * rad * 2, (R() - .5) * rad * 2]); if (!okAt(q, 4)) continue; const big = 1 - dist(q, c) / (rad * 1.5); if (R() < .7) { const sz = 3 + R() * 5 * Math.max(.4, big); add_('chunk', q, sz * .45 + big * 3, sz, sz * .7, sz); } else add_('brick', q, 1.5 + big * 3, 6, 3, 3, R() * 6.28, R() * .6); } dec.push([c[0], c[1], rad * 2.6, 'b2', 0x5a554c, .5, R() * 6.28, 1]); };
     // дороги: ямы, заплатки, мазут, мусор у обочин
-    for (const [a, b] of (streetPlan && streetPlan.roads) || []) { const d = norm(sub(b, a)), n = perp(d), L = dist(a, b), ang = Math.atan2(d[0], d[1]);
-      for (let t = 20; t < L; t += 46) { const c = add(a, d, t), r = R(), q = add(c, n, (R() - .5) * 36);
+    for (const [a, b, rw] of (streetPlan && streetPlan.segs) || []) { const d = norm(sub(b, a)), n = perp(d), L = dist(a, b), ang = Math.atan2(d[0], d[1]);
+      for (let t = 20; t < L; t += 46) { const c = add(a, d, t), r = R(), q = add(c, n, (R() - .5) * (rw - 40));
         if (r < .5) { R(); R(); } // сохраняем позиции остального декора
         else if (r < .62) dec.push([q[0], q[1], 16 + R() * 18, 'hole', 0x6a6258, 1, R() * 6.28, 1]);
         else if (r < .74) dec.push([q[0], q[1], 30 + R() * 24, 'patch', 0x2e2d2a, .6, -ang + (R() - .5) * .2, .55 + R() * .4]);
         else if (r < .8) dec.push([q[0], q[1], 28 + R() * 36, 'b1', 0x0a0806, .5, R() * 6.28, .7]);
-        if (R() < .4) { const e = add(c, n, (R() < .5 ? -1 : 1) * (19 + R() * 7)); if (okAt(e, 4)) junk(e); }
-        if (R() < .05) { const e = add(c, n, (R() < .5 ? -1 : 1) * 18); if (okAt(e, 12)) pile(e, 10, 14); } } }
+        if (R() < .4) { const e = add(c, n, (R() < .5 ? -1 : 1) * (rw / 2 + 8 + R() * 10)); if (okAt(e, 4)) junk(e); }
+        if (R() < .05) { const e = add(c, n, (R() < .5 ? -1 : 1) * (rw / 2 + 14)); if (okAt(e, 12)) pile(e, 10, 14); } } }
     // дома: завалы у стен, сгоревшие — копоть вокруг, огонь в окнах и дым над крышей
     for (const b of Bl) { if (b.kind && b.kind.startsWith('ch')) continue; const burnt = b.burnt, n = burnt ? 3 : R() < .45 ? 1 : 0;
       for (let i = 0; i < n; i++) { const sx = R() < .5 ? -1 : 1, sy = R() < .5 ? -1 : 1, c = add(add(b.p, b.u, sx * (b.w / 2 + 16)), b.v, sy * (b.h / 2 * R() + 10)); pile(c, burnt ? 18 : 12, burnt ? 22 : 15); }
