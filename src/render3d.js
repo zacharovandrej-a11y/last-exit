@@ -1648,14 +1648,28 @@ void main(){
       shp(0x161616, sh => { sh.moveTo(-14.9, 1.25); sh.lineTo(-16, 1.3); sh.quadraticCurveTo(-16.2, -2, -15.95, -5.2); sh.lineTo(-14.9, -5.2); sh.closePath(); }, 2.4, .2);
       for (let i = 0; i < 3; i++) box(0x222222, 0, -1.9 + i * .1, -15.6 + i * .04, 2.5, .08, .9);
       muz = 22.8;
-    } else if (w === 4) { // снайперская винтовка с оптикой
-      tube(GC.st, 0, 0, 2, 1.25, 10, 14); box(GC.st, 1.55, .2, -.6, 2.2, .35, .35); ball(GC.st, 2.8, .1, -.6, .6);
-      tube(GC.dk, 0, .2, 17, .64, 22, 12, .8); tube(GC.dk, 0, .2, 28.7, .9, 2.2, 8); for (let i = 0; i < 4; i++) box(GC.st, 0, .2, 28 + i * .5, 1.9, .35, .2);
-      tube(GC.dk, 0, 3.3, 3, 1, 10); tube(GC.dk, 0, 3.3, 9.4, 1.55, 3, 14, 1.15); tube(LENS, 0, 3.3, 10.95, 1.35, .12, 14); tube(GC.dk, 0, 3.3, -2.8, 1.25, 2.6, 14, .8); tube(LENS, 0, 3.3, -4.15, .9, .1, 12);
-      post(GC.dk, 0, 4.5, 3, .55, 1.3); side(GC.dk, 1.2, 3.3, 3, .55, 1.2); for (const z of [0, 6]) { box(GC.dk, 0, 2.1, z, 1.2, 1.6, 1); ring(GC.dk, 0, 3.3, z, 1.08, .2); }
-      prof(GC.tn, [[-3, 1.2], [7, 1.1], [7, -.8], [14, -.7], [14, -1.9], [2, -2.2], [.6, -2.2], [-.6, -5.8], [-2.8, -5.8], [-3, -2.6], [-7, -2.2], [-17, -4.4], [-17.2, 1], [-11, 2.2], [-5.5, 2.2]], 2.2, .4);
-      box(GC.dk, 0, -1.7, -17.5, 2.4, 5.6, .6); guard(-.6, 2.6, -1.6, GC.dk); box(GC.dk, 0, -2.4, 3.6, 1.5, 1.6, 3);
-      for (const s of [-1, 1]) box(GC.dk, s * .7, -2.8, 15.5, .4, .4, 7, 0, s * .05); muz = 29.8;
+    } else if (w === 4) { // снайперская винтовка: тяжёлый рифлёный ствол с тормозом, прицел с турелями, синтетическое ложе с пистолетной рукоятью, сошки
+      tube(GC.st, 0, .1, 2.3, 1.15, 9.6, 18); tube(GC.st, 0, .1, -2.75, 1.0, .9, 16, .9); box(GC.dk, 0, 1.3, 2.4, 1, .25, 9.2); for (let i = 0; i < 12; i++) box(0x101010, 0, 1.44, -1.8 + i * .75, 1.02, .08, .22);
+      rod(GC.st, V3(.9, .5, -.7), V3(2.4, -.4, -1.1), .2); ball(GC.dk, 2.55, -.5, -1.15, .58, .58, .58); box(0x0c0c0c, 1.05, .55, 3.2, .06, .8, 2.6);
+      tube(GC.dk, 0, .15, 17, .72, 20, 16, .78); for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; box(0x101010, Math.sin(a) * .66, .15 + Math.cos(a) * .66, 15, .12, .12, 10, 0, 0, -a); }
+      tube(GC.dk, 0, .15, 28.3, .82, 2.6, 16); for (let i = 0; i < 3; i++) for (const sd of [-1, 1]) box(0x050505, sd * .72, .15, 27.6 + i * .7, .14, .5, .35); tube(0x050505, 0, .15, 29.62, .4, .04, 10);
+      tube(GC.dk, 0, 3.6, 3.2, .78, 10.6, 18); tube(GC.dk, 0, 3.6, 9.9, 1.55, 3, 20, 1.18); tube(GC.dk, 0, 3.6, 12.2, 1.6, 1.6, 20); tube(LENS, 0, 3.6, 13.02, 1.42, .05, 20);
+      tube(GC.dk, 0, 3.6, -2.7, 1.25, 2.4, 20, .66); tube(0x141414, 0, 3.6, -4.2, 1.3, .8, 20); tube(LENS, 0, 3.6, -4.62, .95, .04, 16);
+      post(GC.dk, 0, 4.75, 3.4, .55, 1.1, 14); for (let k = 0; k < 10; k++) { const a = k / 10 * 6.283; box(GC.st, Math.sin(a) * .56, 5.05, 3.4 + Math.cos(a) * .56, .1, .5, .1); }
+      side(GC.dk, 1.05, 3.6, 3.4, .5, 1.1, 14); side(GC.dk, -.95, 3.6, 3.4, .42, .9, 12);
+      for (const z of [0, 6.4]) { box(GC.dk, 0, 2.15, z, 1.1, 1.4, .9); ring(GC.dk, 0, 3.6, z, .9, .22); box(GC.st, .75, 2.4, z, .3, .5, .5); }
+      shp(GC.tn, sh => { sh.moveTo(-2.9, 1); sh.lineTo(14.8, .85); sh.quadraticCurveTo(15.6, .7, 15.6, -.2); sh.lineTo(15.4, -1.2); sh.quadraticCurveTo(15, -1.9, 14, -1.95); sh.lineTo(4.4, -2.1); sh.lineTo(3.9, -2.4);
+        sh.quadraticCurveTo(1.4, -2.4, .9, -2.9); sh.quadraticCurveTo(-.2, -4.2, -.6, -6); sh.quadraticCurveTo(-1.6, -6.5, -2.6, -6); sh.quadraticCurveTo(-3.2, -4, -3.3, -3.4); sh.quadraticCurveTo(-8, -3.2, -16.4, -4.7);
+        sh.lineTo(-16.6, 1.3); sh.quadraticCurveTo(-11, 1.6, -6.5, 1.5); sh.quadraticCurveTo(-4, 1.35, -2.9, 1); sh.closePath(); }, 2.1, .38, 0,
+        h => { h.moveTo(-.9, -2.2); h.quadraticCurveTo(-.5, -3.6, -1.3, -4.9); h.quadraticCurveTo(-2.2, -4.6, -2.4, -3.2); h.quadraticCurveTo(-2.1, -2.3, -.9, -2.2); h.closePath(); });
+      for (let i = 0; i < 6; i++) for (const sd of [-1, 1]) box(0x6a5c3e, sd * 1.25, -1, 6 + i * 1.3, .05, .9, .45);
+      box(GC.tn, 0, 2.35, -9.6, 1.9, .6, 5.6); for (const z of [-8.2, -11]) rod(GC.cr, V3(0, 1.4, z), V3(0, 2.1, z), .18);
+      shp(0x151515, sh => { sh.moveTo(-16.5, 1.35); sh.lineTo(-17.6, 1.4); sh.quadraticCurveTo(-17.8, -1.8, -17.5, -4.85); sh.lineTo(-16.4, -4.75); sh.closePath(); }, 2.3, .2);
+      rod(GC.dk, V3(0, -4.4, -12.5), V3(0, -6.4, -12.6), .26); ball(GC.dk, 0, -6.5, -12.6, .4, .3, .4);
+      shp(GC.dk, sh => { sh.moveTo(1.2, -2.05); sh.lineTo(4.2, -2.05); sh.lineTo(4.1, -3.6); sh.lineTo(1.4, -3.6); sh.closePath(); }, 1.5, .12); box(GC.st, 0, -3.7, 2.75, 1.6, .2, 2.9);
+      shp(GC.dk, sh => { sh.moveTo(-.2, -2.1); sh.lineTo(1.1, -2.1); sh.quadraticCurveTo(1.2, -3.2, .2, -3.3); sh.quadraticCurveTo(-.4, -3.2, -.5, -2.4); sh.closePath(); }, .55, .07, 0, h => { h.moveTo(.05, -2.4); h.lineTo(.85, -2.4); h.quadraticCurveTo(.85, -3.05, .25, -3.05); h.quadraticCurveTo(-.15, -3, -.2, -2.6); h.closePath(); });
+      box(GC.dk, 0, -2.3, 13.2, 1.8, .6, 1.4); for (const sd of [-1, 1]) { rod(GC.st, V3(sd * .55, -2.55, 13), V3(sd * .55, -2.65, 21), .22); ball(GC.dk, sd * .55, -2.65, 21.2, .32, .32, .5); }
+      muz = 29.8;
     } else if (w === 5) { // Узи: штампованная коробка с рёбрами, крышка с рукояткой взведения, магазин в рукояти, большая скоба, приклад
       shp(GC.st, sh => { sh.moveTo(-2.6, -1.2); sh.lineTo(8.4, -1.2); sh.lineTo(8.4, 1.5); sh.quadraticCurveTo(8.35, 1.75, 8.1, 1.75); sh.lineTo(-2.3, 1.75); sh.quadraticCurveTo(-2.6, 1.7, -2.6, 1.4); sh.closePath(); }, 2, .18);
       for (const sd of [-1, 1]) { box(GC.st, sd * 1.2, .75, 3, .1, .35, 9.8); box(GC.st, sd * 1.2, -.4, 3, .1, .35, 9.8); box(GC.dk, sd * 1.2, .18, 3, .06, .12, 10.4); }
@@ -1675,80 +1689,171 @@ void main(){
       box(GC.st, 0, .2, -3, 1.6, 1.4, .8); for (const sd of [-1, 1]) rod(GC.st, V3(sd * .95, .1, -3.1), V3(sd * .95, -1.1, -10.2), .22);
       shp(GC.st, sh => { sh.moveTo(-10, 1.1); sh.quadraticCurveTo(-10.7, -.8, -10.5, -2.9); sh.lineTo(-10.05, -2.9); sh.quadraticCurveTo(-10.2, -.8, -9.6, 1.1); sh.closePath(); }, 2.3, .12);
       muz = 11.6;
-    } else if (w === 7) { // пулемёт ПКМ
-      box(GC.dk, 0, .4, 2.5, 2.6, 3.8, 12); box(GC.st, 0, 2.5, 2.5, 2.2, .6, 10); for (let i = 0; i < 4; i++) box(GC.dk, 0, 2.85, -1.5 + i * 2.6, 2.3, .15, .4);
-      tube(GC.dk, 0, .6, 17, .74, 18); for (let i = 0; i < 6; i++) ring(GC.st, 0, .6, 10 + i * 1.2, .8, .14); tube(GC.dk, 0, .6, 26.6, .95, 2.4, 8);
-      tube(GC.st, 0, -.8, 13.5, .48, 10); box(GC.wd2, 0, 3.6, 11, .7, .8, 4.6); box(GC.st, 0, 2.6, 9, .5, 1.4, .5); box(GC.st, 0, 2.6, 13, .5, 1.4, .5);
-      box(GC.dk, 0, 2.2, 24.4, .35, 2.2, .6); for (const s of [-1, 1]) box(GC.st, s * .6, -1.3, 20.5, .35, .35, 8, 0, s * .04);
-      box(GC.wd2, 0, .9, -9.3, 1.8, 1.4, 12); box(GC.wd2, 0, -3, -9.8, 1.8, 1.2, 11.4, -.24); box(GC.dk, 0, -1.2, -15.8, 2.2, 7, 1.1);
-      grip(GC.wd2, -.6, -1.6, .3, 4.8, 1.8); guard(.8, 3.8, -1.6, GC.dk);
-      box(GC.ol, -2.9, -3.4, 4, 3.2, 5.6, 6.4); box(GC.ol2, -2.9, -.45, 4, 3.4, .5, 6.6); box(GC.st, -4.55, -3.4, 4, .2, 1, 2.4);
-      for (let i = 0; i < 5; i++) side(GC.br, -1.6 + i * .2, .1 + i * .3, 4 - 1.3 + i * .65, .28, 1.4, 6); muz = 27.8;
-    } else if (w === 13) { // миниган
-      tube(GC.st, 0, 0, 2, 2.6, 8, 16); for (let i = 0; i < 3; i++) ring(GC.dk, 0, 0, -.8 + i * 2.6, 2.62, .16); tube(GC.dk, 0, 0, -3.5, 2.1, 3, 14);
-      for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; tube(GC.dk, Math.sin(a) * 1.45, Math.cos(a) * 1.45, 14, .42, 18, 8); tube(GC.st, Math.sin(a) * 1.45, Math.cos(a) * 1.45, 23.1, .5, .4, 8); }
-      tube(GC.st, 0, 0, 7, 2.3, 1.2, 14); tube(GC.st, 0, 0, 14, 2.15, 1, 14); tube(GC.st, 0, 0, 20.5, 2.15, 1, 14); tube(GC.dk, 0, 0, 14, .7, 18, 8);
-      box(GC.dk, 0, 3.8, 2, .8, .8, 6.6); box(GC.dk, 0, 3, -.8, .6, 1.6, .6); box(GC.dk, 0, 3, 4.8, .6, 1.6, .6);
-      box(GC.po, 0, -2.8, -3.6, 1.2, 4.6, 1.6); box(GC.ol, -3.1, -1, 2.6, 1.6, 2.2, 6); box(GC.ol, -3.6, -4.4, 0, 3.4, 5, 7.6); box(GC.ol2, -3.6, -1.75, 0, 3.6, .4, 7.8);
-      muz = 23.4; } else if (w === 10) { // револьверный гранатомёт
-      tube(GC.ol, 0, -.4, 3, 3, 6, 14); for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3 + .52; tube(GC.dk, Math.sin(a) * 1.9, -.4 + Math.cos(a) * 1.9, 6.05, .78, .15, 10); box(GC.ol2, Math.sin(a) * 2.95, -.4 + Math.cos(a) * 2.95, 3, .5, .5, 5.6, 0, 0, -a); }
-      tube(GC.dk, 0, -.4, -.15, 1, .5); tube(GC.ol2, 0, .7, 11.5, 1.45, 11, 14); tube(GC.dk, 0, .7, 17.05, 1.2, .15, 14); for (let i = 0; i < 3; i++) ring(GC.ol, 0, .7, 8 + i * 3, 1.48, .2);
-      box(GC.dk, 0, 2.4, 3, 1, .6, 7.4); box(GC.dk, 0, 2.4, 10, .5, .4, 9); box(GC.dk, 0, 3.4, 8.4, .2, 1.8, .9, -.3);
-      box(GC.po, 0, -3.8, 11.5, 1.3, 4.2, 1.7, .15); grip(GC.po, -1, -2.6, .25, 4.4, 1.9); guard(-.4, 1.8, -2.6);
-      box(GC.dk, 0, .3, -6, 1.4, 1.4, 8.6); box(GC.po, 0, -1, -10.6, 2.3, 6, 1.6); box(GC.dk, 0, -2.4, -6.5, .5, .5, 8);
-      muz = 17; } else if (w === 11) { // огнемёт
-      tube(GC.st, 0, 1, 14, .85, 18, 10); tube(GC.dk, 0, 1, 19.5, 1.5, 7.4, 14); for (let i = 0; i < 5; i++) for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + .4; box(0x050505, Math.sin(a) * 1.52, 1 + Math.cos(a) * 1.52, 16.7 + i * 1.4, .45, .45, .45, 0, 0, -a); }
-      tube(GC.dk, 0, 1, 23.8, 1.15, 1.2, 10, .75); tube(0x2a1408, 0, 1, 24.45, .75, .1, 10);
-      box(GC.dk, 0, -.6, 22.4, .7, .7, 2.2); ball(GLOW_B, 0, -.6, 23.6, .42);
-      for (const s of [-1, 1]) { tube(GC.rd, s * 1.65, -4, 3.5, 1.6, 11, 14); ball(GC.rd, s * 1.65, -4, 9, 1.6, 1.6, 1); ball(GC.rd, s * 1.65, -4, -2, 1.6, 1.6, 1); ring(GC.dk, s * 1.65, -4, 1.5, 1.62, .18); ring(GC.dk, s * 1.65, -4, 6, 1.62, .18); }
-      box(GC.cr, 0, -2.2, 10.2, .8, 1.6, .8); post(GC.cr, 0, -1.2, 10.2, .3, 1.6); side(GC.cr, 0, -2.2, 10.6, .9, 3.5, 12); side(GC.wh, 1.8, -2.2, 10.6, .62, .1, 12);
-      { const cv = new T.CatmullRomCurve3([new T.Vector3(-1.6, -5.6, -2.4), new T.Vector3(-2.6, -6.6, -5), new T.Vector3(-3, -3, -6), new T.Vector3(-2, .4, -2), new T.Vector3(-1, 1, 3)]); L.push([new T.TubeGeometry(cv, 16, .45, 6), new T.Matrix4(), GC.dk]); }
-      grip(GC.po, -.2, -.2, .2, 4.6, 1.8); guard(1, 4, -.2, GC.dk); box(GC.po, 0, -1.8, 14, 1.1, 3.2, 1.4, .1); box(GC.st, 0, 1, 2, 2, 2.4, 5);
-      muz = 24.5; } else if (w === 12) { // базука (РПГ)
-      tube(GC.dk, 0, 1.5, 3, 1.5, 30, 16); tube(GC.wd2, 0, 1.5, -1, 1.78, 7.4, 16); for (const z of [-4.6, 2.6]) ring(GC.dk, 0, 1.5, z, 1.8, .2);
-      tube(GC.dk, 0, 1.5, -14.5, 2.65, 5, 16, 1.5 / 2.65); tube(0x060606, 0, 1.5, -17.02, 2.4, .05, 16); ring(GC.st, 0, 1.5, -17, 2.62, .16);
-      tube(GC.ol, 0, 1.5, 19.6, .85, 3.4, 10); tube(GC.ol2, 0, 1.5, 22.6, 2.4, 3.6, 16); tube(GC.ol2, 0, 1.5, 26.2, 2.4, 3.6, 16, .32); tube(GC.br, 0, 1.5, 28.4, .5, 1, 8, .5); ring(GC.br, 0, 1.5, 20.8, 2.4, .12);
-      for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + .78; box(GC.ol, Math.sin(a) * 1.3, 1.5 + Math.cos(a) * 1.3, 18.8, .12, 1.6, 1.4, 0, 0, -a); }
-      grip(GC.dk, .2, 0, .15, 4.6, 1.8); guard(1.6, 4.4, 0, GC.dk); box(GC.dk, 0, -1, 3, 1.4, 2.2, 5); box(GC.dk, 0, -2.4, 7.4, 1.1, 4.8, 1.5, .15);
-      box(GC.dk, -2.3, 2.9, 2.6, 1.3, 2.1, 4.4); tube(GC.dk, -2.3, 3.2, -.6, .55, 2.4, 10); tube(LENS, -2.3, 3.2, 4.85, .5, .1, 10); box(GC.dk, -1.3, 2.4, 2.6, 1, .6, 1.6);
-      box(GC.dk, 0, 3.3, 11, .3, .9, .4); box(GC.dk, 0, 3.3, 4.5, .3, .9, .4); muz = 29.5;
-    } else if (w === 14) { // арбалет
-      prof(GC.po, [[-14, 1], [-14, -3.6], [-6, -1.8], [-3, -1.6], [-2.4, -6], [-.2, -6], [.6, -1.4], [12, -1.1], [12, .7], [-4, .9]], 2, .4); box(GC.dk, 0, -1.4, -14.3, 2.2, 5, .6);
-      box(GC.st, 0, 1.05, 5, .9, .4, 14); guard(.8, 3.6, -1.4, GC.dk); box(GC.dk, 0, 1.4, 3.6, 1.4, .9, 1.8);
-      box(GC.st, 0, .6, 12.4, 3.4, 2.2, 1.6); for (const s of [-1, 1]) { box(GC.dk, s * 4.4, .7, 11.2, 9, .9, 1.4, 0, s * .32); box(GC.st, s * 8.6, .7, 9.6, .7, 1.1, .7); }
-      for (const s of [-1, 1]) box(0xdccfb0, s * 4.3, .9, 6.5, 10.6, .16, .16, 0, -s * Math.atan2(6.1, 8.6));
-      tube(GC.cr, 0, 1.6, 9, .2, 13, 6); tube(GC.dk, 0, 1.6, 16.1, .5, 1.6, 8, .06); for (let k = 0; k < 3; k++) { const a = k * 2.094; box(GC.rd, Math.sin(a) * .5, 1.6 + Math.cos(a) * .5, 3.4, .08, .9, 2, 0, 0, -a); }
-      tube(GC.dk, 0, 3.1, 1.5, .75, 6.4, 12); tube(LENS, 0, 3.1, 4.75, .65, .1, 12); for (const z of [-.4, 3.4]) box(GC.dk, 0, 2.2, z, .8, 1.4, .7);
-      box(GC.st, 0, -.2, 14.4, .3, 2.4, 2.6); muz = 17;
-    } else if (w === 15) { // обрез двустволки
-      for (const s of [-1, 1]) { tube(GC.st, s * .76, .9, 8, .76, 10); tube(0x070707, s * .76, .9, 13.02, .55, .06, 10); }
-      box(GC.st, 0, 1.62, 8, .45, .3, 10); box(GC.st, 0, .6, 1.5, 2.2, 2.6, 4.2); box(GC.cr, 0, .2, 1.4, 2.25, 1.6, 3.2);
-      prof(GC.wd2, [[3.6, -.1], [9, .1], [9, -.9], [3.6, -1.2]], 2.2, .35); for (const s of [-1, 1]) box(GC.dk, s * .6, 2.3, -.4, .35, 1.2, .5, -.6);
-      box(GC.cr, 0, 2.1, 1.2, .5, .5, 2.4, .2); guard(.6, 3, -.8, GC.dk);
-      prof(GC.wd2, [[-.5, 1.7], [-.5, -.8], [-2.6, -4.4], [-4.8, -4.4], [-4.4, -1.8], [-3, 1.7]], 2, .45); muz = 13.1;
-    } else if (w === 16) { // автоматический дробовик с барабаном
-      box(GC.po, 0, .6, 2, 2.6, 4, 13); box(GC.dk, 1.32, 1.2, 3, .08, 1.2, 4); box(GC.dk, 0, 3.3, 3, .9, .9, 7); box(GC.dk, 0, 2.8, .2, .6, 1, .6); box(GC.dk, 0, 2.8, 6, .6, 1, .6);
-      tube(GC.dk, 0, .8, 14, .9, 11); tube(GC.po, 0, .8, 11.2, 1.45, 5.4, 12); for (let i = 0; i < 3; i++) for (const s of [-1, 1]) box(0x050505, s * 1.42, .8, 9.6 + i * 1.6, .1, .7, .9);
-      tube(GC.dk, 0, .8, 20, 1.15, 1.8, 8); for (let i = 0; i < 3; i++) box(GC.dk, 0, 1.95, 19.5 + i * .55, 1.5, .4, .25);
-      side(GC.po, 0, -5, 4.2, 4, 2.8, 20); side(GC.dk, 0, -5, 4.2, 4.05, .6, 20); side(GC.dk, 0, -5, 4.2, 1.2, 3, 10);
-      box(GC.po, 0, -2.2, 12.5, 1.2, 3.6, 1.5, .1); grip(GC.po, -.8, -1.4, .28, 4.8, 1.9); guard(.2, 3.2, -1.4, GC.dk);
-      box(GC.po, 0, .5, -8.6, 2.2, 3.4, 8.4); box(GC.dk, 0, -.1, -13.2, 2.4, 5, .9); muz = 21;
-    } else if (w === 17) { // плазмаган
-      prof(0x9aa3ad, [[-9, 1.6], [-9, -2.2], [-6.5, -2.2], [-3, -1], [6, -1.2], [12, -.6], [14.5, .4], [13, 2.2], [4, 2.6], [-3, 2.4]], 2.4, .4); box(GC.dk, 0, -.2, -7.6, 2.6, 3.6, .5);
-      box(GC.dk, 0, .6, 3, 2.9, 1.4, 14); for (const s of [-1, 1]) box(GLOW_C, s * 1.46, .62, 3, .06, .5, 12);
-      tube(GC.dk, 0, .6, 18, 1, 6, 12); for (let i = 0; i < 4; i++) ring(GLOW_C, 0, .6, 15.6 + i * 1.6, 1.35, .26); tube(GLOW_C, 0, .6, 21.05, .6, .1, 12);
-      post(GLOW_C, 0, -3.6, 3.4, 1.05, 3.6, 12); post(GC.dk, 0, -1.6, 3.4, 1.2, .6, 12); post(GC.dk, 0, -5.6, 3.4, 1.2, .6, 12);
-      grip(GC.dk, -2.6, -1.8, .25, 4.4, 1.9); guard(-1.4, 1.4, -1.8, GC.dk); box(GC.dk, 0, 4, 2, 1, 1.2, 5); tube(GLOW_C, 0, 4, 4.55, .4, .1, 10);
-      muz = 21.2; } else if (w === 18) { // рельсотрон
-      box(GC.dk, 0, 2.3, 12, 1.6, 1, 27); box(GC.dk, 0, -1.1, 12, 1.6, 1, 27); box(GLOW_B, 0, .6, 13, .5, .5, 25); for (let i = 0; i < 6; i++) { ring(GC.st, 0, .6, 4 + i * 3.6, 2.6, .32); box(GC.st, 0, .6, 4 + i * 3.6, 3.6, 4.6, .3); }
-      prof(0x30343a, [[-4, 3], [6, 3], [6, -2], [2, -2.4], [-4, -2.4]], 3, .4); for (const s of [-1, 1]) for (let i = 0; i < 3; i++) post(0x3a5c8c, s * 1, -3.6, -1.6 + i * 2.6, .78, 2.6, 10);
-      prof(0x30343a, [[-4, 2], [-4, -1.4], [-7, -1.6], [-14, -3.8], [-15, -3.8], [-15, 1.2], [-8, 1.4]], 2, .4); grip(GC.dk, .2, -2.4, .25, 4.2, 1.9); guard(1.4, 4.2, -2.4, GC.dk);
-      box(GC.dk, 0, 4.4, 2, 1, 1.6, 6); tube(GLOW_B, 0, 4.4, 5.05, .45, .1, 10); ball(GLOW_B, 0, .6, 25.6, .7); muz = 26;
-    } else if (w === 19) { // ракетница: 4 трубы
-      for (const sx of [-1, 1]) for (const sy of [-1, 1]) { tube(GC.ol, sx * 1.15, 1.6 + sy * 1.15, 8, 1.05, 18, 12); tube(GC.rd, sx * 1.15, 1.6 + sy * 1.15, 16.6, .7, .7, 10, .4); tube(0x0a0a0a, sx * 1.15, 1.6 + sy * 1.15, -1.02, .85, .05, 10); }
-      for (const z of [1.5, 8, 14.5]) box(GC.dk, 0, 1.6, z, 4.8, 4.8, 1);
-      grip(GC.po, .2, -.8, .2, 4.4, 1.9); guard(1.4, 4.4, -.8, GC.dk); box(GC.po, 0, -2.4, 9, 1.2, 3.6, 1.5, .1); box(GC.dk, 0, -.3, 3, 1.4, 1, 6);
-      box(GC.dk, -3, 2.4, 4, 1.2, 1.8, 3.6); tube(LENS, -3, 2.4, 5.85, .5, .1, 10); muz = 18;
+    } else if (w === 7) { // пулемёт ПКМ: штампованная коробка с заклёпками, крышка с прицелом, ствол с ручкой, скелетный приклад, патронная коробка и лента
+      shp(GC.dk, sh => { sh.moveTo(-3.6, -1.6); sh.lineTo(8.6, -1.6); sh.lineTo(8.6, 1.4); sh.lineTo(-3.2, 1.4); sh.quadraticCurveTo(-3.6, 1.3, -3.6, .9); sh.closePath(); }, 2.4, .18);
+      for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) ball(GC.st, sd * 1.36, .9, -2.6 + i * 2.6, .18, .18, .06);
+      shp(GC.st, sh => { sh.moveTo(-3.4, 1.35); sh.lineTo(7.2, 1.35); sh.lineTo(7.2, 1.9); sh.quadraticCurveTo(7, 2.5, 6, 2.55); sh.lineTo(-2.2, 2.55); sh.quadraticCurveTo(-3.4, 2.4, -3.4, 1.8); sh.closePath(); }, 2.2, .15);
+      for (let i = 0; i < 6; i++) box(0x111111, 0, 2.72, -1.8 + i * 1.3, 1.6, .06, .3); box(GC.dk, 0, 3.1, 6.6, .8, .5, 1.6); shp(GC.dk, sh => { sh.moveTo(5.8, 2.9); sh.lineTo(8, 2.9); sh.lineTo(8, 3.2); sh.lineTo(6, 3.6); sh.closePath(); }, .5, .06);
+      tube(GC.dk, 0, .5, 17.5, .74, 18, 14); tube(GC.dk, 0, .5, 26.7, .95, 2.6, 12); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + .4; box(0x050505, Math.sin(a) * .9, .5 + Math.cos(a) * .9, 26.8, .25, .25, 1.8, 0, 0, -a); }
+      tube(GC.st, 0, -.95, 12.5, .5, 8.5, 12); box(GC.st, 0, -.2, 16.8, 1.2, 2.2, 1.1); box(GC.st, 0, -.2, 8.6, 1.4, 2.2, .8);
+      shp(GC.wd2, sh => { sh.moveTo(9.6, 3.3); sh.lineTo(13.4, 3.3); sh.quadraticCurveTo(14, 3.3, 14, 3.8); sh.quadraticCurveTo(14, 4.3, 13.4, 4.3); sh.lineTo(9.6, 4.3); sh.quadraticCurveTo(9, 4.3, 9, 3.8); sh.quadraticCurveTo(9, 3.3, 9.6, 3.3); sh.closePath(); }, .9, .15);
+      for (const z of [9.9, 13.1]) rod(GC.st, V3(0, 1.2, z), V3(0, 3.4, z), .26);
+      shp(GC.dk, sh => { sh.moveTo(23.4, 1.1); sh.lineTo(24.6, 1.1); sh.lineTo(24.6, 2); sh.lineTo(24.2, 3.4); sh.lineTo(23.8, 3.4); sh.lineTo(23.4, 2); sh.closePath(); }, .8, .08); for (const sd of [-1, 1]) box(GC.dk, sd * .55, 2.7, 24, .15, 1.4, .6);
+      for (const sd of [-1, 1]) { rod(GC.st, V3(sd * .55, -1.6, 18.8), V3(sd * .6, -1.7, 25), .22); ball(GC.dk, sd * .6, -1.7, 25.2, .3, .3, .45); } box(GC.st, 0, -1.4, 18.6, 1.5, .6, .9);
+      shp(GC.wd2, sh => { sh.moveTo(-3.6, 1.2); sh.lineTo(-3.6, -1.6); sh.quadraticCurveTo(-6, -2.6, -9, -3.6); sh.quadraticCurveTo(-13, -4.8, -15.4, -5.2); sh.lineTo(-15.6, 1.4); sh.quadraticCurveTo(-10, 1.5, -3.6, 1.2); sh.closePath(); }, 1.8, .3, 0,
+        h => { h.moveTo(-5.2, .2); h.lineTo(-13.6, .25); h.quadraticCurveTo(-14.2, .2, -14.2, -.5); h.lineTo(-14, -3.6); h.quadraticCurveTo(-9.6, -2.9, -6.4, -1.6); h.quadraticCurveTo(-5.2, -1.2, -5.2, .2); h.closePath(); });
+      shp(GC.dk, sh => { sh.moveTo(-15.4, 1.5); sh.lineTo(-16.3, 1.55); sh.lineTo(-16.2, -5.35); sh.lineTo(-15.3, -5.3); sh.closePath(); }, 2, .15);
+      shp(GC.wd2, sh => { sh.moveTo(-1.3, -1.55); sh.lineTo(.3, -1.55); sh.quadraticCurveTo(0, -3.4, -1.2, -6.2); sh.quadraticCurveTo(-2.2, -6.6, -3, -6.1); sh.quadraticCurveTo(-2.1, -3.8, -2.4, -1.9); sh.closePath(); }, 1.6, .25);
+      shp(GC.dk, sh => { sh.moveTo(.2, -1.55); sh.lineTo(3.4, -1.55); sh.lineTo(3.4, -1.9); sh.quadraticCurveTo(3.2, -3, 2.2, -3.05); sh.lineTo(.6, -3.05); sh.closePath(); }, .55, .07, 0, h => { h.moveTo(.6, -1.85); h.lineTo(3, -1.85); h.quadraticCurveTo(2.9, -2.72, 2.15, -2.75); h.lineTo(.9, -2.75); h.closePath(); });
+      shp(GC.ol, sh => { sh.moveTo(1.6, -2.2); sh.lineTo(7.4, -2.2); sh.lineTo(7.4, -7.6); sh.quadraticCurveTo(7.4, -8, 7, -8); sh.lineTo(2, -8); sh.quadraticCurveTo(1.6, -8, 1.6, -7.6); sh.closePath(); }, 3.4, .2, -3);
+      box(GC.ol2, -3, -1.95, 4.5, 3.9, .45, 6.2); box(GC.st, -4.9, -3.6, 4.5, .25, .9, 1.8); rod(GC.st, V3(-3, -1.6, 3), V3(-3, -1.6, 6), .2); box(0xd8d0b0, -4.82, -5.2, 4.5, .06, 1.2, 3.2);
+      for (let i = 0; i < 6; i++) { const t = i / 5, x = -2.4 + t * 2.4, y = -1.7 + t * 2.4, z = 3.2 + t * 1.2; rod(GC.br, V3(x - .05, y, z - 1.2), V3(x - .05, y, z + .5), .26, 8); rod(0x8a8a8a, V3(x - .05, y, z + .5), V3(x - .05, y, z + 1.1), .22, 6); box(GC.st, x, y - .25, z, .5, .12, 2.6); }
+      muz = 28;
+    } else if (w === 13) { // миниган: блок из 6 стволов, зажимы, корпус с мотором, рукоять сверху, гибкий рукав подачи
+      tube(GC.st, 0, 0, 2.3, 2.4, 7.4, 22); for (let i = 0; i < 4; i++) ring(GC.dk, 0, 0, -.8 + i * 2, 2.42, .14); tube(GC.dk, 0, 0, -2.6, 2.6, 2, 22); tube(GC.st, 0, 0, -4, 1.8, 1, 18);
+      for (let k = 0; k < 8; k++) { const a = k / 8 * 6.283; box(0x101010, Math.sin(a) * 2.55, Math.cos(a) * 2.55, -2.6, .3, .3, 1.8, 0, 0, -a); }
+      for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3, x = Math.sin(a) * 1.4, y = Math.cos(a) * 1.4; tube(GC.dk, x, y, 14.6, .4, 17.6, 10); tube(GC.st, x, y, 23.2, .48, .5, 10); tube(0x050505, x, y, 23.47, .26, .04, 8); }
+      for (const z of [7, 14.5, 21.6]) { tube(GC.st, 0, 0, z, 2.1, .9, 22); for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3 + Math.PI / 6; tube(0x0a0a0a, Math.sin(a) * 1.55, Math.cos(a) * 1.55, z + .46, .3, .03, 8); } }
+      tube(GC.dk, 0, 0, 14.6, .62, 17.6, 10);
+      shp(GC.dk, sh => { sh.moveTo(-1, 2.5); sh.lineTo(-.4, 4.3); sh.lineTo(5.8, 4.3); sh.lineTo(6.2, 2.5); sh.lineTo(5.6, 2.5); sh.lineTo(5.2, 3.6); sh.lineTo(.2, 3.6); sh.lineTo(-.3, 2.5); sh.closePath(); }, .9, .15);
+      for (let i = 0; i < 6; i++) box(0x161616, 0, 4.4, .6 + i * .7, 1, .1, .3);
+      for (const sd of [-1, 1]) { box(GC.dk, sd * 1.2, -3.2, -3.4, .7, 3.4, 1.4, 0, 0, sd * .1); box(GC.rd, sd * 1.2, -1.6, -3, .5, .4, .5); }
+      { const cv = new T.CatmullRomCurve3([V3(-2.4, -.6, 3), V3(-4, -1, 2), V3(-4.8, -2.8, -.5), V3(-4.2, -4.4, -2.6)]); L.push([new T.TubeGeometry(cv, 18, .75, 8), new T.Matrix4(), GC.ol2]); }
+      for (let i = 0; i < 6; i++) { const p = new T.CatmullRomCurve3([V3(-2.4, -.6, 3), V3(-4, -1, 2), V3(-4.8, -2.8, -.5), V3(-4.2, -4.4, -2.6)]).getPoint(i / 6); ring(GC.dk, p.x, p.y, p.z, .82, .1); }
+      shp(GC.ol, sh => { sh.moveTo(-6, -3.5); sh.lineTo(1.8, -3.5); sh.lineTo(1.8, -8.4); sh.lineTo(-6, -8.4); sh.closePath(); }, 3.6, .25, -4);
+      box(GC.ol2, -4, -3.3, -2.1, 4, .5, 8.2); box(0xd8d0b0, -5.85, -6, -2.1, .06, 1.4, 3.6);
+      muz = 23.5;
+    } else if (w === 10) { // револьверный гранатомёт: барабан на 6 гранат, рама с планкой и коллиматором, толстый ствол, телескопический приклад
+      tube(GC.ol, 0, -.4, 3, 3, 6.2, 24); for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3 + .52, x = Math.sin(a) * 1.9, y = -.4 + Math.cos(a) * 1.9; tube(GC.dk, x, y, 6.12, .82, .1, 14); tube(GC.br, x, y, 6.15, .55, .06, 12); box(GC.ol2, Math.sin(a + .52) * 2.98, -.4 + Math.cos(a + .52) * 2.98, 3, .7, .5, 5.8, 0, 0, -(a + .52)); }
+      tube(GC.dk, 0, -.4, -.25, 3.05, .5, 24); tube(GC.dk, 0, -.4, 6.35, 3.05, .4, 24); tube(GC.st, 0, -.4, 3, .6, 7.4, 12);
+      tube(GC.ol2, 0, .7, 11.8, 1.42, 11.2, 20); for (let i = 0; i < 4; i++) ring(GC.dk, 0, .7, 8 + i * 2.6, 1.46, .16); tube(GC.dk, 0, .7, 17.42, 1.5, .4, 20); tube(0x050505, 0, .7, 17.64, 1.15, .04, 16);
+      shp(GC.dk, sh => { sh.moveTo(-1, 2.3); sh.lineTo(16.5, 2.3); sh.lineTo(16.5, 2.75); sh.lineTo(-1, 2.75); sh.closePath(); }, 1, .1); for (let i = 0; i < 22; i++) box(0x101010, 0, 2.8, -.6 + i * .78, 1.02, .1, .26);
+      for (const z of [0, 6.1]) box(GC.dk, 0, 1.7, z, 1.2, 1.6, .6);
+      shp(GC.dk, sh => { sh.moveTo(7, 2.8); sh.lineTo(10.6, 2.8); sh.lineTo(10.6, 4.1); sh.quadraticCurveTo(10.6, 5.3, 9.6, 5.3); sh.lineTo(7.8, 5.3); sh.quadraticCurveTo(7, 5.3, 7, 4.3); sh.closePath(); }, 1.6, .12, 0, h => { h.moveTo(7.5, 3.3); h.lineTo(10.1, 3.3); h.lineTo(10.1, 4.6); h.lineTo(7.5, 4.6); h.closePath(); });
+      box(0x3a6f5a, 0, 3.95, 9.9, 1.1, 1.1, .05); ball(new T.Color(2.6, .2, .1), 0, 3.95, 8.6, .08);
+      shp(PO, sh => { sh.moveTo(10.6, -.8); sh.lineTo(12.4, -.8); sh.lineTo(12.6, -4.6); sh.quadraticCurveTo(12.4, -5.2, 11.6, -5.2); sh.quadraticCurveTo(10.8, -5.1, 10.9, -4.4); sh.closePath(); }, 1.5, .2);
+      for (let i = 0; i < 4; i++) box(GC.dk, 0, -1.7 - i * .85, 12.55, 1.6, .25, .25);
+      shp(PO, sh => { sh.moveTo(-2.4, -2.4); sh.lineTo(-.6, -2.4); sh.quadraticCurveTo(-.8, -4.2, -1.8, -7); sh.quadraticCurveTo(-2.8, -7.4, -3.6, -6.9); sh.quadraticCurveTo(-2.9, -4.6, -3.2, -2.8); sh.closePath(); }, 1.6, .25);
+      shp(GC.dk, sh => { sh.moveTo(-.8, -2.3); sh.lineTo(2.2, -2.3); sh.quadraticCurveTo(2.2, -3.7, 1, -3.75); sh.lineTo(-.2, -3.75); sh.closePath(); }, .6, .07, 0, h => { h.moveTo(-.35, -2.6); h.lineTo(1.85, -2.6); h.quadraticCurveTo(1.8, -3.42, 1, -3.45); h.lineTo(-.1, -3.45); h.closePath(); });
+      box(GC.dk, 0, -2.2, 3, 1.8, .6, 6.6);
+      tube(GC.dk, 0, .2, -5.2, .75, 8.6, 12); tube(GC.st, 0, .2, -1.6, .9, 1.4, 12);
+      shp(PO, sh => { sh.moveTo(-9, 1.6); sh.lineTo(-10.8, 1.7); sh.quadraticCurveTo(-11.1, -2, -10.8, -5); sh.lineTo(-9.2, -4.9); sh.quadraticCurveTo(-9.6, -1.8, -8.4, .2); sh.closePath(); }, 2.2, .25);
+      muz = 17.6;
+    } else if (w === 11) { // огнемёт: ствол с перфорированным кожухом, запальник с огоньком, вентиль-маховик, два баллона, шланг, манометр
+      tube(GC.st, 0, 1, 12.5, .8, 15, 12); tube(GC.dk, 0, 1, 19.2, 1.5, 8.6, 20);
+      for (let i = 0; i < 6; i++) for (let k = 0; k < 7; k++) { const a = k / 7 * 6.283 + i * .45; tube(0x050505, Math.sin(a) * 1.5, 1 + Math.cos(a) * 1.5, 15.6 + i * 1.3, .3, .05, 8); }
+      tube(GC.dk, 0, 1, 23.9, 1.2, 1.4, 16, .7); tube(0x2a1408, 0, 1, 24.62, .7, .05, 12); for (let i = 0; i < 3; i++) ring(GC.st, 0, 1, 15 + i * 4.2, 1.53, .1);
+      tube(GC.st, 0, -.9, 21.8, .55, 3.2, 12); tube(GC.dk, 0, -.9, 23.5, .62, .3, 12); ball(GLOW_B, 0, -.9, 23.8, .34); ball(GLOW_O, 0, -.6, 24.4, .4, .6, .4);
+      ring(GC.rd, 0, 1, 3.6, 1.5, .22); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2; rod(GC.rd, V3(0, 1, 3.6), V3(Math.sin(a) * 1.45, 1 + Math.cos(a) * 1.45, 3.6), .12, 6); } tube(GC.st, 0, 1, 4.4, .6, 2, 10);
+      for (const sd of [-1, 1]) { const x = sd * 1.7; tube(GC.rd, x, -4.1, 3.6, 1.6, 10.6, 20); ball(GC.rd, x, -4.1, 8.9, 1.6, 1.6, 1.1); ball(GC.rd, x, -4.1, -1.7, 1.6, 1.6, 1.1);
+        for (const z of [.8, 6.2]) ring(GC.dk, x, -4.1, z, 1.63, .16); tube(GC.st, x, -4.1, 10.1, .45, .8, 10); box(0xe8e0c8, x + sd * 1.55, -4.1, 3.6, .05, 1.2, 4.6); }
+      box(GC.dk, 0, -4.1, 3.6, 1.2, .9, 9.6);
+      post(GC.st, 0, -1.4, 9.4, .3, 2, 8); side(GC.cr, .9, -.6, 9.4, .85, .4, 16); side(GC.wh, 1.12, -.6, 9.4, .7, .05, 16); box(GC.rd, 1.15, -.4, 9.5, .02, .55, .07, 0, 0, .7);
+      { const cv = new T.CatmullRomCurve3([V3(-1.7, -5.6, -2.2), V3(-2.8, -7, -4.6), V3(-3.4, -3.6, -6.4), V3(-2.4, .4, -3.2), V3(-.9, 1, 1)]); L.push([new T.TubeGeometry(cv, 24, .48, 8), new T.Matrix4(), GC.dk]);
+        for (let i = 1; i < 8; i++) { const p = cv.getPoint(i / 8); ball(GC.st, p.x, p.y, p.z, .55, .55, .55); } }
+      shp(PO, sh => { sh.moveTo(-.8, .3); sh.lineTo(.8, .3); sh.quadraticCurveTo(.5, -1.8, -.6, -4.8); sh.quadraticCurveTo(-1.6, -5.2, -2.4, -4.7); sh.quadraticCurveTo(-1.6, -2.4, -1.9, -.1); sh.closePath(); }, 1.6, .25);
+      shp(GC.dk, sh => { sh.moveTo(.7, .2); sh.lineTo(3.6, .2); sh.quadraticCurveTo(3.6, -1.1, 2.4, -1.2); sh.lineTo(1.1, -1.2); sh.closePath(); }, .6, .07, 0, h => { h.moveTo(1.05, -.1); h.lineTo(3.2, -.1); h.quadraticCurveTo(3.15, -.88, 2.4, -.9); h.lineTo(1.3, -.9); h.closePath(); });
+      shp(PO, sh => { sh.moveTo(12.8, .1); sh.lineTo(14.6, .1); sh.lineTo(14.9, -3.6); sh.quadraticCurveTo(14.6, -4.3, 13.8, -4.3); sh.quadraticCurveTo(13, -4.2, 13.1, -3.4); sh.closePath(); }, 1.5, .2);
+      muz = 24.7;
+    } else if (w === 12) { // базука (РПГ-7): труба с деревянными накладками, раструб, оптика ПГО, граната ПГ-7 (точёный профиль)
+      tube(GC.dk, 0, 1.5, 2.5, 1.45, 29, 22); tube(GC.st, 0, 1.5, 16.9, 1.6, .7, 22);
+      tube(GC.wd2, 0, 1.5, -1, 1.78, 7.6, 22); for (let k = 0; k < 10; k++) { const a = k / 10 * 6.283; box(GC.wd, Math.sin(a) * 1.8, 1.5 + Math.cos(a) * 1.8, -1, .12, .12, 7.4, 0, 0, -a); }
+      for (const z of [-4.9, 2.9]) ring(GC.dk, 0, 1.5, z, 1.82, .22);
+      tube(GC.dk, 0, 1.5, -14.6, 2.7, 5.2, 24, 1.45 / 2.7); tube(0x060606, 0, 1.5, -17.22, 2.48, .04, 22); ring(GC.st, 0, 1.5, -17.2, 2.68, .2); ring(GC.st, 0, 1.5, -12, 1.5, .18);
+      { const lp = [[.82, 0], [.82, 1], [1.15, 1.25], [2.45, 2.2], [2.45, 4.7], [2.25, 5.5], [1.45, 8.2], [.75, 9.8], [.36, 10.6], [0, 10.95]].map(([r, y]) => new T.Vector2(r, y));
+        const lt = new T.LatheGeometry(lp, 20); L.push([lt, RX(0, 1.5, 17.2, 1, 1, 1, H), GC.ol2]); ring(GC.ol, 0, 1.5, 20.6, 2.45, .1); ring(GC.ol, 0, 1.5, 21.6, 2.45, .08); tube(GC.br, 0, 1.5, 28.2, .3, .6, 8, .3); box(0x1a1a1a, 1.5, 1.5, 23, .05, 1.2, 1.4); }
+      shp(GC.dk, sh => { sh.moveTo(1.4, .1); sh.lineTo(5.6, .1); sh.lineTo(5.6, -.9); sh.lineTo(1.4, -.9); sh.closePath(); }, 1.4, .12);
+      shp(GC.dk, sh => { sh.moveTo(-.4, -.8); sh.lineTo(1.4, -.8); sh.quadraticCurveTo(1.1, -2.8, .1, -5.4); sh.quadraticCurveTo(-.9, -5.8, -1.7, -5.3); sh.quadraticCurveTo(-.9, -3, -1.2, -1.2); sh.closePath(); }, 1.5, .22);
+      shp(GC.dk, sh => { sh.moveTo(1.3, -.8); sh.lineTo(4.4, -.8); sh.quadraticCurveTo(4.4, -2.2, 3.2, -2.25); sh.lineTo(1.7, -2.25); sh.closePath(); }, .55, .07, 0, h => { h.moveTo(1.65, -1.1); h.lineTo(4, -1.1); h.quadraticCurveTo(3.95, -1.92, 3.2, -1.95); h.lineTo(1.9, -1.95); h.closePath(); });
+      shp(GC.wd2, sh => { sh.moveTo(6.6, -.1); sh.lineTo(8.2, -.1); sh.lineTo(8.6, -4.4); sh.quadraticCurveTo(8.3, -5, 7.5, -5); sh.quadraticCurveTo(6.7, -4.9, 6.8, -4.1); sh.closePath(); }, 1.5, .22);
+      box(GC.dk, -2.35, 3, 2.6, 1.4, 2.2, 4.8); tube(GC.dk, -2.35, 3.4, -.5, .55, 2.6, 14); tube(0x141414, -2.35, 3.4, -1.9, .62, .6, 14); tube(LENS, -2.35, 3.4, 5.06, .55, .05, 14); box(GC.dk, -1.4, 2.4, 2.6, 1, .6, 1.8);
+      side(GC.dk, -3.1, 3.6, 2, .32, .4, 10); post(GC.dk, -2.35, 4.25, 3.4, .3, .5, 10);
+      box(GC.dk, 0, 3.3, 10.6, .3, 1, .4); box(GC.dk, 0, 3.3, 4.2, .9, .9, .35); box(0x000000, 0, 3.4, 4.2, .25, .5, .37);
+      for (const z of [-7, 12]) { ring(GC.st, 0, 1.5, z, 1.52, .12); box(GC.st, 1.6, 1.5, z, .2, .7, .7); }
+      muz = 29.5;
+    } else if (w === 14) { // арбалет (блочный): скелетное ложе, изогнутые плечи с блоками, тетива и тросы, прицел, болт с оперением
+      shp(PO, sh => { sh.moveTo(-14, 1.2); sh.quadraticCurveTo(-14.3, -1.4, -13.8, -3.9); sh.lineTo(-12.6, -3.9); sh.quadraticCurveTo(-8, -2.4, -4.2, -1.6); sh.quadraticCurveTo(-3.2, -2.8, -3.1, -5.8); sh.quadraticCurveTo(-2, -6.4, -.9, -5.9);
+        sh.quadraticCurveTo(-.6, -3, .4, -1.3); sh.lineTo(12.4, -1); sh.lineTo(12.4, .8); sh.lineTo(-2, 1); sh.quadraticCurveTo(-8, 1.3, -14, 1.2); sh.closePath(); }, 1.8, .3, 0,
+        h => { h.moveTo(-11.8, .2); h.lineTo(-5, -.1); h.quadraticCurveTo(-5.4, -.9, -6, -1.6); h.quadraticCurveTo(-9.5, -2.4, -11.8, -2.9); h.closePath(); });
+      shp(0x181818, sh => { sh.moveTo(-14, 1.3); sh.lineTo(-14.9, 1.3); sh.quadraticCurveTo(-15.1, -1.4, -14.7, -4); sh.lineTo(-13.8, -4); sh.closePath(); }, 2, .15);
+      box(GC.st, 0, 1.05, 5.2, 1, .35, 14.2); box(0x101010, 0, 1.24, 5.2, .25, .05, 14); box(GC.dk, 0, 1.45, 3.2, 1.6, .9, 2.6);
+      shp(GC.dk, sh => { sh.moveTo(-1, -1.2); sh.lineTo(1.8, -1.2); sh.quadraticCurveTo(1.8, -2.6, .6, -2.7); sh.lineTo(-.6, -2.7); sh.closePath(); }, .55, .07, 0, h => { h.moveTo(-.65, -1.5); h.lineTo(1.4, -1.5); h.quadraticCurveTo(1.35, -2.35, .6, -2.4); h.lineTo(-.4, -2.4); h.closePath(); });
+      box(GC.dk, 0, .5, 12.6, 3.6, 2.2, 1.6); for (const sd of [-1, 1]) { const cv = new T.QuadraticBezierCurve3(V3(sd * 1.6, .7, 12.6), V3(sd * 5.4, .7, 13.4), V3(sd * 8.8, .7, 10.4));
+        L.push([new T.TubeGeometry(cv, 14, .42, 6), new T.Matrix4().makeScale(1, 1.6, 1), GC.dk]); side(GC.st, sd * 8.9, .7, 10.2, .85, .5, 16); side(GC.dk, sd * 9.2, .7, 10.2, .4, .2, 10); }
+      for (const sd of [-1, 1]) { rod(0xdccfb0, V3(sd * 8.9, .9, 10.6), V3(0, 1.4, 2.9), .07, 4); rod(0x555555, V3(sd * 8.9, .5, 10), V3(-sd * 1.2, .55, 12), .05, 4); }
+      { const st = new T.TorusGeometry(1.4, .18, 6, 16, Math.PI); L.push([st, RX(0, -.1, 14.2, 1, 1, 1, 0, 0, Math.PI), GC.dk]); }
+      tube(GC.cr, 0, 1.75, 9.6, .17, 13.2, 6); tube(GC.dk, 0, 1.75, 16.6, .42, 1.4, 8, .05); for (let k = 0; k < 3; k++) { const a = k * 2.094; box(GC.rd, Math.sin(a) * .42, 1.75 + Math.cos(a) * .42, 3.9, .05, .8, 1.8, 0, 0, -a); } ring(GC.br, 0, 1.75, 3.1, .2, .08);
+      tube(GC.dk, 0, 3.3, 1.2, .72, 7, 16); tube(GC.dk, 0, 3.3, 5, 1.05, 1.4, 16, 1.2); tube(LENS, 0, 3.3, 5.72, .95, .04, 14); tube(GC.dk, 0, 3.3, -2.6, .85, 1.2, 14); tube(LENS, 0, 3.3, -3.22, .6, .04, 12);
+      for (const z of [-.4, 3]) box(GC.dk, 0, 2.25, z, .8, 1.3, .7); post(GC.dk, 0, 4.2, 1.4, .4, .7, 10);
+      muz = 17.2;
+    } else if (w === 15) { // обрез двустволки: горизонтальные стволы с планкой, колодка с гравировкой, внешние курки, два спуска, цевьё и обрезанная рукоять
+      for (const sd of [-1, 1]) { tube(GC.st, sd * .76, .95, 8.2, .76, 10.4, 16); tube(0x050505, sd * .76, .95, 13.42, .58, .04, 14); tube(GC.st, sd * .76, .95, 13.2, .8, .3, 16); }
+      box(GC.st, 0, 1.7, 8.2, .5, .25, 10.3); box(GC.st, 0, .2, 8.2, .5, .3, 10.3); ball(GC.br, 0, 1.92, 13.1, .16);
+      shp(GC.cr, sh => { sh.moveTo(-.6, -.6); sh.lineTo(3, -.6); sh.lineTo(3, 1.8); sh.lineTo(.2, 1.85); sh.quadraticCurveTo(-.6, 1.8, -.7, 1.1); sh.closePath(); }, 2.1, .15);
+      for (let i = 0; i < 7; i++) for (const sd of [-1, 1]) box(0x8a8f95, sd * 1.21, .1 + (i % 3) * .55, .2 + i * .38, .03, .08, .5, i * .4);
+      box(GC.cr, 0, 2.05, .9, .5, .4, 2, .25); shp(GC.wd2, sh => { sh.moveTo(3.1, .25); sh.lineTo(9.4, .25); sh.quadraticCurveTo(9.8, .2, 9.8, -.3); sh.quadraticCurveTo(9.6, -1.1, 8.8, -1.15); sh.lineTo(3.4, -1.15); sh.quadraticCurveTo(3, -1, 3.1, .25); sh.closePath(); }, 2, .25);
+      for (const sd of [-1, 1]) { shp(GC.dk, sh => { sh.moveTo(-.3, 1.2); sh.lineTo(.2, 1.2); sh.lineTo(.1, 2.2); sh.quadraticCurveTo(-.4, 3.1, -1.3, 3); sh.quadraticCurveTo(-.6, 2.4, -.4, 1.9); sh.closePath(); }, .35, .06, sd * .55); }
+      shp(GC.cr, sh => { sh.moveTo(.2, -.6); sh.lineTo(3, -.6); sh.quadraticCurveTo(3.2, -2, 2, -2.1); sh.lineTo(.6, -2.1); sh.quadraticCurveTo(0, -1.9, .2, -.6); sh.closePath(); }, .55, .07, 0, h => { h.moveTo(.5, -.9); h.lineTo(2.7, -.9); h.quadraticCurveTo(2.85, -1.75, 2, -1.8); h.lineTo(.7, -1.8); h.quadraticCurveTo(.35, -1.7, .5, -.9); h.closePath(); });
+      for (const z of [1.1, 1.9]) shp(GC.cr, sh => { sh.moveTo(z, -.6); sh.quadraticCurveTo(z + .5, -1, z + .3, -1.55); sh.lineTo(z + .1, -1.55); sh.quadraticCurveTo(z + .25, -1.1, z - .2, -.6); sh.closePath(); }, .25, .04);
+      shp(GC.wd2, sh => { sh.moveTo(-.6, 1.6); sh.lineTo(-.6, -.6); sh.quadraticCurveTo(-1, -2, -2.2, -4); sh.quadraticCurveTo(-3.6, -4.9, -5, -4.3); sh.quadraticCurveTo(-4.6, -2.4, -3.6, -.6); sh.quadraticCurveTo(-3, .8, -3.2, 1.7); sh.quadraticCurveTo(-1.8, 1.9, -.6, 1.6); sh.closePath(); }, 1.9, .4);
+      for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) box(GC.wd, sd * 1.15, -1.4 - i * .55, -2 - i * .3, .04, .08, 1.2, .5);
+      muz = 13.5;
+    } else if (w === 16) { // автоматический дробовик (Сайга): коробка АК, полимерное цевьё, дульный тормоз, барабан, складной скелетный приклад, коллиматор
+      shp(GC.dk, sh => { sh.moveTo(-3, -1.4); sh.lineTo(8, -1.4); sh.lineTo(8, 1.3); sh.lineTo(-2.6, 1.3); sh.quadraticCurveTo(-3, 1.2, -3, .8); sh.closePath(); }, 2.3, .15);
+      shp(GC.dk, sh => { sh.moveTo(-2.7, 1.25); sh.lineTo(7.9, 1.25); sh.lineTo(7.9, 1.7); sh.quadraticCurveTo(7.8, 2.4, 7, 2.45); sh.lineTo(-1.4, 2.45); sh.quadraticCurveTo(-2.6, 2.4, -2.7, 1.65); sh.closePath(); }, 2.1, .18);
+      box(0x0c0c0c, 1.22, .6, 3.6, .06, 1, 3.4); box(GC.st, 1.35, .25, 1.6, .14, .55, 5.6, .04);
+      box(GC.dk, 0, 2.75, 3, .9, .2, 8); for (let i = 0; i < 11; i++) box(0x101010, 0, 2.88, -1.2 + i * .82, .92, .08, .3);
+      shp(GC.dk, sh => { sh.moveTo(1.2, 2.85); sh.lineTo(4.4, 2.85); sh.lineTo(4.4, 3.9); sh.quadraticCurveTo(4.3, 4.7, 3.5, 4.7); sh.lineTo(1.9, 4.7); sh.quadraticCurveTo(1.2, 4.6, 1.2, 3.9); sh.closePath(); }, 1.5, .1, 0, h => { h.moveTo(1.6, 3.2); h.lineTo(4, 3.2); h.lineTo(4, 4.3); h.lineTo(1.6, 4.3); h.closePath(); }); box(0x3a6f5a, 0, 3.75, 4.2, 1.1, 1, .05);
+      shp(PO, sh => { sh.moveTo(8.6, 1.4); sh.lineTo(15, 1.3); sh.lineTo(15, -.8); sh.quadraticCurveTo(14.9, -1.7, 14, -1.7); sh.lineTo(9.6, -1.7); sh.quadraticCurveTo(8.6, -1.6, 8.6, -.6); sh.closePath(); }, 2.5, .3);
+      for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) box(0x0c0c0c, sd * 1.45, 0, 9.6 + i * 1.1, .06, 1.6, .4);
+      tube(GC.dk, 0, .4, 18.2, .8, 6.8, 14); tube(GC.dk, 0, .4, 22.2, 1.15, 2.4, 16); for (let i = 0; i < 4; i++) for (const sd of [-1, 1]) box(0x050505, sd * 1, .4, 21.4 + i * .5, .3, .7, .22); tube(0x050505, 0, .4, 23.42, .6, .04, 12);
+      tube(GC.st, 0, 1.9, 16.2, .45, 2, 10); box(GC.st, 0, 1.4, 17.2, 1.1, 1.4, .8);
+      { const dr = new T.CylinderGeometry(4.2, 4.2, 2.9, 28); L.push([dr, RX(0, -6, 4.6, 1, 1, 1, 0, 0, H), PO]); side(GC.dk, 0, -6, 4.6, 4.25, .5, 28); side(GC.st, 0, -6, 4.6, 1.3, 3.1, 14); side(0x4a3a20, 1.5, -6, 4.6, 3.6, .02, 24);
+        for (let k = 0; k < 8; k++) { const a = k / 8 * 6.283; box(GC.dk, 1.48, -6 + Math.cos(a) * 3, 4.6 + Math.sin(a) * 3, .05, .25, 1.2, a); } box(PO, 0, -1.9, 4.6, 1.6, 1.4, 3.2); }
+      shp(PO, sh => { sh.moveTo(-.4, -1.35); sh.lineTo(1.2, -1.35); sh.quadraticCurveTo(.8, -3.4, -.3, -6); sh.quadraticCurveTo(-1.3, -6.4, -2.1, -5.9); sh.quadraticCurveTo(-1.2, -3.6, -1.5, -1.7); sh.closePath(); }, 1.6, .25);
+      shp(GC.dk, sh => { sh.moveTo(1.1, -1.35); sh.lineTo(3.4, -1.35); sh.lineTo(3.4, -1.7); sh.lineTo(1.9, -2.8); sh.quadraticCurveTo(1.1, -2.9, .9, -2.3); sh.closePath(); }, .55, .07, 0, h => { h.moveTo(1.45, -1.6); h.lineTo(2.9, -1.6); h.lineTo(1.9, -2.45); h.quadraticCurveTo(1.45, -2.5, 1.4, -2.1); h.closePath(); });
+      shp(PO, sh => { sh.moveTo(-3, 1.1); sh.lineTo(-3, -1.3); sh.lineTo(-13, -3.8); sh.lineTo(-13.4, -3.7); sh.lineTo(-13.4, 1.4); sh.lineTo(-3, 1.1); sh.closePath(); }, 1.6, .25, 0,
+        h => { h.moveTo(-4.6, .1); h.lineTo(-11.9, .4); h.lineTo(-11.9, -2.6); h.lineTo(-4.6, -.9); h.closePath(); });
+      shp(0x151515, sh => { sh.moveTo(-13.4, 1.5); sh.lineTo(-14.2, 1.5); sh.lineTo(-14.2, -4); sh.lineTo(-13.4, -3.9); sh.closePath(); }, 1.9, .15);
+      muz = 23.4;
+    } else if (w === 17) { // плазмаган: обтекаемый корпус с панелями и стыками, светящиеся катушки и вентиляция, стеклянная энергоячейка, голографический прицел
+      shp(0xb8bec6, sh => { sh.moveTo(-9, 1.4); sh.quadraticCurveTo(-9.4, -1, -8.6, -2.4); sh.lineTo(-6.4, -2.4); sh.quadraticCurveTo(-4.6, -1, -2.6, -1); sh.lineTo(6, -1.3); sh.quadraticCurveTo(11, -1, 13.6, .2); sh.quadraticCurveTo(14.6, 1.2, 13.2, 2.2);
+        sh.quadraticCurveTo(8, 2.9, 3, 2.9); sh.quadraticCurveTo(-3, 2.9, -6, 2.4); sh.quadraticCurveTo(-8.6, 2.1, -9, 1.4); sh.closePath(); }, 2.2, .45);
+      for (const z of [-3.6, 2.6, 8.4]) for (const sd of [-1, 1]) box(0x55606a, sd * 1.56, .9, z, .03, 3.4, .1); for (const sd of [-1, 1]) box(0x55606a, sd * 1.56, 1.8, 3, .03, .08, 16);
+      box(GC.dk, 0, .5, 4.6, 3.2, 1.2, 9); for (let i = 0; i < 7; i++) for (const sd of [-1, 1]) box(GLOW_C, sd * 1.62, .5, 1.2 + i * 1.1, .05, .7, .5);
+      tube(GC.dk, 0, .6, 17.2, 1.05, 7, 18); for (let i = 0; i < 5; i++) { ring(GLOW_C, 0, .6, 14.6 + i * 1.3, 1.25, .2); ring(GC.st, 0, .6, 15.25 + i * 1.3, 1.15, .14); }
+      tube(GC.st, 0, .6, 21, 1.3, .8, 18, .85); tube(GLOW_C, 0, .6, 21.42, .7, .04, 16);
+      shp(GC.dk, sh => { sh.moveTo(-3.4, -1.1); sh.lineTo(-1.6, -1.1); sh.quadraticCurveTo(-1.9, -3.4, -2.8, -6); sh.quadraticCurveTo(-3.8, -6.4, -4.6, -5.9); sh.quadraticCurveTo(-3.8, -3.6, -4.2, -1.5); sh.closePath(); }, 1.6, .25);
+      shp(GC.dk, sh => { sh.moveTo(-1.8, -1.1); sh.lineTo(1, -1.1); sh.quadraticCurveTo(1, -2.4, -.1, -2.5); sh.lineTo(-1.3, -2.5); sh.closePath(); }, .55, .07, 0, h => { h.moveTo(-1.45, -1.4); h.lineTo(.6, -1.4); h.quadraticCurveTo(.55, -2.15, -.1, -2.2); h.lineTo(-1.1, -2.2); h.closePath(); });
+      post(GC.dk, 0, -2.2, 4, 1.25, .6, 18); post(GLOW_C, 0, -4.1, 4, .85, 3.2, 18); post(0x8fa6b0, 0, -4.1, 4, 1.05, 3.4, 18); post(GC.dk, 0, -6, 4, 1.25, .6, 18);
+      shp(GC.dk, sh => { sh.moveTo(1, 2.8); sh.lineTo(5, 2.8); sh.lineTo(5, 3.7); sh.quadraticCurveTo(4.9, 4.6, 4, 4.6); sh.lineTo(2, 4.6); sh.quadraticCurveTo(1, 4.6, 1, 3.7); sh.closePath(); }, 1.4, .1, 0, h => { h.moveTo(1.4, 3.1); h.lineTo(4.6, 3.1); h.lineTo(4.6, 4.2); h.lineTo(1.4, 4.2); h.closePath(); });
+      box(new T.Color(.4, 1.4, 1.6), 0, 3.65, 4.3, .9, .9, .04);
+      muz = 21.5;
+    } else if (w === 18) { // рельсотрон: две направляющие с горящим каналом, кольца-ускорители, рёбра охлаждения, банки конденсаторов, кабели, прицел
+      for (const y of [2.4, -1.2]) { shp(GC.dk, sh => { sh.moveTo(-.6, y - .55); sh.lineTo(26.4, y - .55); sh.lineTo(26.8, y); sh.lineTo(26.4, y + .55); sh.lineTo(-.6, y + .55); sh.closePath(); }, 1.5, .12); box(GC.cr, 0, y + (y > 0 ? -.6 : .6), 13, 1.2, .1, 26.6); }
+      box(GLOW_B, 0, .6, 13.4, .45, .45, 25.4); for (let i = 0; i < 7; i++) { const z = 3 + i * 3.4; ring(GC.st, 0, .6, z, 2.45, .36); ring(GLOW_B, 0, .6, z, 2.45, .08); box(GC.st, 0, .6, z, 3.4, 4.6, .3); }
+      for (let i = 0; i < 9; i++) box(GC.st, 0, 3.4, 4 + i * 2.2, 1.8, .9, .25);
+      shp(0x30343a, sh => { sh.moveTo(-4.4, 3.2); sh.lineTo(1.2, 3.2); sh.lineTo(1.2, -2.2); sh.lineTo(-1.6, -2.6); sh.lineTo(-4.4, -2.6); sh.closePath(); }, 3, .35);
+      for (const sd of [-1, 1]) for (let i = 0; i < 3; i++) { const z = -3.4 + i * 1.9; post(0x3a5c8c, sd * 1.05, -3.7, z, .82, 2.6, 14); post(GC.cr, sd * 1.05, -2.35, z, .5, .15, 10); post(GC.dk, sd * 1.05, -5.05, z, .85, .12, 14); }
+      for (const sd of [-1, 1]) { const cv = new T.CatmullRomCurve3([V3(sd * 1.4, -2.4, -.4), V3(sd * 2, -1.6, 2.2), V3(sd * 1.7, -.2, 4.6), V3(sd * 1.2, .4, 6)]); L.push([new T.TubeGeometry(cv, 14, .22, 6), new T.Matrix4(), sd > 0 ? GC.rd : GC.dk]); }
+      shp(0x30343a, sh => { sh.moveTo(-4.4, 2.2); sh.lineTo(-4.4, -1.6); sh.quadraticCurveTo(-8, -2.4, -14, -3.8); sh.lineTo(-15, -3.8); sh.lineTo(-15, 1.4); sh.quadraticCurveTo(-9, 1.8, -4.4, 2.2); sh.closePath(); }, 2, .35, 0,
+        h => { h.moveTo(-6.4, .9); h.lineTo(-12.8, .8); h.lineTo(-12.8, -2.4); h.quadraticCurveTo(-9, -1.8, -6.4, -1); h.closePath(); });
+      shp(PO, sh => { sh.moveTo(-.4, -2.4); sh.lineTo(1.2, -2.4); sh.quadraticCurveTo(.9, -4.4, -.1, -7); sh.quadraticCurveTo(-1.1, -7.4, -1.9, -6.9); sh.quadraticCurveTo(-1, -4.6, -1.3, -2.8); sh.closePath(); }, 1.6, .25);
+      tube(GC.dk, 0, 4.6, 1.8, .7, 6.4, 16); tube(GLOW_B, 0, 4.6, 5.02, .6, .04, 14); for (const z of [0, 3.6]) box(GC.dk, 0, 3.95, z, .7, .9, .6);
+      ball(GLOW_B, 0, .6, 26.4, .75); muz = 27;
+    } else if (w === 19) { // ракетница (4 трубы, как M202): короб из труб, откидная крышка, прицел, рукояти, ремни
+      shp(GC.ol, sh => { sh.moveTo(-1.4, -.85); sh.lineTo(17.6, -.85); sh.lineTo(17.6, 4.05); sh.lineTo(-1.4, 4.05); sh.closePath(); }, 4.4, .35);
+      for (const sx of [-1, 1]) for (const sy of [-1, 1]) { const x = sx * 1.12, y = 1.6 + sy * 1.12; tube(0x0a0a0a, x, y, 17.97, .92, .05, 14); tube(GC.rd, x, y, 17.4, .72, 1, 12, .35); tube(0x0a0a0a, x, y, -1.77, .92, .05, 14); }
+      for (const z of [2, 9.4, 15.6]) { box(GC.ol2, 0, 1.6, z, 5.2, 5.2, .6); for (const sd of [-1, 1]) ball(GC.st, sd * 2.62, 1.6, z, .12, .25, .25); }
+      for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) box(GC.ol2, sd * 2.5, -.2 + i * .9, 6, .05, .12, 6);
+      shp(GC.ol2, sh => { sh.moveTo(18.1, -1); sh.lineTo(18.6, -1); sh.lineTo(18.6, 4.2); sh.lineTo(18.1, 4.2); sh.closePath(); }, 4.6, .12, 0); box(GC.dk, 0, 4.5, 17.9, 1.4, .5, .5);
+      shp(GC.dk, sh => { sh.moveTo(5.8, -.85); sh.lineTo(7.6, -.85); sh.quadraticCurveTo(7.4, -3, 6.4, -5.6); sh.quadraticCurveTo(5.4, -6, 4.6, -5.5); sh.quadraticCurveTo(5.4, -3.2, 5.1, -1.2); sh.closePath(); }, 1.5, .22);
+      shp(GC.dk, sh => { sh.moveTo(7.4, -.85); sh.lineTo(10, -.85); sh.quadraticCurveTo(10, -2.2, 8.8, -2.25); sh.lineTo(7.8, -2.25); sh.closePath(); }, .55, .07, 0, h => { h.moveTo(7.8, -1.15); h.lineTo(9.6, -1.15); h.quadraticCurveTo(9.55, -1.95, 8.8, -1.95); h.lineTo(8, -1.95); h.closePath(); });
+      shp(GC.dk, sh => { sh.moveTo(-.2, -.85); sh.lineTo(1.5, -.85); sh.quadraticCurveTo(1.2, -3, .2, -5.6); sh.quadraticCurveTo(-.8, -6, -1.6, -5.5); sh.quadraticCurveTo(-.8, -3.2, -1.1, -1.2); sh.closePath(); }, 1.5, .22);
+      box(GC.dk, -3, 2.6, 6, 1.3, 2.4, 3.6); tube(GC.dk, -3, 3, 3.4, .5, 1.8, 12); tube(LENS, -3, 3, 7.82, .5, .04, 12); box(GC.dk, -2.4, 2.6, 6, .6, 1, 2);
+      rod(GC.dk, V3(0, 4.5, 5), V3(0, 5.6, 6.6), .25); rod(GC.dk, V3(0, 5.6, 6.6), V3(0, 5.6, 10.4), .3); rod(GC.dk, V3(0, 5.6, 10.4), V3(0, 4.5, 12), .25);
+      box(0xd8d0b0, 2.55, 1.6, 12.6, .05, 1.6, 3.4);
+      muz = 18.2;
     } else { box(GC.st, 0, 0, 3, 2.4, 3, 10); tube(GC.st, 0, .4, 12, .6, 10); }
     GMUZ[w] = muz; return mergeG(L);
   }
@@ -1991,7 +2096,7 @@ void main(){
     _ik.h.set(0, -A - Bn * Math.cos(th), Bn * Math.sin(th)).normalize(); t.normalize();
     sh.quaternion.setFromUnitVectors(_ik.h, t); _ik.q2.setFromAxisAngle(t, side * .55); sh.quaternion.premultiply(_ik.q2);
   }
-  const GRIP = new T.Vector3(0, -2.6, .4), FORE = { 2: 10.5, 3: 11.2, 4: 10, 5: 5, 7: 13, 10: 11, 11: 13, 12: 7, 13: 4, 14: 8, 15: 6, 16: 12, 17: 11, 18: 10, 19: 9 };
+  const GRIP = new T.Vector3(0, -2.6, .4), FORE = { 2: 10.5, 3: 11.2, 4: 11, 5: 5, 7: 13, 10: 11.6, 11: 13.8, 12: 7.4, 13: 3, 14: 8, 15: 6.5, 16: 11.5, 17: 11, 18: 10, 19: 6.6 };
   function sectAcc(c, s) {
     const u = c.userData; if (u.accS === s) return; u.accS = s;
     for (const g of u.acc || []) g.parent && g.parent.remove(g); u.acc = [];
