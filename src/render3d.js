@@ -851,6 +851,20 @@ void main(){
   const wallParts = {}, wallGone = new Set(); // проломленные стены
   function smashWall(id, objs) { wallGone.add(id); if (boardMesh && boardIdx[id]) { for (const [i] of boardIdx[id]) boardMesh.setMatrixAt(i, zero); boardMesh.instanceMatrix.needsUpdate = true; } for (const [mesh, i] of wallParts[id] || []) { mesh.setMatrixAt(i, zero); mesh.instanceMatrix.needsUpdate = true; } killObj(id); const o = objs && objs[id]; if (o) { debrisAt(at(o.p, 20), 18, o.type === 'bw' ? 0x8a7a6a : 0x6b4a2e, 120, 4); debrisAt(at(o.p, 30), 8, 0x5a5048, 90, 2.5); if (glassIdx[id]) breakGlass(id, objs); } }
   const boardPlan = [], boardIdx = {}, I4 = new T.Matrix4(); let boardMesh = null;
+  // наклейки фасадов: 0 копоть над окном, 1 подтёки под карнизом, 2 отбитая штукатурка с кирпичом, 3 следы пуль
+  const decalPlan = []; let decalMeshes = []; const decalGeo = new T.PlaneGeometry(1, 1), decalMats = [];
+  function decalMat(k) { if (decalMats[k]) return decalMats[k]; const W = 128, H = k < 2 ? 256 : 128, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d'); let sd = 7 + k * 13; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+    if (k === 0) { for (let i = 0; i < 70; i++) { const x = W / 2 + (r() - .5) * W * (.4 + .5 * r()), y = H * (1 - Math.pow(r(), 1.6)), rad = 10 + r() * 26, a = .12 * (y / H) + .02, gr = g.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, `rgba(14,11,9,${a})`); gr.addColorStop(1, 'rgba(14,11,9,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H); }
+      const gb = g.createLinearGradient(0, H, 0, H * .6); gb.addColorStop(0, 'rgba(10,8,6,.75)'); gb.addColorStop(1, 'rgba(10,8,6,0)'); g.fillStyle = gb; g.fillRect(W * .12, 0, W * .76, H); }
+    else if (k === 1) { for (let i = 0; i < 46; i++) { const x = r() * W, w = 1 + r() * 4, len = H * (.25 + r() * .75), gr = g.createLinearGradient(0, 0, 0, len); gr.addColorStop(0, `rgba(30,26,20,${.25 + r() * .35})`); gr.addColorStop(1, 'rgba(30,26,20,0)'); g.fillStyle = gr; g.fillRect(x, 0, w, len); }
+      const gt = g.createLinearGradient(0, 0, 0, H * .3); gt.addColorStop(0, 'rgba(28,24,18,.45)'); gt.addColorStop(1, 'rgba(28,24,18,0)'); g.fillStyle = gt; g.fillRect(0, 0, W, H); }
+    else if (k === 2) { const pts = []; for (let i = 0; i < 14; i++) { const a = i / 14 * 6.283, rr = .3 + r() * .17; pts.push([W / 2 + Math.cos(a) * W * rr, H / 2 + Math.sin(a) * H * rr]); }
+      g.save(); g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.clip(); g.fillStyle = '#c9c2b4'; g.fillRect(0, 0, W, H);
+      for (let y = 0; y < H; y += 12) for (let x = -(y / 12 % 2) * 12; x < W; x += 24) { const c = 120 + r() * 40 | 0; g.fillStyle = `rgb(${c},${c * .52 | 0},${c * .4 | 0})`; g.fillRect(x + 1, y + 1, 22, 10); }
+      g.restore(); g.strokeStyle = 'rgba(60,54,46,.8)'; g.lineWidth = 3; g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.stroke(); g.strokeStyle = 'rgba(235,228,214,.7)'; g.lineWidth = 2; g.stroke(); }
+    else { for (let i = 0; i < 10; i++) { const x = 14 + r() * (W - 28), y = 14 + r() * (H - 28), rr = 3 + r() * 3; g.fillStyle = 'rgba(220,214,200,.75)'; g.beginPath(); g.arc(x, y, rr * 2, 0, 6.283); g.fill(); g.fillStyle = 'rgba(70,62,54,.8)'; g.beginPath(); g.arc(x, y, rr * 1.3, 0, 6.283); g.fill(); g.fillStyle = 'rgba(8,6,5,.95)'; g.beginPath(); g.arc(x, y, rr * .7, 0, 6.283); g.fill(); } }
+    const t = new T.CanvasTexture(cv); t.anisotropy = 4;
+    return decalMats[k] = new T.MeshLambertMaterial({ map: t, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }); }
   const bInst = {}, bParts = []; let insideB = -1; const deco = {}; const glassPlan = [], glassIdx = []; let glassMesh = null;
   // Вывеска: по умолчанию к камере, с facing — закреплена в плоскости фасада.
   function sign(bid, wp, y, w, h, lines, bg, fg, frame, facing = null) {
@@ -1069,6 +1083,7 @@ void main(){
     ground.material.uniforms.orderC.value.set(1e6, 1e6);
     for (const k in wallParts) delete wallParts[k];
     for (const k in bInst) { scene.remove(bInst[k].mesh); if (bInst[k].mesh.userData.outline) scene.remove(bInst[k].mesh.userData.outline); delete bInst[k]; }
+    decalPlan.length = 0; for (const m of decalMeshes) scene.remove(m); decalMeshes = [];
     bParts.length = 0; insideB = -1; glassPlan.length = 0; boardPlan.length = 0; if (boardMesh) { scene.remove(boardMesh); boardMesh = null; } for (const k in boardIdx) delete boardIdx[k]; if (glassMesh) { scene.remove(glassMesh); glassMesh = null; } glassIdx.length = 0; for (const k in deco) { deco[k].forEach(m => scene.remove(m)); delete deco[k]; }
     const plan = {}, Y = new T.Vector3(0, 1, 0), ONE = new T.Vector3(1, 1, 1);
     for (const b of objs.blds || []) {
@@ -1131,6 +1146,49 @@ void main(){
         pcs.push([geo.box, 'brick', 48, 0x98624c, M(b.w * .22, chimneyY, -b.h * .16, 12, 34, 12), 'roof']);
         pcs.push([geo.box, 'concrete', 48, 0x625e57, M(b.w * .22, chimneyY + 18, -b.h * .16, 16, 3, 16), 'roof']);
       }
+      // ===== детали фасадов: водостоки, кондиционеры, щитки и кабели, трубы, антенны, тарелки, вентиляция; копоть, подтёки, сколы, следы пуль =====
+      if (!K.slit && K.church === undefined) {
+        const P = (g, tx, col, m, role = 'top') => pcs.push([g, tx, 24, col, m, role]);
+        const gutC = [0x7d8288, 0x6a6e70, 0x8a7a68][b.id % 3], gable = K.roof === 'gable', R = Math.min(b.h, b.w) * .38, along = b.w >= b.h;
+        const ext = []; for (const id of b.walls) { const o = objs[id], X = o.lx, Z = o.ly; if (!(o.hor ? Math.abs(Z) > b.h / 2 - WALLT : Math.abs(X) > b.w / 2 - WALLT)) continue; ext.push({ o, X, Z, nx: o.hor ? 0 : Math.sign(X), nz: o.hor ? Math.sign(Z) : 0 }); }
+        const isBurnt = rh(b.id, 11) < .14;
+        // водостоки: желоба вдоль карнизов и трубы на углах
+        if (gable) { const ex = along ? b.w * 1.04 : b.h * 1.04, off = (along ? b.h : b.w) * 1.08 / 2 + 1.2;
+          for (const sd of [-1, 1]) { P(geo.cyl10, 'metal', gutC, along ? RX(0, wallH - 1.2, sd * off, 2, ex, 2, 0, 0, Math.PI / 2) : RX(sd * off, wallH - 1.2, 0, 2, ex, 2, Math.PI / 2, 0, 0), 'roof');
+            for (const e of [-1, 1]) { const px = along ? e * (b.w / 2 - 5) : sd * (off - 1.5), pz = along ? sd * (off - 1.5) : e * (b.h / 2 - 5);
+              P(geo.cyl10, 'metal', gutC, M(px, wallH / 2 - 1, pz, 1.3, wallH - 2, 1.3)); P(geo.box, 'metal', gutC, M(px + (along ? 0 : sd * 2), 2.5, pz + (along ? sd * 2 : 0), along ? 2.6 : 5, 2.2, along ? 5 : 2.6));
+              for (const y of [16, 40]) P(geo.box, 'metal', 0x4a4a48, M(px, y, pz, 3.2, .8, 3.2)); } } }
+        else for (const [ex, ez] of [[1, 1], [-1, -1]]) { const px = ex * (b.w / 2 - 6), pz = ez * (b.h / 2 + 2.6);
+          P(geo.cyl10, 'metal', gutC, M(px, (wallH + 4) / 2, pz, 1.4, wallH + 4, 1.4)); P(geo.box, 'metal', gutC, M(px, wallH + 3, pz - ez * 1.5, 3, 2, 4)); P(geo.box, 'metal', gutC, M(px, 2.5, pz + ez * 2, 2.8, 2.2, 5));
+          for (const y of [18, 44]) P(geo.box, 'metal', 0x4a4a48, M(px, y, pz - ez * .6, 3.4, .8, 3.4)); }
+        // кондиционеры на глухих стенах
+        if (/^(apart|office|market|villa|barracks)$/.test(b.kind)) for (const w of ext) { const o = w.o; if (o.win || o.len < 30 || rh(o.id, 21) > .42) continue;
+          const ox = w.X + w.nx * (WALLT / 2 + 4.6), oz = w.Z + w.nz * (WALLT / 2 + 4.6), ry = w.nz ? 0 : Math.PI / 2, sh = (rh(o.id, 22) - .5) * (o.len - 22), ax = w.nz ? sh : 0, az = w.nz ? 0 : sh, y = wallH * (.5 + rh(o.id, 23) * .2);
+          P(geo.box, 'metal', 0xd2d0c8, M(ox + ax, y, oz + az, 18, 12, 8.4, ry));
+          P(geo.cyl10, 'metal', 0x2c2e30, RX(ox + ax + w.nx * 4.3, y, oz + az + w.nz * 4.3, 4.2, .5, 4.2, w.nz ? Math.PI / 2 : 0, 0, w.nx ? Math.PI / 2 : 0));
+          for (let k = -1; k <= 1; k++) P(geo.box, 'metal', 0x9a9a94, M(ox + ax + w.nx * 4.4 + (w.nz ? 0 : 0), y + k * 1.6, oz + az + w.nz * 4.4, w.nz ? 8 : .3, .3, w.nz ? .3 : 8, 0));
+          for (const e of [-6, 6]) P(geo.box, 'metal', 0x5a5a58, M(ox + ax - w.nx * 2 + (w.nz ? e : 0), y - 7, oz + az - w.nz * 2 + (w.nz ? 0 : e), w.nz ? 1 : 9, 1.2, w.nz ? 9 : 1, 0));
+          P(geo.cyl6, 'metal', 0x3a3a3a, M(ox + ax + (w.nz ? 7 : 0) - w.nx * 3, y / 2 - 3, oz + az + (w.nz ? 0 : 7) - w.nz * 3, .4, y - 6, .4)); }
+        // щиток и кабель у первой двери
+        if (b.doors.length) { const d = b.doors[0], r = sub(lerp(d.i, d.o, .5), b.p), x = dot(r, b.u), z = dot(r, b.v), n = norm(sub(d.o, d.i)), nx = dot(n, b.u), nz = dot(n, b.v), hor = Math.abs(nz) > .5, s = (K.door || DOOR) / 2 + 12;
+          const bx = x + (hor ? s : 0) + nx * (WALLT / 2 + 1.6), bz = z + (hor ? 0 : s) + nz * (WALLT / 2 + 1.6);
+          P(geo.box, 'metal', 0x8a8e86, M(bx, 40, bz, hor ? 9 : 3, 13, hor ? 3 : 9)); P(geo.box, 'metal', 0x3a3a38, M(bx + nx * 1.6, 41, bz + nz * 1.6, hor ? 3 : .3, 2, hor ? .3 : 3));
+          P(geo.cyl6, 'metal', 0x1e1e1e, M(bx, (46.5 + wallH) / 2, bz, .45, wallH - 46.5, .45)); P(geo.box, 'plaster', 0x2a4a7a, M(bx + (hor ? -6 : 0) + nx * 0, 56, bz + (hor ? 0 : -6), hor ? 5 : 3.2, 4, hor ? 3.2 : 5)); }
+        // крыши: печные трубы у вилл и домиков, на плоских — вентиляция, люк, антенна, спутниковые тарелки
+        if (gable && /^(villa|lodge)$/.test(b.kind)) { const cx = (along ? -b.w * .26 : b.w * .16), cz = (along ? b.h * .14 : -b.h * .26), d = along ? Math.abs(cz) / (b.h * .54) : Math.abs(cx) / (b.w * .54), ry0 = wallH + R * (1 - d);
+          P(geo.box, 'brick', 0x8e5644, M(cx, ry0 + 4, cz, 11, 26, 11), 'roof'); P(geo.box, 'concrete', 0x5e5a54, M(cx, ry0 + 17.5, cz, 14, 2.5, 14), 'roof'); P(geo.cyl10, 'metal', 0x3a3a3a, M(cx, ry0 + 20.5, cz, 2.4, 4, 2.4), 'roof'); }
+        if (!gable) { for (let k = 0; k < 3; k++) { const vx = (rh(b.id, 40 + k) - .5) * b.w * .7, vz = (rh(b.id, 44 + k) - .5) * b.h * .7; P(geo.cyl10, 'metal', 0x7a7c78, M(vx, wallH + 7, vz, 1.8, 10, 1.8), 'roof'); P(geo.cyl10, 'metal', 0x5a5c58, M(vx, wallH + 12.5, vz, 2.6, 1.2, 2.6), 'roof'); }
+          P(geo.box, 'metal', 0x6a6e6a, M(-b.w * .28, wallH + 4.5, b.h * .22, 16, 3, 16), 'roof'); P(geo.box, 'metal', 0x4a4e4a, M(-b.w * .28, wallH + 6.2, b.h * .22, 13, .6, 13), 'roof');
+          if (/^(apart|office|barracks)$/.test(b.kind)) { const ax = b.w * .32, az = b.h * .3; P(geo.cyl6, 'metal', 0x2a2a2a, M(ax, wallH + 22, az, .5, 40, .5), 'roof'); for (const [y, l] of [[32, 14], [26, 18], [20, 22]]) P(geo.box, 'metal', 0x2a2a2a, M(ax, wallH + y, az, l, .5, .5), 'roof');
+            for (let k = 0; k < (b.kind === 'apart' ? 3 : 1); k++) { const sx = -b.w * .1 + k * 22, sz = -b.h * .36; P(geo.cyl6, 'metal', 0x6a6a68, M(sx, wallH + 9, sz, .7, 12, .7), 'roof'); P(geo.cyl10, 'metal', 0xd8d6d0, RX(sx, wallH + 15, sz + 1.5, 6.5, .9, 6.5, -1.1 + k * .1, k * .5, 0), 'roof'); P(geo.cyl6, 'metal', 0x3a3a3a, RX(sx, wallH + 17, sz + 5.6, .35, 6, .35, -1, k * .5, 0), 'roof'); } } }
+        // наклейки на фасаде (копоть над окнами, подтёки под крышей, сколы штукатурки, следы пуль) — в общий план, рисуются после
+        for (const w of ext) { const o = w.o, ry = w.nz ? (w.nz > 0 ? 0 : Math.PI) : (w.nx > 0 ? Math.PI / 2 : -Math.PI / 2), ox = w.X + w.nx * (WALLT / 2 + .6), oz = w.Z + w.nz * (WALLT / 2 + .6);
+          const at = (s, y, wdt, h, k) => decalPlan.push([k, b.id, o.id, base.clone().multiply(RX(ox + (w.nz ? s : 0), y, oz + (w.nz ? 0 : s), wdt, h, 1, 0, ry, 0))]);
+          if (o.win && (isBurnt || rh(o.id, 31) < .2)) at(0, winTop + 15, o.len * 1.5, 34, 0);
+          if (rh(o.id, 33) < .55) at((rh(o.id, 34) - .5) * o.len * .3, wallH - 15, o.len * (.6 + rh(o.id, 35) * .5), 28, 1);
+          if (!o.win && rh(o.id, 36) < .38) { const sz = 14 + rh(o.id, 37) * 16; at((rh(o.id, 38) - .5) * (o.len - sz), 12 + rh(o.id, 39) * (wallH - 36), sz * 1.3, sz, 2); }
+          if (rh(o.id, 40) < .22) at((rh(o.id, 41) - .5) * (o.len - 18), 18 + rh(o.id, 42) * 26, 18, 18, 3); }
+      }
       // крыша
       const rc = ROOFC[b.id % ROOFC.length];
       const GR = { gable: [.38, K.style === 'metal' ? 0x7a807a : rc], lowgable: [.2, K.church === 0 ? 0x315855 : 0x5a6068], steep: [K.church === 1 ? .55 : .75, 0x2a2730] }[K.roof];
@@ -1153,6 +1211,8 @@ void main(){
       const burnt = K.church === undefined && rh(b.id, 11) < .14; if (burnt) { b.burnt = 1; for (const pc of pcs) if (typeof pc[3] === 'number' && (pc[5] === 'roof' || pc[5] === 'top' || pc[5] === 'wall')) pc[3] = new T.Color(pc[3]).lerp(SOOT, pc[5] === 'wall' ? .45 : .8).getHex(); } // сгоревший дом
       for (const [g, tx, sc, col, lm, role, low, wid] of pcs) { const key = g.uuid + '|' + tx + '|' + sc + '|' + (role === 'floor' ? 'f' : 'w'); (plan[key] = plan[key] || { g, tx, sc, items: [] }).items.push([b.id, col, base.clone().multiply(lm), role, low ? base.clone().multiply(low) : null, wid]); }
     }
+    for (let k = 0; k < 4; k++) { const items = decalPlan.filter(d => d[0] === k); if (!items.length) continue; const mesh = new T.InstancedMesh(decalGeo, decalMat(k), items.length); mesh.frustumCulled = false; mesh.renderOrder = 2; mesh.receiveShadow = true;
+      items.forEach(([, bid, wid, m], i) => { mesh.setMatrixAt(i, wallGone.has(wid) ? zero : m); (bParts[bid] = bParts[bid] || []).push([mesh, i, m, 'top', null, wid]); (wallParts[wid] = wallParts[wid] || []).push([mesh, i]); }); scene.add(mesh); decalMeshes.push(mesh); }
     if (boardPlan.length) { boardMesh = new T.InstancedMesh(geo.box, worldMat(), boardPlan.length); boardMesh.frustumCulled = false; boardMesh.castShadow = true; // доски на окнах
       boardPlan.forEach(([oid, bid, m], i) => { (boardIdx[oid] = boardIdx[oid] || []).push([i, m, bid]); boardMesh.setMatrixAt(i, objs[oid].dead ? zero : m); boardMesh.setColorAt(i, new T.Color([0x6b5238, 0x5a4430, 0x7a6040][(oid + i) % 3])); }); scene.add(boardMesh); }
     if (glassPlan.length) { glassMesh = new T.InstancedMesh(geo.box, GROUNDED ? new T.MeshPhongMaterial({ color: 0x9cb2bd, specular: 0x9cabb0, shininess: 55, transparent: true, opacity: .28, depthWrite: false }) : new T.MeshLambertMaterial({ color: 0xbfe4ff, transparent: true, opacity: .32, depthWrite: false }), glassPlan.length); glassMesh.frustumCulled = false;
