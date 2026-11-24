@@ -2136,9 +2136,62 @@ void main(){
     x.fillStyle = '#f0e3cd'; x.fillRect(14, 21, 11, 5); x.fillRect(39, 21, 11, 5);
     x.fillStyle = '#3e4745'; x.fillRect(19, 21, 4, 5); x.fillRect(41, 21, 4, 5);
     x.strokeStyle = '#956958'; x.lineWidth = 2; x.beginPath(); x.moveTo(23, 46); x.quadraticCurveTo(32, 49, 41, 46); x.stroke(); return new T.CanvasTexture(c); })();
+  function heroCloth(profile) {
+    const shape = profile.map(([height, radius]) => new T.Vector2(radius, height));
+    return new T.LatheGeometry(shape, 12);
+  }
+  const heroJacket = heroCloth([[-.5, 0], [-.5, .38], [-.4, .43], [-.16, .43], [.12, .48], [.32, .51], [.42, .46], [.5, .29], [.5, 0]]);
+  const heroSleeve = heroCloth([[-.55, 0], [-.55, .34], [-.47, .41], [-.18, .44], [.11, .49], [.34, .51], [.49, .39], [.54, 0]]);
+  let playableFace;
+  function playableHeadGeometry() {
+    if (playableFace) return playableFace;
+    const { positions, indices } = RAIDER_SUIT_MODEL;
+    const vertices = [], faces = [], remap = new Map();
+    for (let i = 0; i < indices.length; i += 3) {
+      const a = indices[i], b = indices[i + 1], c = indices[i + 2];
+      if (Math.min(positions[a * 3 + 1], positions[b * 3 + 1], positions[c * 3 + 1]) < 17.7) continue;
+      for (const id of [a, b, c]) {
+        if (!remap.has(id)) {
+          remap.set(id, vertices.length / 3);
+          vertices.push(positions[id * 3] * 1.21, (positions[id * 3 + 1] - 21.22) * 1.14, positions[id * 3 + 2] - .19);
+        }
+        faces.push(remap.get(id));
+      }
+    }
+    playableFace = new T.BufferGeometry();
+    playableFace.setAttribute('position', new T.Float32BufferAttribute(vertices, 3));
+    playableFace.setIndex(faces);
+    playableFace.computeVertexNormals();
+    return playableFace;
+  }
+  const darkHair = (() => {
+    // A single swept silhouette with a shorter hairline around the face.
+    const points = [], indices = [], rings = 10, segments = 24;
+    for (let ring = 0; ring <= rings; ring++) {
+      const u = ring / rings;
+      for (let i = 0; i < segments; i++) {
+        const angle = 2 * Math.PI * i / segments, x = Math.sin(angle), z = Math.cos(angle);
+        const drape = (1 - Math.max(0, z) ** 2.4) ** .72;
+        const theta = u * (1.06 + drape * 1.27);
+        const groove = 1 + Math.sin(angle * 9 + u * 4) * .035 * u;
+        points.push(3.65 * x * Math.sin(theta) * groove + u * .27,
+          1.53 + 3.92 * Math.cos(theta) - drape * u ** 3 * 3.7,
+          -.42 + 4.62 * z * Math.sin(theta) * groove);
+        if (ring) {
+          const a = (ring - 1) * segments + i, b = (ring - 1) * segments + (i + 1) % segments;
+          indices.push(a, a + segments, b, b, a + segments, b + segments);
+        }
+      }
+    }
+    const geometry = new T.BufferGeometry();
+    geometry.setAttribute('position', new T.Float32BufferAttribute(points, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    return geometry;
+  })();
   function makeChar(ch) {
     const g = new T.Group(), body = new T.Group(); g.add(body);
-    const hero = HERO_MODELS[ch];
+    const hero = HERO_MODELS[ch], detailed = ch === 0 || ch === 10;
     const cv = hero || (ch >= CH_SECT ? CIV_S[(ch - CH_SECT) % 4] : ch >= 100 ? CIV[(ch - 100) % CIV.length] : null);
     const refined = ch === CH_SECT, rounded = refined || !cv || !!hero;
     if (STYLE !== 'real') g.scale.setScalar(1.15); // в ярких стилях люди крупнее
@@ -2150,12 +2203,19 @@ void main(){
     const part = (gg, mat, x, y, z, sx, sy, sz, par = body) => { const o = new T.Mesh(gg, mat); o.position.set(x, y, z); o.scale.set(sx, sy, sz); par.add(o); return o; };
     const boot = lam(refined ? 0xc78e9d : cv && cv.boots || 0x2e241b), gear = lam(0x3b3d30), belt = lam(cv ? 0x2a2420 : 0x26261f);
     // ноги: бедро + голень (колено гнётся)
-    const leg = s => { const hip = new T.Group(); hip.position.set(s * 3.1, 24, 0); body.add(hip); part(rounded ? geo.humanLimb : geo.box, mats.pants, 0, -6, 0, 5, 12, 5.6, hip);
-      const knee = new T.Group(); knee.position.y = -12; hip.add(knee); part(rounded ? geo.humanLimb : geo.box, mats.pants, 0, -5.5, 0, 4.6, 11, 5.2, knee); part(refined ? geo.slipperShoe : geo.box, boot, 0, -11, 1.2, 5, 3.4, 8, knee); return [hip, knee]; };
+    const leg = s => { const hip = new T.Group(); hip.position.set(s * 3.1, 24, 0); body.add(hip); part(detailed ? heroSleeve : rounded ? geo.humanLimb : geo.box, mats.pants, 0, -6, 0, 5, 12, 5.6, hip);
+      const knee = new T.Group(); knee.position.y = -12; hip.add(knee); part(detailed ? heroSleeve : rounded ? geo.humanLimb : geo.box, mats.pants, 0, -5.5, 0, 4.6, 11, 5.2, knee); part(refined || detailed ? geo.slipperShoe : geo.box, boot, 0, -11, 1.2, 5, 3.4, 8, knee); return [hip, knee]; };
     const [legL, kneeL] = leg(-1), [legR, kneeR] = leg(1);
     part(geo.box, belt, 0, 25, 0, 13.6, 2.4, 7.6);
-    const torso = part(rounded ? geo.tailoredTorso : geo.box, mats.shirt, 0, 33, 0, cv && cv.wide ? 16 : 13, 15, cv && cv.wide ? 8.5 : 7);
-    if (!cv) { part(geo.box, gear, 0, 33.5, 3.8, 9, 7, 1); for (const s of [-1, 1]) part(geo.box, gear, s * 3.8, 33.5, 0, 1.4, 15.2, 7.4); } // разгрузка — только у бойцов
+    const torso = part(detailed ? heroJacket : rounded ? geo.tailoredTorso : geo.box, mats.shirt, 0, 33, 0, cv && cv.wide ? 16 : 13, 15, cv && cv.wide ? 8.5 : 7);
+    if (ch === 0) {
+      part(heroJacket, gear, 0, 34, .5, 12.8, 13.4, 7.8);
+      for (const side of [-1, 1]) {
+        part(geo.box, lam(0x67634a), side * 3.5, 36.8, 4.5, 1.35, 8.5, .8);
+        part(geo.tailoredTorso, lam(0x4c4d3c), side * 3, 31, 4.65, 4.7, 5.5, 2.3);
+        part(geo.box, lam(0x706a50), side * 3, 32.5, 5.85, 4.2, 1.1, .55);
+      }
+    } else if (!cv) { part(geo.box, gear, 0, 33.5, 3.8, 9, 7, 1); for (const s of [-1, 1]) part(geo.box, gear, s * 3.8, 33.5, 0, 1.4, 15.2, 7.4); } // разгрузка — только у бойцов
     else {
       if (cv.skirt) part(geo.box, lam(cv.skirt), 0, cv.long ? 14 : 20, 0, 14, cv.long ? 24 : 12, 9); // юбка / плащ / ряса
       if (cv.tie && !refined) { part(geo.box, lam(0xf4f4f0), 0, 36, 3.6, 4, 9, .6); part(geo.box, lam(cv.n === 'Тапок' ? 0x2a50a0 : 0xc02020), 0, 34.5, 3.9, 1.4, 8, .6); }
@@ -2193,14 +2253,20 @@ void main(){
     const vest = new T.Group(); body.add(vest); vest.visible = false; // бронежилет (если подобрал броню)
     part(geo.box, lam(0x6b6248), 0, 33, 0, 14.4, 13, 9, vest); for (let i = -1; i <= 1; i++) part(geo.box, lam(0x585040), i * 4.2, 31, 4.9, 3.6, 5, 1.6, vest);
     if (!cv) part(geo.box, gear, 0, 30, -4.6, 8, 8, 2.4); // рюкзак-подсумок сзади
-    part(geo.box, mats.skin, 0, 41.5, 0, 3.4, 2.4, 3.4); // шея
+    part(detailed ? geo.cyl10 : geo.box, mats.skin, 0, 41.5, 0, 3.4, 2.4, 3.4); // шея
     const head = new T.Group(); head.position.set(0, 46.5, 0); body.add(head);
-    part(geo.sph, mats.skin, 0, 0, .3, 4.1, 4.9, 4.5, head);
+    if (detailed) part(playableHeadGeometry(), mats.skin, 0, 0, 0, 1, 1, 1, head);
+    else part(geo.sph, mats.skin, 0, 0, .3, 4.1, 4.9, 4.5, head);
     if (!rounded) part(geo.box, lam(0x1a1a1a), 0, .7, 4.1, 4.8, .9, .6, head);
     else {
       const face = part(geo.facePlane, new T.MeshLambertMaterial({ map: faceTex, transparent: true, depthWrite: false, alphaTest: .1 }), 0, .1, 4.83, 5.2, 5.2, 1, head); face.userData.noMerge = face.userData.noOutline = face.userData.noShadow = true;
-      part(geo.faceDetail, mats.skin, 0, -.2, 4.7, .75, 1.1, 1, head);
-      for (const side of [-1, 1]) part(geo.faceDetail, mats.skin, side * 4, -.3, .1, .7, 1.2, .7, head);
+      if (!detailed) {
+        part(geo.faceDetail, mats.skin, 0, -.2, 4.7, .75, 1.1, 1, head);
+        for (const side of [-1, 1]) part(geo.faceDetail, mats.skin, side * 4, -.3, .1, .7, 1.2, .7, head);
+      } else {
+        face.position.set(0, -.25, 4.16);
+        face.scale.set(4.2, 4.2, 1);
+      }
     }
     if (STYLE !== 'real') head.scale.setScalar(refined ? 1.06 : rounded ? 1.14 : 1.25);
     if (!cv) {
@@ -2209,9 +2275,7 @@ void main(){
     }
     else { const hm = (gg, c, x, y, z, sx, sy, sz, rx = 0) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.x = rx; head.add(o); };
       ({ darkhair: () => {
-          hm(geo.dome, 0x292127, 0, 1.45, -.2, 4.75, 4.25, 4.75);
-          for (const side of [-1, 1]) hm(geo.sph, 0x292127, side * 3.6, -2.6, -.65, 1.45, 5.1, 2.65, side * .09);
-          hm(geo.sph, 0x382c2c, 0, -3.1, -2.8, 4.2, 5.3, 1.95);
+          hm(darkHair, 0x292127, 0, 0, 0, 1, 1, 1);
         },
         priest: () => {
           hm(geo.dome, 0x665d54, 0, 1.25, -.55, 4.5, 3.5, 4.5);
@@ -2258,8 +2322,8 @@ void main(){
         hardhat: () => { hm(geo.dome, 0xffc61a, 0, 1.6, 0, 5.2, 4.4, 5.4); hm(geo.cyl10, 0xffc61a, 0, 1.4, .4, 6.4, .6, 6.6); },
         buzz: () => hm(geo.dome, 0x2a2018, 0, 1.6, -.2, 4.4, 2.4, 4.6) })[cv.hat](); }
     // руки: плечо + предплечье, держат оружие двумя руками
-    const arm = s => { const sh = new T.Group(); sh.position.set(s * 8.2, 39, 0); body.add(sh); part(rounded ? geo.humanLimb : geo.box, mats.shirt, 0, -4.8, 0, 3.8, 9.6, 3.8, sh);
-      const el = new T.Group(); el.position.y = -9.4; sh.add(el); part(rounded ? geo.humanLimb : geo.box, mats.shirt, 0, -4.2, 0, 3.4, 8.4, 3.4, el); part(refined ? geo.faceDetail : geo.box, refined ? mats.skin : lam(0x2a2a24), 0, -9.2, 0, refined ? 1.5 : 3, refined ? 2 : 2.6, refined ? 1.4 : 3, el); return [sh, el]; };
+    const arm = s => { const sh = new T.Group(); sh.position.set(s * (ch === 10 ? 7.45 : 8.2), 39, 0); body.add(sh); part(detailed ? heroSleeve : rounded ? geo.humanLimb : geo.box, mats.shirt, 0, -4.8, 0, 3.8, 9.6, 3.8, sh);
+      const el = new T.Group(); el.position.y = -9.4; sh.add(el); part(detailed ? heroSleeve : rounded ? geo.humanLimb : geo.box, mats.shirt, 0, -4.2, 0, 3.4, 8.4, 3.4, el); part(refined || detailed ? geo.faceDetail : geo.box, refined || ch === 10 ? mats.skin : lam(0x2a2a24), 0, -9.2, 0, refined ? 1.5 : 3, refined ? 2 : 2.6, refined ? 1.4 : 3, el); return [sh, el]; };
     const [armL, elL] = arm(-1), [armR, elR] = arm(1);
     if (hero?.tank) for (const joint of [armL, elL, armR, elR]) joint.children.find(o => o.isMesh).material = mats.skin;
     if (hero?.gloves) for (const joint of [elL, elR]) joint.children.filter(o => o.isMesh).at(-1).material = lam(0x82654e);
@@ -2487,8 +2551,8 @@ void main(){
       pvR.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
       pvR.setSize(258, 258, false);
       pvScene = new T.Scene();
-      pvScene.add(new T.HemisphereLight(0xf5e7d7, 0x768992, 1.05));
-      const key = new T.DirectionalLight(0xffdfb4, .76);
+      pvScene.add(new T.HemisphereLight(0xf5e7d7, 0x768992, .76));
+      const key = new T.DirectionalLight(0xffdfb4, .68);
       key.position.set(30, 60, 50); pvScene.add(key);
       const rim = new T.DirectionalLight(0x9bbcc9, .45);
       rim.position.set(-30, 38, -50); pvScene.add(rim);
