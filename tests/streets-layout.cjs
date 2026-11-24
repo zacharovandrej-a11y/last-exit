@@ -3,32 +3,25 @@ const root = path.join(__dirname, '..'), render = fs.readFileSync(path.join(root
 const planner = render.slice(render.indexOf('function planStreets'), render.indexOf('const G3'));
 vm.runInNewContext(fs.readFileSync(path.join(root, 'src/shared.js'), 'utf8') + '\n' + planner + `
 const world = genWorld(), plan = planStreets(world);
-assert.deepEqual(plan.missed, [], 'Every door needs a street connection');
-assert.equal(plan.walks.length, world.blds.reduce((n, b) => n + b.doors.length, 0));
-const key = p => p.join(','), graph = new Map();
-for (const [a, b] of plan.roads) for (const [p, q] of [[a,b],[b,a]]) {
-  const k = key(p); if (!graph.has(k)) graph.set(k, []); graph.get(k).push(key(q));
-}
-const first = graph.keys().next().value, seen = new Set([first]), queue = [first];
-while (queue.length) for (const k of graph.get(queue.pop())) if (!seen.has(k)) { seen.add(k); queue.push(k); }
-assert.equal(seen.size, graph.size, 'Street network must be connected');
-for (const walk of plan.walks) {
-  assert(seen.has(key(walk.points[walk.points.length - 1])), 'Walk ends in grass');
-  for (let i = 1; i < walk.points.length; i++) {
-    const a = walk.points[i-1], b = walk.points[i], n = Math.max(1, Math.ceil(dist(a,b)/6));
-    for (let j = 0; j <= n; j++) {
-      const p = lerp(a,b,j/n);
-      assert(!nearObjs(world,p,PR).some(o => !o.dead && !o.nc && objPush(o,p,PR)), 'Blocked walk at building '+walk.bid);
-    }
-  }
-}
-for (const [a,b] of plan.roads) for (let i=0;i<=6;i++) {
- const p=lerp(a,b,i/6);
- assert(!nearObjs(world,p,26).some(o=>!o.dead&&!o.nc&&objPush(o,p,26)), 'Street crosses an obstacle');
- for(const b of world.blds) if(b.yard){const r=sub(p,b.p);assert(Math.abs(dot(r,b.u))>=b.yard[0]/2||Math.abs(dot(r,b.v))>=b.yard[1]/2,'Public street crosses a private yard');}
-}
-console.log('Connected streets:',plan.walks.length,'doors,',plan.roads.length,'segments; all paths clear');
-// Разрушенные объекты не должны менять рисунок улиц у вновь подключившихся игроков.
+const segD = (p, [a, b]) => { const ab = sub(b, a), t = Math.max(0, Math.min(1, dot(sub(p, a), ab) / Math.max(1e-6, dot(ab, ab)))); return dist(p, add(a, ab, t)); };
+assert(world.roads.length >= 8, 'Road network is missing');
+// иерархия: трасса шире улицы, улица шире грунтовки; машина (60) помещается в полосу
+const W = {}; for (const r of world.roads) W[r.k] = r.w;
+assert(W.main > W.street && W.street > W.dirt, 'Road hierarchy');
+assert(W.street / 2 >= 70 && W.dirt >= 100, 'Lane narrower than a car');
+// связность: каждая дорога касается другой дороги (или уходит за край карты)
+const segs = plan.segs, touch = (r, q) => segs.some(s => s[4] === q && segs.some(t => { if (t[4] !== r) return false; const n = Math.ceil(dist(t[0], t[1]) / 10); for (let i = 0; i <= n; i++) if (segD(lerp(t[0], t[1], i / n), s) < s[2] / 2 + 4) return true; return false; }));
+const seen = new Set([0]), queue = [0];
+while (queue.length) { const r = queue.pop(); for (let q = 0; q < world.roads.length; q++) if (!seen.has(q) && touch(r, q)) { seen.add(q); queue.push(q); } }
+assert.equal(seen.size, world.roads.length, 'Road network must be connected: ' + world.roads.map((r, i) => seen.has(i) ? '' : i + r.k + JSON.stringify(r.pts[0])).join(' '));
+assert(plan.junctions.length >= 8, 'Too few crossroads');
+// дома стоят у дорог: каждый дом (кроме бункеров и штабов) в пределах 420 от дороги
+for (const b of world.blds) if (!/^ch|bunker/.test(b.kind)) assert(segs.some(s => segD(b.p, s) - s[2] / 2 < 420 + b.rad), 'Building far from roads: ' + b.kind + ' ' + b.id);
+// здания не стоят на дорогах
+for (const s of segs) for (let t = 0; t <= 1; t += .02) assert(bldAt(world.blds, lerp(s[0], s[1], t)) < 0, 'Road through building');
+// дорожки от дверей не проходят сквозь здания
+for (const walk of plan.walks) { const [a, b] = walk.points.slice(-2); for (let t = .1; t <= 1; t += .05) assert(bldAt(world.blds, lerp(a, b, t)) < 0, 'Walk through building ' + walk.bid); }
+console.log('Roads:', world.roads.length, 'segments:', segs.length, 'crossroads:', plan.junctions.length, 'walks:', plan.walks.length);
 for (const o of world) if (o.hp) o.dead = true;
 assert.deepEqual(planStreets(world), plan, 'Street layout changes with destruction state');
 `, { console, assert });

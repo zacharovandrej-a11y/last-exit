@@ -204,10 +204,11 @@ function relStart() { if (relT > 0 || ammo[myW] >= magOf(myW)) return; relT = ZW
 // ===== стрельба: попадания считает клиент (что видишь — в то попадаешь), стены и машины останавливают пули =====
 // Пули летят видимыми штрихами (как в Crimsonland); урон, кровь и разбитые стёкла — в момент, когда пуля долетела.
 let outHits = [], outShots = [], outBooms = [], outObj = [], outGlass = [];
-const HITOBJ = new Set(['car', 'truck', 'barrel', 'crate']);
+const HITOBJ = new Set(['car', 'truck', 'bus', 'barrel', 'crate']);
 function addBullet(W, from, d, end, ev) {
   const b = { from, d, end, s: 0, v: (W.bv || 2600) * (W.pel > 1 ? .85 + Math.random() * .3 : 1), bl: (W.bl || 30) * 1.5, bw: W.bw || 2.4, bc: W.bc || 0xffe066, ev, W, done: false };
-  if (W.trail) { const tr = { a: from, b: from, t: 0, life: W.trail === 3 ? .9 : W.trail === 2 ? .7 : .55, c: W.trail === 3 ? 0x5aa8ff : W.trail === 2 ? 0x6a6660 : 0x8a8a8a, w: W.trail === 3 ? 6 : W.trail === 2 ? 5 : 2.6, k: W.trail === 3 ? 1 : .55, follow: b }; trails.push(tr); }
+  if (W.trail === 4) { const tr = { a: from, b: from, t: 0, life: 1.6, c: 0x8a8580, w: W.proj === 3 ? 6 : 9, k: .75, follow: b }; trails.push(tr); }
+  else if (W.trail) { const tr = { a: from, b: from, t: 0, life: W.trail === 3 ? .9 : W.trail === 2 ? .7 : .55, c: W.trail === 3 ? 0x5aa8ff : W.trail === 2 ? 0x6a6660 : 0x8a8a8a, w: W.trail === 3 ? 6 : W.trail === 2 ? 5 : 2.6, k: W.trail === 3 ? 1 : .55, follow: b }; trails.push(tr); }
   tracers.push(b); return b;
 }
 function stepBullets(dt) {
@@ -277,7 +278,7 @@ function sfx(k, v = 1) {
   if (!A || v <= .02) return; const now = A.currentTime, g = A.createGain(); g.connect(A.destination);
   const noise = (f, d, gain, type = 'lowpass') => { const s = A.createBufferSource(); s.buffer = noiseB; const fl = A.createBiquadFilter(); fl.type = type; fl.frequency.value = f; s.connect(fl); fl.connect(g); g.gain.setValueAtTime(gain * v, now); g.gain.exponentialRampToValueAtTime(.001, now + d); s.start(now, Math.random() * .5); s.stop(now + d); };
   const tone = (f0, f1, d, gain, type = 'sine') => { const o = A.createOscillator(); o.type = type; o.connect(g); o.frequency.setValueAtTime(f0, now); o.frequency.exponentialRampToValueAtTime(f1, now + d); g.gain.setValueAtTime(gain * v, now); g.gain.exponentialRampToValueAtTime(.001, now + d); o.start(now); o.stop(now + d); };
-  if (k.startsWith('shot')) { const w = ZW[+k.slice(4)] || ZW[0]; if (w.fire) noise(700, .1, .12); else noise(w.pel > 1 ? 900 : w.dmg > 60 ? 1200 : w.rate > 10 ? 2600 : 1800, w.pel > 1 || w.dmg > 60 ? .3 : .12, .28); }
+  if (k.startsWith('shot')) { const w = ZW[+k.slice(4)] || ZW[0]; if (w.fire) noise(700, .1, .12); else if (w.proj === 1 || w.proj === 3) noise(520, .6, .55); else if (w.proj === 2) noise(3000, .05, .15); else noise(w.pel > 1 ? 900 : w.dmg > 60 ? 1200 : w.rate > 10 ? 2600 : 1800, w.pel > 1 || w.dmg > 60 ? .3 : .12, .28); }
   else if (k === 'boom') noise(380, 1, .9);
   else if (k === 'splat') noise(500, .18, .35, 'bandpass');
   else if (k === 'crate' || k === 'smash') noise(900, .15, .3, 'bandpass');
@@ -316,6 +317,13 @@ function loop(now) {
     for (const [id, zb] of S.b.z) { const za = S.a.z.get(id) || zb, p = lerp(za.p, zb.p, S.k);
       let z = zst.get(id); if (!z) { z = Object.assign({ id, p, lp: p, walk: Math.random() * 6, yaw: Math.atan2(meP[0] - p[0], meP[1] - p[1]), flash: 0 }, ZFX.look(id)); zst.set(id, z); }
       const d = dist(p, z.lp); z.walk += d * .12 / ZT[zb.ty].sc; if (d > .2) { const ty = Math.atan2(p[0] - z.lp[0], p[1] - z.lp[1]); let dy = ty - z.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); z.yaw += dy * .2; }
+      if (zb.ty === 1) {
+        if ((zb.fl & 1) && !(z.fl & 1)) z.attackSince = now / 1000;
+        if ((zb.fl & 8) && !(z.fl & 8)) {
+          z.freezeSince = now / 1000;
+          z.freezeWalk = z.walk;
+        }
+      }
       z.lp = p; z.p = p; z.ty = zb.ty; z.lost = zb.lost; z.fl = zb.fl;
       const facingBack = !(zb.lost & 4) && (zb.ty === 1 && raiderBackKick(id) && (zb.fl & 1) ||
         zb.ty === 0 && streetWalksBackward(id) && !(zb.fl & 1));
@@ -347,14 +355,14 @@ function loop(now) {
     wa.deadT = pb.st === 1 ? wa.deadT + dt : 0;
     plist.push({ id: pb.id, p, st: pb.st, hp: pb.hp, down: pb.down });
     if (pb.st === 2) continue;
-    list.push({ id: pb.id, ch: skinOf[pb.id] ?? PCH[pb.id], p, aim, wb: pb.st === 1 ? 0 : ZW[w].m | (Math.min(3, (pb.id === myId ? wl[w] : 1) - 1) << 4), walk: wa.walk, moving, fire, down: pb.st === 1, deadT: wa.deadT, hp: Math.round(pb.hp * 100), fall: pb.st === 1 ? [-aim[0], -aim[1]] : null });
+    list.push({ id: pb.id, ch: skinOf[pb.id] ?? PCH[pb.id], p, aim, wb: pb.st === 1 ? 0 : ZW[w].m | (Math.min(3, (pb.id === myId ? wl[w] : 1) - 1) << 5), walk: wa.walk, moving, fire, down: pb.st === 1, deadT: wa.deadT, hp: Math.round(pb.hp * 100), fall: pb.st === 1 ? [-aim[0], -aim[1]] : null });
     if (playing && pb.st === 0) ZFX.footsteps(pb.id, p, moving, dt);
   }
   const meS = cur && cur.pl.find(q => q.id === myId); if (meS) { if (meS.hp < lastHp - .01 && meS.st === 0) { hurtFlash = 1; sfx('hurt'); } lastHp = meS.hp; }
   hurtFlash = Math.max(0, hurtFlash - dt * 2.5);
     shake = Math.max(0, shake - dt * (8 + shake * 2)); if (Math.random() < .6) shakeV = [(Math.random() - .5) * 2, (Math.random() - .5) * 2];
   const camP = playing || inRoom ? add(meP, shakeV, shake) : [ZSPAWN[0] + Math.sin(now / 9000) * 300, ZSPAWN[1] + Math.cos(now / 9000) * 300];
-  G3.frame({ now, dt, objs, zone: NOZONE, plan: null, matchT: 0, phase: 0, loot, list, tracers, trails, shots: frameShots, shipS: [0, 0], shipD: [1, 0], camP, inB: playing ? bldAt(objs.blds, meP) : -1, me: playing && meSt !== 2 ? meP : null, zoom, extra: (d, n) => ZFX.update(d, n, zl) });
+  G3.frame({ now, dt, objs, zone: NOZONE, plan: null, matchT: 0, phase: 0, loot, list, tracers, trails, shots: frameShots, benders: list.map(e => [e.p[0], e.p[1], 24]).concat(zl.filter(z => Math.abs(z.p[0] - meP[0]) < 500 && Math.abs(z.p[1] - meP[1]) < 500).slice(0, 8).map(z => [z.p[0], z.p[1], 18 + 8 * ZT[z.ty].sc])), shipS: [0, 0], shipD: [1, 0], camP, inB: playing ? bldAt(objs.blds, meP) : -1, me: playing && meSt !== 2 ? meP : null, zoom, extra: (d, n) => ZFX.update(d, n, zl) });
   frameShots = [];
   hud(now, dt, cur, meS, plist, zl);
 }
@@ -371,9 +379,7 @@ function hud(now, dt, cur, meS, plist, zl) {
   if (hurtFlash > 0) { const g = ctx.createRadialGradient(W_ / 2, H_ / 2, Math.min(W_, H_) * .3, W_ / 2, H_ / 2, Math.max(W_, H_) * .7); g.addColorStop(0, 'rgba(160,0,0,0)'); g.addColorStop(1, 'rgba(160,0,0,' + hurtFlash * .6 + ')'); ctx.fillStyle = g; ctx.fillRect(0, 0, W_, H_); }
   // пепел и дымка заката (рисуется поверх мира, дёшево — 2D)
   { const hz = ctx.createLinearGradient(0, 0, W_ * .3, H_); hz.addColorStop(0, 'rgba(255,120,40,.1)'); hz.addColorStop(.5, 'rgba(255,120,40,0)'); hz.addColorStop(1, 'rgba(40,10,0,.12)'); ctx.fillStyle = hz; ctx.fillRect(0, 0, W_, H_);
-    if (!ash.length) for (let i = 0; i < 46; i++) ash.push({ x: Math.random() * W_, y: Math.random() * H_, v: 12 + Math.random() * 22, s: 1 + Math.random() * 2.2, ph: Math.random() * 6, e: Math.random() < .12 });
-    for (const f of ash) { f.y += f.v * dt; f.x += (Math.sin(now / 900 + f.ph) * 10 - 8) * dt; if (f.y > H_ + 5) { f.y = -5; f.x = Math.random() * W_ * 1.2; } if (f.x < -5) f.x = W_ + 5;
-      ctx.fillStyle = f.e ? 'rgba(255,150,60,' + (.5 + .4 * Math.sin(now / 120 + f.ph)) + ')' : 'rgba(200,190,180,.55)'; ctx.fillRect(f.x, f.y, f.s, f.s); } }
+  } // падающий пепел убран: на экране он читался как снег
   if (now < buf.frz) { ctx.fillStyle = 'rgba(120,190,255,' + (.08 + .04 * Math.sin(now / 200)) + ')'; ctx.fillRect(0, 0, W_, H_); }
   // лазерный прицел и перекрестие (как в Crimsonland)
   if (meS && meS.st === 0) { const W = ZW[myW], [px, py] = G3.project(meP, 24);
@@ -384,10 +390,17 @@ function hud(now, dt, cur, meS, plist, zl) {
       for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.beginPath(); ctx.moveTo(mouse.x + a * (r + 2), mouse.y + b * (r + 2)); ctx.lineTo(mouse.x + a * (r + 8), mouse.y + b * (r + 8)); ctx.stroke(); }
       if (relT > 0) { ctx.strokeStyle = '#ffd43b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(mouse.x, mouse.y, r + 12, -1.57, -1.57 + 6.283 * (1 - relT / (ZW[myW].rel / (1 + (pk.rel || 0) * .25)))); ctx.stroke(); } }
     if (now < buf.shield) { ctx.strokeStyle = 'rgba(177,151,252,' + (.5 + .3 * Math.sin(now / 120)) + ')'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(px, py - 4, 30, 34, 0, 0, 7); ctx.stroke(); } }
-  // последние зомби: метки, чтобы не искать их по всей карте
-  if (cur.phase === 1 && cur.left > 0 && cur.left <= 5) for (const z of zl) { const sc = ZT[z.ty].sc, [x, y, vis] = G3.project(z.p, 46 * sc), bob = Math.sin(now / 160) * 4;
+  // полоски жизни над головами врагов (тонкие; над громилой и боссом — шире)
+  { const HB = [66, 36, 70, 64, 80, 118], BW = [24, 22, 34, 24, 40, 64], few = cur.phase === 1 && cur.left > 0 && cur.left <= 5;
+    for (const z of zl) { if (z.fall) continue; const ty = z.ty, [x, y, vis] = G3.project(z.p, HB[ty] || 60); if (!vis || x < -40 || x > W_ + 40 || y < 30 || y > H_ + 10) continue;
+      const w = BW[ty] || 24, h = ty >= 4 ? 4 : 3, hp = Math.max(0, Math.min(1, z.hp ?? 1)), x0 = Math.round(x - w / 2), y0 = Math.round(y - 6);
+      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x0 - 1, y0 - 1, w + 2, h + 2);
+      ctx.fillStyle = hp > .6 ? '#5fd35f' : hp > .3 ? '#f2c94c' : '#ff4d3d'; ctx.fillRect(x0, y0, Math.max(1, Math.round(w * hp)), h);
+      if (few) { ctx.strokeStyle = 'rgba(255,59,59,' + (.55 + .35 * Math.sin(now / 150)) + ')'; ctx.lineWidth = 1.5; ctx.strokeRect(x0 - 2.5, y0 - 2.5, w + 5, h + 5); } } }
+  // последние зомби: стрелки по краю экрана к тем, кого не видно (видимых и так выдаёт полоска жизни)
+  if (cur.phase === 1 && cur.left > 0 && cur.left <= 5) for (const z of zl) { const sc = ZT[z.ty].sc, [x, y, vis] = G3.project(z.p, 46 * sc);
     ctx.fillStyle = '#ff3b3b'; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineWidth = 2;
-    if (vis && x > 10 && x < W_ - 10 && y > 40 && y < H_ - 10) { ctx.beginPath(); ctx.moveTo(x, y - 4 + bob); ctx.lineTo(x - 9, y - 18 + bob); ctx.lineTo(x + 9, y - 18 + bob); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    if (vis && x > 10 && x < W_ - 10 && y > 40 && y < H_ - 10) continue;
     else { const cx = W_ / 2, cy = H_ / 2 + 15, dx = x - cx, dy = y - cy, k = Math.min((W_ / 2 - 30) / Math.max(1, Math.abs(dx)), (H_ / 2 - 70) / Math.max(1, Math.abs(dy))), ex = cx + dx * k, ey = cy + dy * k, a = Math.atan2(dy, dx);
       ctx.save(); ctx.translate(ex, ey); ctx.rotate(a); const pu = 1 + .15 * Math.sin(now / 150); ctx.scale(pu, pu); ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-8, -11); ctx.lineTo(-3, 0); ctx.lineTo(-8, 11); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
       txt(Math.round(dist(z.p, meP) * .036) + ' м', ex - Math.cos(a) * 26, ey - Math.sin(a) * 26 + 5, 12, '#ffb3b3'); } }

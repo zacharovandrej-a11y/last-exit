@@ -103,7 +103,7 @@ const OT = {
   house: { s: 0 }, car: { s: 1, hp: 160 }, truck: { s: 1, hp: 240 }, crate: { s: 0, hp: 45 }, wall: { s: 1 }, igloo: { s: 0 }, tent: { s: 1 },
   bw: { s: 1 }, furn: { s: 1, pass: 1 }, barrel: { s: 0, hp: 30 }, fence: { s: 1, pass: 1 }, bush: { s: 0, nc: 1, pass: 1 },
   grave: { s: 1, pass: 1 }, deadtree: { s: 0 }, ifence: { s: 1, pass: 1 }, antenna: { s: 0, pass: 1 }, billboard: { s: 1 }, dish: { s: 0, pass: 1 }, junk: { s: 0 }, shed: { s: 1 },
-  sandbag: { s: 1, pass: 1 }, jersey: { s: 1 }, // баррикады: мешки (пули пролетают, ранние зомби не перелезают) и бетонные блоки
+  sandbag: { s: 1, pass: 1 }, jersey: { s: 1 }, bus: { s: 1, hp: 320 }, // bus — брошенные автобусы // баррикады: мешки (пули пролетают, ранние зомби не перелезают) и бетонные блоки
 };
 // здания: план из комнат (BSP-деление), двери между комнатами, окна (пули и взгляд проходят, человек — нет)
 // style: стены/пол/крыша; hall — большой зал без деления; maxRoom — размер комнаты
@@ -134,7 +134,32 @@ function genWorld() {
     const v = sub(b, a), t = Math.max(0, Math.min(1, dot(sub(p, a), v) / dot(v, v)));
     return dist(p, add(a, v, t)) < 60 + m;
   });
-  const free = (p, m) => { if (blocksApproach(p, m) || housePlots.some(b => { const r = sub(p, b.p); return Math.hypot(Math.max(0, Math.abs(dot(r, b.u)) - b.yard[0] / 2), Math.max(0, Math.abs(dot(r, b.v)) - b.yard[1] / 2)) < m; })) return false; for (const o of objs) if (o.bid === undefined && dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + (b.kind === 'ch0' ? 370 : b.kind === 'ch3' ? 330 : b.rad)) return false; return true; };
+  // ===== дорожная сеть (с 24.11): сначала дороги, потом дома фасадом к ним. Ширины под масштаб игрока (~34 ед. = 1 м):
+  // main — трасса через посёлок, 2 полосы (~6 м + обочины); street — улица (~4.5 м); dirt — грунтовка (~3.5 м).
+  const roads = [], RW = { main: 200, street: 150, dirt: 110 };
+  const road = (k, pts) => roads.push({ k, w: RW[k], pts });
+  road('main', [[-2000, -40], [-1300, -15], [-560, -45], [40, -20], [760, 15], [1400, -25], [2000, 0]]); // трасса запад—восток
+  road('main', [[30, -2000], [10, -1300], [50, -560], [40, -20], [70, 640], [20, 1260], [40, 2000]]); // трасса север—юг
+  // город (северо-запад): сетка кварталов ~720×720, улицы выходят на обе трассы
+  road('street', [[-1900, -1450], [-1720, -1450], [-900, -1450], [13, -1450]]); road('street', [[-1900, -760], [-1720, -760], [-900, -760], [45, -760]]);
+  road('street', [[-1720, -1900], [-1720, -1450], [-1720, -760], [-1720, -28]]); road('street', [[-900, -1900], [-900, -1450], [-900, -760], [-900, -40], [-900, 340]]);
+  road('street', [[-900, 340], [56, 340], [620, 345]]); // южная улица от центра
+  { const c = BIOMES[1].c; road('street', [[20, c[1]], [c[0] - 300, c[1] + 20], [c[0] + 300, c[1]]]); road('street', [[c[0], c[1] - 380], [c[0], c[1] + 360]]); } // военная база: подъезд от трассы и плац
+  { const c = BIOMES[2].c; road('dirt', [[c[0] + 60, -40], [c[0], c[1] - 200], [c[0] - 20, c[1] + 420]]); road('dirt', [[c[0] - 420, c[1] + 60], [c[0] + 420, c[1] + 40], [30, c[1] + 90]]); } // ферма: грунтовки
+  { const c = BIOMES[4].c; road('dirt', [[55, c[1] - 40], [c[0] - 200, c[1] - 10], [c[0] + 160, c[1] + 10]]); } // лес
+  const rsegs = []; for (const r of roads) for (let i = 1; i < r.pts.length; i++) rsegs.push([r.pts[i - 1], r.pts[i], r.w, r.k]);
+  const segD = (p, [a, b]) => { const ab = sub(b, a), t = Math.max(0, Math.min(1, dot(sub(p, a), ab) / Math.max(1e-6, dot(ab, ab)))); return dist(p, add(a, ab, t)); };
+  const onRoad = (p, m) => rsegs.some(s => segD(p, s) < s[2] / 2 + m);
+  // точка вдоль полилинии по длине s: [точка, направление]
+  const alongR = (r, s) => { for (let i = 1; i < r.pts.length; i++) { const L = dist(r.pts[i - 1], r.pts[i]); if (s <= L || i === r.pts.length - 1) { const d = norm(sub(r.pts[i], r.pts[i - 1])); return [add(r.pts[i - 1], d, Math.min(s, L)), d]; } s -= L; } };
+  const rLen = r => { let L = 0; for (let i = 1; i < r.pts.length; i++) L += dist(r.pts[i - 1], r.pts[i]); return L; };
+  // место под здание у дороги: фасадом к улице, отступ от края дороги
+  const roadSpot = (cen, R, depth, kinds = ['main', 'street', 'dirt']) => { const c = rsegs.filter(s => kinds.includes(s[3]) && (!cen || segD(cen, s) < R)); if (!c.length) return null;
+    const s = c[Math.floor(rnd() * c.length)], q = lerp(s[0], s[1], .1 + rnd() * .8), d = norm(sub(s[1], s[0])), side = rnd() < .5 ? 1 : -1, n = perp(d);
+    const p = add(q, n, side * (s[2] / 2 + 46 + depth / 2)), v = [-n[0] * side, -n[1] * side]; return [p, Math.atan2(-v[0], v[1])]; };
+  // прямоугольник (здание с двором) не должен залезать на дорогу: проверяем точки по контуру и внутри
+  const rectOnRoad = (p, a, W, H) => { const u = [Math.cos(a), Math.sin(a)], v = perp(u); for (let x = -W / 2; x <= W / 2 + 1; x += Math.max(30, W / 8)) for (let y = -H / 2; y <= H / 2 + 1; y += Math.max(30, H / 8)) if (onRoad(add(add(p, u, x), v, y), 14)) return true; return false; };
+  const free = (p, m, rect) => { if (blocksApproach(p, m) || (rect ? rectOnRoad(p, rect[0], rect[1], rect[2]) : onRoad(p, Math.max(8, m * .8))) || housePlots.some(b => { const r = sub(p, b.p); return Math.hypot(Math.max(0, Math.abs(dot(r, b.u)) - b.yard[0] / 2), Math.max(0, Math.abs(dot(r, b.v)) - b.yard[1] / 2)) < m; })) return false; for (const o of objs) if (o.bid === undefined && !o.gone && dist(o.p, p) < m + o.rad) return false; for (const b of blds) if (dist(b.p, p) < m + (b.kind === 'ch0' ? 370 : b.kind === 'ch3' ? 330 : b.rad)) return false; return true; };
   function putA(type, p, w, h, a) {
     const u = [Math.cos(a), Math.sin(a)];
     const o = { id: objs.length, type, p, a, u, v: perp(u), w, h, rad: Math.hypot(w, h) / 2, sh: OT[type].s };
@@ -144,11 +169,11 @@ function genWorld() {
   function many(type, cen, r, w, h, n, gap = 30, tries = 1) {
     for (let i = 0; i < n; i++) for (let k = 0; k < tries; k++) { const p = cen ? nearPt(rnd, cen, r) : rndMap(rnd, 80); if (inMap(p, 60) && free(p, Math.max(w, h) / 2 + gap)) { put(type, p, w, h); break; } }
   }
-  function building(kind, p) {
+  function building(kind, p, ang) {
     const K = BKIND[kind], W2 = K.w / 2, H2 = K.h / 2, t = WALLT, D = DOOR, ED = K.door || DOOR;
     const randomAngle = Math.floor(rnd() * 4) * 1.5708 + (rnd() - .5) * .3;
     // Вход церкви находится на локальной стороне -X; сохраняем оба вызова rnd для угла.
-    const a = K.church !== undefined ? Math.atan2(p[1], p[0]) + (K.church === 2 ? -.32 : .32) : randomAngle, u = [Math.cos(a), Math.sin(a)], v = perp(u);
+    const a = K.church !== undefined ? Math.atan2(p[1], p[0]) + (K.church === 2 ? -.32 : .32) : ang !== undefined ? ang : randomAngle, u = [Math.cos(a), Math.sin(a)], v = perp(u);
     const b = { id: blds.length, kind, p, a, u, v, w: K.w, h: K.h, rad: Math.hypot(K.w, K.h) / 2, walls: [], furn: [], doors: [], rooms: [], idoors: [] };
     const L = (x, y) => add(add(p, u, x), v, y);
     const seg = (x0, y0, x1, y1, win) => { const ln = Math.hypot(x1 - x0, y1 - y0); if (ln < 3) return; const hor = Math.abs(y1 - y0) < 1e-6;
@@ -240,13 +265,14 @@ function genWorld() {
       for (const d of b.doors) hqApproaches.push([d.o, add(d.o, norm(sub(d.o, d.i)), Math.max(...K.yard) / 2 + 80 - dist(d.o, p))]);
     } return b;
   }
-  function manyB(kinds, cen, r, n, tries = 30) { for (let i = 0; i < n; i++) { const kind = kinds[Math.floor(rnd() * kinds.length)], K = BKIND[kind], m = Math.hypot(...(K.yard || [K.w, K.h])) / 2 + 30;
-    for (let k = 0; k < tries; k++) { const p = cen ? nearPt(rnd, cen, r) : rndMap(rnd, m); if (inMap(p, m) && free(p, m) && blds.every(b => BKIND[b.kind].church === undefined || dist(p, b.p) >= 250 + m)) { building(kind, p); break; } } } }
+  function manyB(kinds, cen, r, n, tries = 70) { for (let i = 0; i < n; i++) { const kind = kinds[Math.floor(rnd() * kinds.length)], K = BKIND[kind], m = Math.hypot(...(K.yard || [K.w, K.h])) / 2 + 30;
+    for (let k = 0; k < tries; k++) { const rs = k < tries * .8 ? roadSpot(cen, cen ? r + 200 : 0, (K.yard ? K.yard[1] : K.h) + (kind === 'bunker' ? 160 : 0), cen ? ['main', 'street', 'dirt'] : ['main', 'dirt']) : null, p = rs ? rs[0] : cen ? nearPt(rnd, cen, r) : rndMap(rnd, m);
+      if (inMap(p, m) && free(p, rs ? m * .6 : m, rs ? [rs[1], ...(K.yard || [K.w + 40, K.h + 40])] : null) && blds.every(b => BKIND[b.kind].church === undefined || dist(p, b.p) >= 250 + m) && (!rs || blds.every(b => dist(p, b.p) > (b.yard ? Math.hypot(...b.yard) / 2 : b.rad) * .72 + m * .62))) { building(kind, p, rs ? rs[1] : undefined); break; } } } }
   const B = BIOMES;
-  building('market', B[3].c);
+  building('market', [380, -330], 0); // рынок — на углу центрального перекрёстка, фасадом к трассе
   // церкви сект (ставим первыми, чтобы нашлось место)
-  const CHP = [[-1400, -1400], [-1400, 1400], [1400, -1400], [1400, 1400]], churches = [];
-  CHP.forEach((c, i) => { const K = BKIND['ch' + i], m = Math.hypot(K.w, K.h) / 2 + 40; for (let k = 0; k < 60; k++) { const p = k ? nearPt(rnd, c, 40 + k * 6) : c; if (inMap(p, m) && free(p, m)) { const b = building('ch' + i, p); b.sect = i; churches.push(b.id); break; } } });
+  const CHP = [[-1420, 300], [-1560, 1520], [1620, -470], [1560, 1560]], churches = []; // бывшие церкви — на окраинах, не в кварталах
+  CHP.forEach((c, i) => { const K = BKIND['ch' + i], m = Math.hypot(K.w, K.h) / 2 + 40; for (let k = 0; k < 140; k++) { const p = k ? nearPt(rnd, c, 40 + k * 4) : c; if (inMap(p, m) && free(p, m)) { const b = building('ch' + i, p); b.sect = i; churches.push(b.id); break; } } });
   for (const id of churches) { const d = blds[id].doors[0]; hqApproaches.push([d.o, add(d.o, norm(sub(d.o, d.i)), 260)]); }
   // кладбище вокруг обители Ордена: могилы рядами, мёртвые деревья, ограда с проходами
   { const ob = blds[churches[1]], R = 290;
@@ -258,22 +284,59 @@ function genWorld() {
   // у собора Плаката: билборды вокруг
   { const pb = blds[churches[3]]; for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283 + .3, p = add(pb.p, [Math.cos(a) * (pb.rad + 55), Math.sin(a) * (pb.rad + 55)]); if (free(p, 36)) putA('billboard', p, 70, 8, a + 1.5708); } }
   // Два жилых участка размещаем до случайной плотной застройки: образцы не должны исчезать.
-  for (const p of [[740, 260], [-1530, 215]]) { const m = Math.hypot(...BKIND.house.yard) / 2 + 30;
-    if (inMap(p, m) && free(p, m)) building('house', p); }
-  manyB(['apart', 'office', 'apart', 'villa', 'house'], B[0].c, 520, 11); manyB(['house', 'villa'], B[0].c, 560, 6);
-  manyB(['barracks', 'hangar', 'barracks'], B[1].c, 440, 5); manyB(['bunker'], B[1].c, 460, 5);
-  manyB(['barn'], B[2].c, 470, 3); manyB(['house', 'villa'], B[2].c, 500, 4);
-  manyB(['office', 'house'], B[3].c, 380, 3);
-  manyB(['lodge'], B[4].c, 480, 4); manyB(['adobe'], B[5].c, 380, 5);
-  manyB(['house', 'villa', 'house', 'adobe', 'lodge'], null, 0, 16, 10); // одиночные дома по карте
+  for (const [p, a] of [[[1070, 590], Math.PI], [[-700, 730], Math.PI]]) { const Y = BKIND.house.yard;
+    if (inMap(p, Y[0] / 2) && free(p, 220, [a, Y[0], Y[1]])) building('house', p, a); }
+  // застройка вдоль улиц: идём по каждой дороге и ставим дома подряд с обеих сторон, фасадом к дороге, с просветами и пустыми участками
+  // пересечение двух прямоугольников (SAT): [центр, ось u, полуразмеры]
+  const obbHit = (p, u, hw, hh, q, u2, hw2, hh2, pad) => { const v = perp(u), v2 = perp(u2), r = sub(q, p);
+    for (const ax of [u, v, u2, v2]) { const ra = hw * Math.abs(dot(u, ax)) + hh * Math.abs(dot(v, ax)), rb = hw2 * Math.abs(dot(u2, ax)) + hh2 * Math.abs(dot(v2, ax)); if (Math.abs(dot(r, ax)) > ra + rb + pad) return false; } return true; };
+  const footHit = (p, ang, W, H, pad) => { const u = [Math.cos(ang), Math.sin(ang)]; return blds.some(b => { const bw = (b.yard ? b.yard[0] : b.w + 20) / 2, bh = (b.yard ? b.yard[1] : b.h + 20) / 2; return obbHit(p, u, W / 2, H / 2, b.p, b.u, bw, bh, pad); }); };
+  function lineB(kinds, filt, opt = {}) { const gap = opt.gap ?? 30, skip = opt.skip ?? .18, setback = opt.setback ?? 40;
+    for (const sg of rsegs) { if (!filt(sg)) continue; const [a0, a1, w] = sg, L = dist(a0, a1), d = norm(sub(a1, a0)), n = perp(d);
+      for (const side of [-1, 1]) { let s = opt.start ?? 40; while (s < L - 60) { const k0 = Math.floor(rnd() * kinds.length);
+        if (rnd() < skip) { s += 160; continue; }
+        let placed = 0; // пробуем все типы по кругу, начиная со случайного: в узкий просвет встанет дом поменьше
+        for (let j = 0; j < kinds.length && !placed; j++) { const kind = kinds[(k0 + j) % kinds.length], K = BKIND[kind], fw = K.yard ? K.yard[0] : K.w + 20, fd = K.yard ? K.yard[1] : K.h + 20;
+          if (s + fw > L + 40) continue; const q = add(a0, d, s + fw / 2), p = add(q, n, side * (w / 2 + setback + fd / 2)), v = [-n[0] * side, -n[1] * side], ang = Math.atan2(-v[0], v[1]), m = Math.hypot(fw, fd) / 2;
+          if (inMap(p, m * .8) && free(p, m * .45, [ang, fw, fd]) && !footHit(p, ang, fw, fd, 12)) { building(kind, p, ang); s += fw + gap; placed = 1; } }
+        if (!placed) s += 30; } } } }
+  const near = (c, R) => sg => segD(c, sg) < R, cen = [40, -20];
+  lineB(['apart', 'office', 'apart', 'villa', 'apart'], sg => sg[3] === 'street' && segD(B[0].c, sg) < 900 && Math.max(sg[0][1], sg[1][1]) < -100, { setback: 34, skip: .08, gap: 24 }); // город
+  lineB(['office', 'apart', 'villa', 'house'], sg => (sg[3] === 'street' && near(B[3].c, 700)(sg)) || (sg[3] === 'main' && near(cen, 900)(sg)), { skip: .25 }); // центр у перекрёстка
+  lineB(['barracks', 'hangar', 'barracks'], sg => sg[3] === 'street' && near(B[1].c, 520)(sg), { gap: 70 }); manyB(['bunker'], B[1].c, 460, 4);
+  lineB(['house', 'barn', 'villa', 'house'], sg => sg[3] === 'dirt' && near(B[2].c, 760)(sg), { skip: .3, gap: 90 }); // ферма
+  lineB(['lodge', 'lodge', 'villa'], sg => sg[3] === 'dirt' && near(B[4].c, 900)(sg), { skip: .3, gap: 120 }); // лесные домики
+  lineB(['adobe', 'adobe', 'house'], sg => sg[3] === 'main' && near(B[5].c, 520)(sg), { skip: .25 }); // юг
+  lineB(['house', 'villa', 'lodge'], sg => sg[3] === 'main' && !near(cen, 900)(sg) && !near(B[5].c, 520)(sg), { skip: .55, gap: 160 }); // хутора вдоль трасс
+  // ===== машины по смыслу: брошенная пробка на выездах, припаркованные у обочин, авария на перекрёстке, автобусы на остановках =====
+  { const rv = mkRng(9090), clearOf = (p, m) => inMap(p, 80) && !blds.some(b => dist(b.p, p) < b.rad + m) && !objs.some(o => !o.gone && o.bid === undefined && (o.type === 'car' || o.type === 'truck' || o.type === 'bus') && dist(o.p, p) < m + o.rad * .8);
+    const veh = (type, p, d, jit = .1) => { const W = type === 'bus' ? [300, 86] : type === 'truck' ? [220, 80] : [150, 60], a = Math.atan2(d[1], d[0]) + (rv() - .5) * jit * 2;
+      if (!clearOf(p, W[0] * .45) || blocksApproach(p, W[0] * .45)) return null; return putA(type, p, W[0], W[1], a); };
+    const pick = () => { const r = rv(); return r < .08 ? 'bus' : r < .16 ? 'truck' : 'car'; };
+    // пробка: обе полосы, люди бежали — машины вкривь, двери нараспашку, просветы для прохода
+    for (const [ri, s0, s1, dirSign] of [[0, 350, 1150, 1], [1, 2650, 3350, -1], [0, 3000, 3500, -1], [1, 400, 900, 1]]) { const r = roads[ri];
+      for (const lane of [-1, 1]) { let s = s0 + rv() * 120; while (s < s1) { const [q, d] = alongR(r, s), n = perp(d), ty = pick();
+        if (rv() > .22) veh(ty, add(q, n, lane * r.w / 4 + (rv() - .5) * 18), lane * dirSign > 0 ? d : [-d[0], -d[1]], rv() < .12 ? .7 : .12);
+        s += (ty === 'bus' ? 340 : ty === 'truck' ? 260 : 185) + rv() * 90; } } }
+    // припаркованные у обочин улиц
+    for (const r of roads) { if (r.k === 'main') continue; const L = rLen(r); for (let s = 120; s < L - 120; s += 230 + rv() * 120) { if (rv() > .42) continue; const [q, d] = alongR(r, s), side = rv() < .5 ? 1 : -1;
+      veh(r.k === 'dirt' && rv() < .5 ? 'truck' : 'car', add(q, perp(d), side * (r.w / 2 - 34)), rv() < .5 ? d : [-d[0], -d[1]], .05); } }
+    // авария на центральном перекрёстке и у въезда в город
+    for (const [c, k] of [[[40, -20], 3], [[-840, -40], 2]]) for (let i = 0; i < k; i++) { const a = rv() * 6.28; veh('car', add(c, [Math.cos(a) * (70 + rv() * 60), Math.sin(a) * (70 + rv() * 60)]), [Math.cos(a + 1.2), Math.sin(a + 1.2)], .3); }
+    // автобусы на остановках трассы
+    for (const [ri, s] of [[0, 1500], [0, 2500], [1, 1600], [1, 2300]]) { const r = roads[ri], [q, d] = alongR(r, s); veh('bus', add(q, perp(d), r.w / 2 - 46), d, .03); }
+    // армейские грузовики на подъезде к базе
+    { const r = roads.find(x => x.k === 'street' && Math.abs(x.pts[0][1] - B[1].c[1]) < 60 && x.pts[0][0] < 100); if (r) for (let s = 500; s < 1100; s += 240) { const [q, d] = alongR(r, s); veh('truck', add(q, perp(d), r.w / 2 - 44), d, .04); } }
+  }
+
   // улица: машины, бочки, заборы, кусты
-  many('car', B[0].c, 620, 120, 52, 14, 12, 6); many('car', B[3].c, 440, 120, 52, 14, 12, 6); many('car', null, 0, 120, 52, 12, 20, 4); many('truck', B[1].c, 520, 170, 62, 6, 14, 6); many('truck', B[2].c, 520, 170, 62, 3, 14, 6); many('barrel', B[1].c, 520, 18, 18, 24, 12, 3); many('barrel', B[3].c, 380, 18, 18, 10);
+  many('barrel', B[1].c, 520, 18, 18, 24, 12, 3); many('barrel', B[3].c, 380, 18, 18, 10);
   many('wall', B[1].c, 480, 90, 18, 12); many('tent', B[1].c, 480, 60, 50, 8);
   many('hay', B[2].c, 500, 30, 30, 26); many('fence', B[2].c, 500, 90, 6, 18);
   many('pine', B[4].c, 520, 40, 40, 80); many('snowman', B[4].c, 500, 24, 24, 14);
   many('cactus', B[5].c, 420, 26, 26, 50); many('rock', B[5].c, 420, 40, 40, 26);
   many('crate', null, 0, 34, 34, 90, 40);
-  many('tree', null, 0, 44, 44, 420); many('rock', null, 0, 36, 36, 110); many('bush', null, 0, 34, 34, 260, 10);
+  many('tree', null, 0, 44, 44, 420, 30, 3); many('rock', null, 0, 36, 36, 110); many('bush', null, 0, 34, 34, 260, 10);
   // У каждого участка два выхода и свободные дорожки от дверей к калиткам.
   for (const b of housePlots) {
     const local = (x, y) => add(add(b.p, b.u, x), b.v, y), [w, h] = b.yard;
@@ -286,17 +349,47 @@ function genWorld() {
     putA('tree', local(240, 175), 64, 64, b.a);
     putA('shed', local(-240, -210), 100, 80, b.a);
   }
-  // постапокалипсис: брошенные блокпосты из мешков и бетонных блоков (свой генератор — остальной мир не меняется)
-  { const r2 = mkRng(31337), rot = (a, x, y) => [Math.cos(a) * x - Math.sin(a) * y, Math.sin(a) * x + Math.cos(a) * y], cens = [B[3].c, B[0].c, B[1].c, null];
-    for (let k = 0; k < 18; k++) { const cen = cens[k % 4];
-      for (let t = 0; t < 90; t++) { const p = cen ? nearPt(r2, cen, 600) : rndMap(r2, 200), a = r2() * 6.2832; if (!inMap(p, 120) || !free(p, 62)) continue;
-        putA('sandbag', add(p, rot(a, 0, -34)), 76, 14, a); for (const sd of [-1, 1]) putA('sandbag', add(p, rot(a, sd * 44, -6)), 48, 14, a + 1.5708);
-        if (r2() < .7) putA('jersey', add(p, rot(a, (r2() - .5) * 40, 58)), 58, 16, a + (r2() - .5) * .5); break; } }
-    for (let k = 0; k < 26; k++) for (let t = 0; t < 30; t++) { const p = rndMap(r2, 200); if (!inMap(p, 100) || !free(p, 50)) continue; const a = r2() * 6.2832; putA('jersey', p, 58, 16, a); if (r2() < .5) putA('jersey', add(p, rot(a, 64, (r2() - .5) * 10)), 58, 16, a + (r2() - .5) * .4); break; } }
-  // Убираем бункер после расстановки карты, чтобы остальные здания и объекты сохранили координаты.
-  const bunkerId = 17;
-  const removedBunker = blds[bunkerId]?.kind === 'bunker' ? blds[bunkerId] : null;
+  // постапокалипсис: реквизит не россыпью, а сценами со смыслом (свой генератор — остальной мир не меняется).
+  // Случайные ящики и бочки на улицах убираем; вместо них блокпосты, лагеря выживших, склады у ангаров, бочки у гаражей, баррикады у домов.
+  { const r2 = mkRng(31337), r3 = mkRng(5150), rot = (a, x, y) => [Math.cos(a) * x - Math.sin(a) * y, Math.sin(a) * x + Math.cos(a) * y];
+    for (const o of objs) if ((o.type === 'crate' || o.type === 'barrel') && o.bid === undefined) o.gone = 1;
+    const at = (p, a, x, y) => add(p, rot(a, x, y)), J = (k = 1) => (r3() - .5) * k;
+    const P = (ty, p, a, x, y, w, h, da = 0, ex) => { const o = putA(ty, at(p, a, x, y), w, h, a + da); if (ex) Object.assign(o, ex); return o; };
+    const spot = (cen, R, m, tries = 400) => { for (let t = 0; t < tries; t++) { const p = cen ? nearPt(r3, cen, R) : rndMap(r3, 200); if (inMap(p, 120) && free(p, m)) return p; } return null; };
+    const beside = (b, m) => { const dirs = [b.u, b.v, [-b.u[0], -b.u[1]], [-b.v[0], -b.v[1]]]; const s0 = Math.floor(r3() * 4); for (let i = 0; i < 4; i++) { const d = dirs[(s0 + i) % 4], p = add(b.p, d, b.rad + m + 8); if (inMap(p, 100) && free(p, m)) return [p, Math.atan2(d[1], d[0])]; } return null; };
+    // 1) блокпосты на дорогах: бетонные блоки поперёк проезжей части (с проходом), мешки буквой П на обочине, армейские ящики, бочка-костёр
+    for (const [ri, f] of [[0, .3], [0, .72], [1, .3], [1, .72], [4, .45], [2, .55], [6, .3], [8, .5]]) { const r = roads[ri]; if (!r) continue; const [q, d] = alongR(r, rLen(r) * f), n = perp(d), a = Math.atan2(n[1], n[0]), sd = r3() < .5 ? 1 : -1;
+      const nb = Math.ceil(r.w / 64), gap = Math.floor(r3() * nb); for (let i = 0; i < nb; i++) if (i !== gap) { const o = putA('jersey', add(add(q, n, (i - (nb - 1) / 2) * 64 + J(6)), d, J(10)), 58, 16, a + J(.25)); }
+      const c = add(q, n, sd * (r.w / 2 + 62)), A = Math.atan2(-n[1] * sd, -n[0] * sd) + Math.PI / 2;
+      if (free(c, 50)) { P('sandbag', c, A, 0, 36, 84, 14); for (const e of [-1, 1]) P('sandbag', c, A, e * 48, 4, 56, 14, 1.5708);
+        P('crate', c, A, -22, -14, 30, 18, J(.6), { vk: 1 }); if (r3() < .6) P('crate', c, A, 24, -18, 30, 18, J(.6), { vk: 1 }); P('barrel', c, A, 4, 14, 18, 18, 0, { fire: 1 }); } }
+    // 2) лагеря выживших: палатка, бочка-костёр в центре, ящики, мешки, пара бочек
+    for (let k = 0; k < 8; k++) { const p = spot(k < 4 ? [B[0].c, B[2].c, B[3].c, B[4].c][k] : null, 760, 92); if (!p) continue; const a = r3() * 6.2832;
+      P('tent', p, a, 0, -52, 60, 50); if (r3() < .5) P('tent', p, a, -64, -10, 60, 50, 1.2 + J(.3));
+      P('barrel', p, a, 6, 18, 18, 18, 0, { fire: 1 });
+      P('crate', p, a, 46, -10, 26, 26, J(.8), { vk: 0, lv: r3() < .4 ? 2 : 1 }); P('crate', p, a, 52, 26, 34, 34, J(.5), { vk: 2 }); P('crate', p, a, -40, 40, 30, 18, J(.8), { vk: 1 });
+      P('sandbag', p, a, 0, 74, 70, 14, J(.2)); P('barrel', p, a, -46, 62, 18, 18, 0, { vk: 0 }); if (r3() < .6) P('barrel', p, a, -24, 70, 18, 18, 0, { vk: 4, tip: 1 }); }
+    // 3) склады у ангаров, рынка, казарм, офисов, амбаров: штабеля ящиков на поддонах
+    for (const b of blds) { if (!/^(hangar|market|barracks|office|barn)$/.test(b.kind) || r3() > .75) continue; const q = beside(b, 58); if (!q) continue; const [p, d] = q, a = d + 1.5708;
+      const nx = 2 + Math.floor(r3() * 2), ny = 2; for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) { if (r3() < .15) continue; P('crate', p, a, (i - (nx - 1) / 2) * 42, (j - .5) * 42, 36, 36, J(.08), { vk: r3() < .6 ? 0 : 2, lv: 1 + Math.floor(r3() * 3), pal: 1 }); }
+      if (r3() < .6) { P('barrel', p, a, nx * 21 + 16, -10, 18, 18, 0, { vk: 4 }); P('barrel', p, a, nx * 21 + 16, 12, 18, 18, 0, { vk: 4 }); } }
+    // 4) бочки у гаражей и сараев: ряды, одна опрокинута, рядом канистры-бочки другого цвета — взрываются цепочкой
+    const sheds = objs.filter(o => o.type === 'shed' && !o.gone);
+    for (let k = 0; k < 14; k++) { let p = null, a = r3() * 6.2832;
+      if (k < 8 && sheds.length) { const s = sheds[Math.floor(r3() * sheds.length)]; for (let t = 0; t < 8 && !p; t++) { const q = add(s.p, rot(r3() * 6.2832, 85, 0)); if (inMap(q, 100) && free(q, 40)) { p = q; a = s.a; } } }
+      else p = spot(k % 2 ? B[1].c : null, 560, 50); if (!p) continue; const vk = [0, 1, 2, 3, 4][Math.floor(r3() * 5)], cols = 2 + Math.floor(r3() * 2);
+      for (let i = 0; i < cols; i++) for (let j = 0; j < 2; j++) if (r3() < .9) P('barrel', p, a, (i - (cols - 1) / 2) * 20 + J(2), (j - .5) * 20 + J(2), 18, 18, 0, { vk: r3() < .8 ? vk : 0 });
+      if (r3() < .7) P('barrel', p, a, cols * 10 + 18, 8, 18, 18, J(1), { vk, tip: 1 }); }
+    // 5) баррикады у домов: мешки вдоль стены, ящики рядом — тут кто-то держал оборону
+    for (const b of blds) { if (!/^(apart|office|villa|lodge)$/.test(b.kind) || r3() > .3) continue; const q = beside(b, 30); if (!q) continue; const [p, d] = q, a = d + 1.5708;
+      P('sandbag', p, a, J(20), 0, 70, 14, J(.15)); P('crate', p, a, 48, 6, 26, 26, J(.5), { vk: 0 }); if (r3() < .5) P('crate', p, a, -46, 4, 30, 18, J(.5), { vk: 1 }); }
+    // автобусы теперь ставятся вместе с остальным транспортом на дорогах
+  }
+  // Убираем бункер №17 (мешал улицам) после расстановки карты — остальные здания и объекты сохраняют координаты.
+  // Его стены и мебель помечаем gone: ниже они удаляются при перенумерации, как лишняя мебель.
+  const bunkerId = -1, removedBunker = blds[bunkerId]?.kind === 'bunker' ? blds[bunkerId] : null;
   if (removedBunker) {
+    for (const id of [...removedBunker.walls, ...removedBunker.furn]) objs[id].gone = 1;
     blds.splice(bunkerId, 1);
     for (let id = bunkerId; id < blds.length; id++) blds[id].id = id;
     for (const o of objs) if (o.bid > bunkerId) o.bid--;
@@ -305,19 +398,14 @@ function genWorld() {
   // убираем «лишнюю» мебель и перенумеровываем
   const keep = objs.filter(o => !o.gone), idm = new Map(); objs.length = 0; keep.forEach((o, i) => { idm.set(o.id, i); o.id = i; objs.push(o); });
   for (const b of blds) { b.walls = b.walls.map(i => idm.get(i)); b.furn = b.furn.filter(i => idm.has(i)).map(i => idm.get(i)); if (b.altar !== undefined) b.altar = idm.get(b.altar); if (b.box !== undefined) b.box = idm.get(b.box); }
-  // Пустые слоты сохраняют номера объектов, на которые ссылаются сетевые сообщения.
-  if (removedBunker) for (const oldId of [...removedBunker.walls, ...removedBunker.furn]) {
-    const id = idm.get(oldId);
-    if (id !== undefined) objs[id] = { id, type: 'removed', p: objs[id].p, rad: 0, nc: 1 };
-  }
-  objs.blds = blds; objs.churches = churches; gridBuild(objs);
+  objs.blds = blds; objs.churches = churches; objs.roads = roads.map(r => ({ k: r.k, w: r.w, pts: r.pts })); gridBuild(objs);
   return objs;
 }
 // сетка для быстрых проверок (какие объекты рядом)
 const GC = 100;
 function gridBuild(objs) {
   const g = new Map();
-  for (const o of objs) { if (o.type === 'removed') continue; const r = o.rad; for (let cx = Math.floor((o.p[0] - r) / GC); cx <= Math.floor((o.p[0] + r) / GC); cx++) for (let cy = Math.floor((o.p[1] - r) / GC); cy <= Math.floor((o.p[1] + r) / GC); cy++) { const k = cx * 1000 + cy; let a = g.get(k); if (!a) g.set(k, a = []); a.push(o); } }
+  for (const o of objs) { const r = o.rad; for (let cx = Math.floor((o.p[0] - r) / GC); cx <= Math.floor((o.p[0] + r) / GC); cx++) for (let cy = Math.floor((o.p[1] - r) / GC); cy <= Math.floor((o.p[1] + r) / GC); cy++) { const k = cx * 1000 + cy; let a = g.get(k); if (!a) g.set(k, a = []); a.push(o); } }
   objs.grid = g; objs.stamp = 0;
 }
 function nearObjs(objs, p, r) {
@@ -452,22 +540,25 @@ const ZW = [ // bv/bl/bw/bc — вид пули: скорость, длина, �
   { n: 'Дробовик', dmg: 15, rate: 1.4, mag: 8, rel: 2.0, spread: .3, pel: 9, range: 300, wave: 3, m: 3, gore: 3, bv: 2000, bl: 18, bw: 2.2, bc: 0xffb84a, kick: 3.2, kb: 6 },
   { n: 'Автомат', dmg: 22, rate: 9, mag: 30, rel: 1.8, spread: .05, pel: 1, range: 620, wave: 5, m: 2, gore: 2, bv: 2900, bl: 44, bw: 2.4, bc: 0xffe066, kick: .9, kb: 8 },
   { n: 'Револьвер', dmg: 70, rate: 2, mag: 6, rel: 1.6, spread: .02, pel: 1, range: 560, wave: 6, m: 8, gore: 3, oneh: 1, pierce: 2, bv: 3000, bl: 52, bw: 3.4, bc: 0xfff0a0, kick: 2.4, kb: 20 },
-  { n: 'Обрез', dmg: 19, rate: 2.6, mag: 2, rel: 1.1, spread: .45, pel: 12, range: 220, wave: 7, m: 3, gore: 4, bv: 1800, bl: 16, bw: 2.4, bc: 0xffa040, kick: 4, kb: 7 },
+  { n: 'Обрез', dmg: 19, rate: 2.6, mag: 2, rel: 1.1, spread: .45, pel: 12, range: 220, wave: 7, m: 15, gore: 4, bv: 1800, bl: 16, bw: 2.4, bc: 0xffa040, kick: 4, kb: 7 },
+  { n: 'Арбалет', dmg: 120, rate: 1.5, mag: 5, rel: 1.6, spread: .006, pel: 1, range: 760, wave: 8, m: 14, gore: 3, pierce: 4, bv: 1700, bl: 26, bw: 1.8, bc: 0xe8dcc0, kick: 1, kb: 16, proj: 2 },
   { n: 'Пулемёт', dmg: 20, rate: 13, mag: 100, rel: 3.2, spread: .09, pel: 1, range: 640, wave: 9, m: 7, gore: 2, bv: 2900, bl: 46, bw: 2.6, bc: 0xffcf50, kick: 1, kb: 7 },
   { n: 'Снайперка', dmg: 170, rate: 1.3, mag: 6, rel: 2.0, spread: .004, pel: 1, range: 1300, wave: 11, m: 4, gore: 4, pierce: 6, bv: 5200, bl: 150, bw: 2.8, bc: 0xffffff, kick: 3.5, kb: 30, trail: 1 },
   { n: 'Гранатомёт', dmg: 150, rate: 1.2, mag: 6, rel: 2.4, spread: .02, pel: 1, range: 700, wave: 13, m: 10, gore: 5, boom: 95, bv: 1100, bl: 14, bw: 5, bc: 0xffa040, kick: 2.5, kb: 0, trail: 2 },
   { n: 'Огнемёт', dmg: 7, rate: 20, mag: 150, rel: 2.4, spread: .22, pel: 1, range: 210, wave: 15, m: 11, gore: 1, fire: 1, pierce: 3, kick: .3, kb: 1 },
-  { n: 'Миниган', dmg: 19, rate: 26, mag: 300, rel: 4.5, spread: .12, pel: 1, range: 620, wave: 18, m: 7, gore: 3, bv: 3000, bl: 40, bw: 2.4, bc: 0xffd860, kick: .7, kb: 6 },
-  { n: 'Авто-дробовик', dmg: 14, rate: 5, mag: 20, rel: 2.6, spread: .32, pel: 8, range: 300, wave: 21, m: 3, gore: 4, bv: 2000, bl: 18, bw: 2.2, bc: 0xffa040, kick: 2.2, kb: 6 },
-  { n: 'Плазмаган', dmg: 55, rate: 6, mag: 40, rel: 2.0, spread: .03, pel: 1, range: 720, wave: 24, m: 9, gore: 4, pierce: 4, bv: 1900, bl: 30, bw: 6, bc: 0x5ff0ff, kick: 1.2, kb: 14, plasma: 1 },
-  { n: 'Рельсотрон', dmg: 420, rate: .8, mag: 4, rel: 2.6, spread: 0, pel: 1, range: 1600, wave: 27, m: 4, gore: 6, pierce: 99, bv: 9000, bl: 400, bw: 4, bc: 0x8fd0ff, kick: 5, kb: 40, trail: 3 },
+  { n: 'Базука', dmg: 280, rate: .7, mag: 1, rel: 2.0, spread: .01, pel: 1, range: 820, wave: 16, m: 12, gore: 6, boom: 150, bv: 950, bl: 18, bw: 5, bc: 0xffb050, kick: 5, kb: 0, trail: 4, proj: 1 },
+  { n: 'Миниган', dmg: 19, rate: 26, mag: 300, rel: 4.5, spread: .12, pel: 1, range: 620, wave: 18, m: 13, gore: 3, bv: 3000, bl: 40, bw: 2.4, bc: 0xffd860, kick: .7, kb: 6 },
+  { n: 'Авто-дробовик', dmg: 14, rate: 5, mag: 20, rel: 2.6, spread: .32, pel: 8, range: 300, wave: 21, m: 16, gore: 4, bv: 2000, bl: 18, bw: 2.2, bc: 0xffa040, kick: 2.2, kb: 6 },
+  { n: 'Плазмаган', dmg: 55, rate: 6, mag: 40, rel: 2.0, spread: .03, pel: 1, range: 720, wave: 24, m: 17, gore: 4, pierce: 4, bv: 1900, bl: 30, bw: 6, bc: 0x5ff0ff, kick: 1.2, kb: 14, plasma: 1 },
+  { n: 'Рельсотрон', dmg: 420, rate: .8, mag: 4, rel: 2.6, spread: 0, pel: 1, range: 1600, wave: 27, m: 18, gore: 6, pierce: 99, bv: 9000, bl: 400, bw: 4, bc: 0x8fd0ff, kick: 5, kb: 40, trail: 3 },
+  { n: 'Ракетница', dmg: 90, rate: 3.5, mag: 12, rel: 2.6, spread: .07, pel: 1, range: 760, wave: 29, m: 19, gore: 5, boom: 75, bv: 1250, bl: 14, bw: 3.6, bc: 0xffb050, kick: 1.8, kb: 0, trail: 4, proj: 3 },
 ];
 // зомби. ab — умения: 1 перепрыгивает заборы, 2 лезет в окна, 4 ломает стены/окна/заборы/машины
 const ZT = [
-  { n: 'налётчик', hp: 42, sp: 44, r: 10, dmg: 10, sc: 1, wave: 1, xp: 1, ab: 0 },
-  { n: 'бегун', hp: 30, sp: 98, r: 9, dmg: 8, sc: 1.02, wave: 1, xp: 1, ab: 1 },
+  { n: 'налётчик', hp: 42, sp: 44, r: 13, dmg: 10, sc: 1, wave: 1, xp: 1, ab: 0 },
+  { n: 'бегун', hp: 30, sp: 98, r: 12, dmg: 8, sc: 1.02, wave: 1, xp: 1, ab: 1 },
   { n: 'знаменосица', hp: 200, sp: 30, r: 16, dmg: 22, sc: 1.45, wave: 1, xp: 4, ab: 0 },
-  { n: 'знаменосец поддержки', hp: 52, sp: 50, r: 11, dmg: 0, sc: 1.2, wave: 1, xp: 2, ab: 0 },
+  { n: 'знаменосец поддержки', hp: 52, sp: 50, r: 13, dmg: 0, sc: 1.2, wave: 1, xp: 2, ab: 0 },
   { n: 'громила', hp: 650, sp: 50, r: 20, dmg: 30, sc: 1.9, wave: 1, xp: 12, ab: 4 },
   { n: 'босс', hp: 3500, sp: 42, r: 30, dmg: 40, sc: 2.8, wave: 99, xp: 60, ab: 5, boss: 1 },
 ];

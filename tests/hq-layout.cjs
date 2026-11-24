@@ -4,7 +4,7 @@ const c={assert,console};vm.createContext(c);vm.runInContext(src+`
 const w=genWorld(), w2=genWorld();
 assert.equal(JSON.stringify(w),JSON.stringify(w2));
 assert.equal(JSON.stringify(w.blds),JSON.stringify(w2.blds));
-const positions=[[-1400,-1400],[-1400,1400],[1400,-1400],[1400,1400]];
+const positions=[[-1420,300],[-1560,1520],[1620,-470],[1560,1560]]; // штабы на окраинах, вне уличной сетки
 assert.equal(w.churches.length,4);
 for(const [s,id] of w.churches.entries()) {
  const b=w.blds[id],d=b.doors[0],v=norm(sub(d.o,d.i)),side=perp(v);

@@ -54,7 +54,7 @@ const near = (ds, q) => ds.reduce((m, d) => dist(d.o, q) < dist(m.o, q) ? d : m)
 const toLocal = (b, p) => { const r = sub(p, b.p); return [dot(r, b.u), dot(r, b.v)]; };
 const toWorld = (b, l) => add(add(b.p, b.u, l[0]), b.v, l[1]);
 function roomAt(b, l) { let best = 0, bd = 1e9; b.rooms.forEach((r, i) => { const dx = Math.max(r.x0 - l[0], 0, l[0] - r.x1), dy = Math.max(r.y0 - l[1], 0, l[1] - r.y1), d = Math.hypot(dx, dy); if (d < bd) { bd = d; best = i; } }); return best; }
-const SMASH = new Set(['bw', 'fence', 'ifence', 'furn', 'shed', 'car', 'truck', 'crate', 'barrel', 'tent', 'grave', 'sandbag', 'jersey']);
+const SMASH = new Set(['bw', 'fence', 'ifence', 'furn', 'shed', 'car', 'truck', 'bus', 'crate', 'barrel', 'tent', 'grave', 'sandbag', 'jersey']);
 
 // ===== комната =====
 export class World {
@@ -191,7 +191,7 @@ export class World {
       if (g >= 2 && dmg > z.mhp * .12 && this.rnd() < .1 * g) z.lost |= 1 << Math.floor(this.rnd() * (g >= 3 ? 3 : 2));
       if (z.hp <= 0) this.killZ(z, p, g + (dmg > z.mhp * .8 ? 1 : 0));
     }
-    if (Array.isArray(m.o)) for (const [oid, dmg] of m.o.slice(0, 10)) { const o = this.objs[oid | 0]; if (!o || o.dead || !(o.hp > 0) || dist(o.p, p.p) > W.range + 150) continue; if (!['car', 'truck', 'barrel', 'crate'].includes(o.type)) continue; o.hp -= Math.min(maxD, +dmg || 0); this.objHurt(o, p); }
+    if (Array.isArray(m.o)) for (const [oid, dmg] of m.o.slice(0, 10)) { const o = this.objs[oid | 0]; if (!o || o.dead || !(o.hp > 0) || dist(o.p, p.p) > W.range + 150) continue; if (!['car', 'truck', 'bus', 'barrel', 'crate'].includes(o.type)) continue; o.hp -= Math.min(maxD, +dmg || 0); this.objHurt(o, p); }
     if (Array.isArray(m.g)) for (const oid of m.g.slice(0, 10)) { const o = this.objs[oid | 0]; if (o && o.win && !o.broken) { o.broken = 1; this.sendAll({ t: 'gl', id: o.id }, p.c); } }
     if (Array.isArray(m.s) && m.s.length) this.shots.push([p.id, p.w, m.s.slice(0, 30)]);
     if (Array.isArray(m.b)) for (const b of m.b.slice(0, 4)) { this.shots.push([p.id, -1, [[+b[0] | 0, +b[1] | 0]]]); }
@@ -214,7 +214,7 @@ export class World {
   // ===== предметы мира: машины, бочки, ящики, стены =====
   objHurt(o, by) {
     if (o.type === 'crate') { if (o.hp <= 0 && !o.dead) { o.dead = true; o.fixT = this.t + 150; this.sendAll({ t: 'cr', id: o.id }); } return; }
-    if (o.type === 'car' || o.type === 'truck') {
+    if (o.type === 'car' || o.type === 'truck' || o.type === 'bus') {
       if (o.hp < OT[o.type].hp * .5 && !o.smoke && !o.burnt) { o.smoke = 1; this.sendAll({ t: 'ob', id: o.id, s: 1 }); }
       if (o.hp <= 0 && !o.burnt) { o.burnt = 1; o.fixT = this.t + 180; this.sendAll({ t: 'ob', id: o.id, s: 2 }); this.explode(o.p, by, 130, 160); }
       return; }
@@ -224,7 +224,7 @@ export class World {
   explode(c, by, R, dmg) {
     this.sendAll({ t: 'boom', p: [Math.round(c[0]), Math.round(c[1])], r: R });
     for (const z of this.zs.values()) { const d = dist(z.p, c); if (d < R + z.r) { const k = 1 - Math.min(1, d / R); this.damageRaider(z, dmg * (.3 + k * k)); z.lastDir = norm(sub(z.p, c)); if (z.hp <= 0) this.killZ(z, by, 5); } }
-    for (const o of nearObjs(this.objs, c, R)) { if (o.dead || !(o.hp > 0) || dist(o.p, c) > R * .8) continue; if (o.type === 'barrel' || o.type === 'crate') { o.hp = 0; this.later.push([this.t + .15 + this.rnd() * .2, o, by]); } else if ((o.type === 'car' || o.type === 'truck') && !o.burnt) { o.hp -= dmg * .8; this.later.push([this.t + .3, o, by]); } }
+    for (const o of nearObjs(this.objs, c, R)) { if (o.dead || !(o.hp > 0) || dist(o.p, c) > R * .8) continue; if (o.type === 'barrel' || o.type === 'crate') { o.hp = 0; this.later.push([this.t + .15 + this.rnd() * .2, o, by]); } else if ((o.type === 'car' || o.type === 'truck' || o.type === 'bus') && !o.burnt) { o.hp -= dmg * .8; this.later.push([this.t + .3, o, by]); } }
   }
   hurt(p, dmg) {
     if (p.st === 0) { p.hp -= dmg; if (p.hp <= 0) { p.hp = 0; p.st = 1; p.downT = ZDOWN; p.revT = 0; this.msg('🆘 ' + p.name + ' упал! Ползи к напарнику', '#ff6b6b'); } }
