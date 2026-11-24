@@ -3,6 +3,7 @@
 /*SHARED*/
 const INDEX_HTML = __INDEX_HTML__;
 const THREE_JS = __THREE__;
+const HERO_PORTRAITS = __HERO_PORTRAITS__;
 const ICONS = { 192: '__ICON192__', 512: '__ICON512__' };
 const b64bin = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 const cleanCode = s => String(s || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6);
@@ -25,6 +26,12 @@ export default {
     }), { headers: { 'content-type': 'application/manifest+json' } });
     if (url.pathname === '/icon-192.png' || url.pathname === '/icon-512.png')
       return new Response(b64bin(ICONS[url.pathname.includes('512') ? 512 : 192]), { headers: { 'content-type': 'image/png', 'cache-control': 'max-age=86400' } });
+    const portrait = /^\/heroes\/(0|1[0-6])\.webp$/.exec(url.pathname);
+    if (portrait && Object.prototype.hasOwnProperty.call(HERO_PORTRAITS, portrait[1])) {
+      return new Response(b64bin(HERO_PORTRAITS[portrait[1]]), {
+        headers: { 'content-type': 'image/webp', 'cache-control': 'public, max-age=3600' }
+      });
+    }
     if (url.pathname === '/three.min.js') return new Response(THREE_JS, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=604800' } });
     if (url.pathname === '/sw.js') return new Response("self.addEventListener('fetch',()=>{});", { headers: { 'content-type': 'text/javascript' } });
     return new Response('not found', { status: 404 });
@@ -66,7 +73,7 @@ export class World {
   async fetch(req) {
     const url = new URL(req.url); this.code = this.code || cleanCode(url.searchParams.get('r'));
     const { 0: cli, 1: ws } = new WebSocketPair(); ws.accept();
-    const c = { ws, name: String(url.searchParams.get('n') || 'Игрок').slice(0, 12) || 'Игрок', skin: Math.max(0, Math.min(9, parseInt(url.searchParams.get('k')) || 0)), p: null };
+    const c = { ws, name: String(url.searchParams.get('n') || 'Игрок').slice(0, 12) || 'Игрок', skin: playableSkin(Number(url.searchParams.get('k'))), p: null };
     if (this.players.length >= ZMAXP) { this.send(c, { t: 'err', s: 'Комната заполнена' }); ws.close(1013, 'full'); return new Response(null, { status: 101, webSocket: cli }); }
     this.clients.add(c);
     ws.addEventListener('message', e => { try { this.onMsg(c, e.data); } catch (err) { } });

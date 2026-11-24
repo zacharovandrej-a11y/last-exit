@@ -9,7 +9,8 @@ let snaps = [], lastSnap = null, meP = [...ZSPAWN], meAim = [1, 0], meSt = 0, my
 let perkOpts = null, perkLv = 0, msgs = [], overInfo = null, bigMsg = null, startedT = 0;
 const ammo = ZW.map(w => w.mag); let relT = 0, fireT = 0, bloom = 0;
 const zst = new Map(), loot = new Map(), tracers = [], trails = [], walks = {}; const ash = []; let frameShots = [], shake = 0, shakeV = [0, 0], buf = { rage: 0, spd: 0, ammo: 0, shield: 0, frz: 0 };
-const ZSKIN = 10; let mySkin = (+localStorage.getItem('zskin') || 0) % ZSKIN;
+let heroIndex = Math.max(0, PLAYABLE_HEROES.findIndex(hero => hero.id === Number(localStorage.getItem('zskin'))));
+let mySkin = PLAYABLE_HEROES[heroIndex].id;
 $('rec').textContent = +(localStorage.getItem('zbest') || 0) ? '🏆 Твой рекорд: волна ' + localStorage.getItem('zbest') : '';
 $('name').value = localStorage.getItem('zname') || '';
 const myName = () => ($('name').value.trim() || 'Игрок').slice(0, 12);
@@ -29,8 +30,46 @@ const newCode = () => { const A = 'ABCDEFGHJKMNPQRSTUVWXYZ'; let s = ''; for (le
 $('quick').onclick = async () => { const l = (await refreshRooms()) || []; const f = l.filter(r => r.n < 4 && r.st !== 'over').sort((a, b) => (a.st === 'wait' ? -1 : 0) - (b.st === 'wait' ? -1 : 0) || a.w - b.w)[0]; connect(f ? f.c : newCode()); };
 $('create').onclick = () => connect(newCode());
 $('go').onclick = () => { send({ t: 'start' }); audioInit(); };
-const setSkin = d => { mySkin = (mySkin + d + ZSKIN) % ZSKIN; localStorage.setItem('zskin', mySkin); };
-$('skp').onclick = () => setSkin(-1); $('skn').onclick = () => setSkin(1);
+const portraitURL = hero => '/heroes/' + hero.id + '.webp';
+const heroButtons = PLAYABLE_HEROES.map((hero, i) => {
+  const button = document.createElement('button'), image = document.createElement('img'), label = document.createElement('span');
+  button.type = 'button';
+  button.dataset.hero = hero.id;
+  image.src = portraitURL(hero); image.alt = ''; image.decoding = 'async';
+  label.textContent = hero.name;
+  button.append(image, label);
+  button.onclick = () => selectHero(i, false);
+  $('hero-roster').append(button);
+  return button;
+});
+function selectHero(index, reveal) {
+  heroIndex = (index + PLAYABLE_HEROES.length) % PLAYABLE_HEROES.length;
+  const hero = PLAYABLE_HEROES[heroIndex];
+  mySkin = hero.id;
+  localStorage.setItem('zskin', mySkin);
+  $('hero-photo').src = portraitURL(hero);
+  $('hero-photo').alt = 'Портрет — ' + hero.name;
+  $('hero-name').textContent = hero.name;
+  $('hero-look').textContent = hero.look;
+  $('skin').setAttribute('aria-label', '3D-модель — ' + hero.name);
+  heroButtons.forEach((button, i) => button.setAttribute('aria-pressed', i === heroIndex));
+  if (reveal) {
+    const roster = $('hero-roster'), button = heroButtons[heroIndex];
+    if (button.offsetLeft < roster.scrollLeft) roster.scrollLeft = button.offsetLeft;
+    else if (button.offsetLeft + button.offsetWidth > roster.scrollLeft + roster.clientWidth) {
+      roster.scrollLeft = button.offsetLeft + button.offsetWidth - roster.clientWidth;
+    }
+  }
+}
+$('skp').onclick = () => selectHero(heroIndex - 1, true);
+$('skn').onclick = () => selectHero(heroIndex + 1, true);
+$('hero-roster').addEventListener('keydown', e => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  e.preventDefault();
+  selectHero(heroIndex + (e.key === 'ArrowRight' ? 1 : -1), true);
+  heroButtons[heroIndex].focus({ preventScroll: true });
+});
+selectHero(heroIndex, true);
 $('leave').onclick = () => leaveRoom();
 $('share').onclick = () => { const url = location.origin + '/?r=' + roomCode; if (navigator.share) navigator.share({ title: 'LAST EXIT', text: 'Заходи отбиваться от налётчиков!', url }).catch(() => { }); else { navigator.clipboard && navigator.clipboard.writeText(url); $('share').textContent = '✔ Ссылка скопирована'; } };
 function connect(code) {
@@ -42,7 +81,7 @@ function connect(code) {
 }
 const send = m => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); };
 function leaveRoom() { inRoom = false; roomCode = ''; if (ws) { ws.onclose = null; ws.close(); ws = null; } history.replaceState(null, '', '/'); show('start'); refreshRooms(); }
-{ const r = new URLSearchParams(location.search).get('r'); if (r) { $('start').querySelector('.hint').textContent = 'Тебя позвали в комнату ' + r.toUpperCase() + ' — впиши имя и жми «Быстрая игра»'; $('quick').onclick = () => connect(r.toUpperCase()); } }
+{ const r = new URLSearchParams(location.search).get('r'); if (r) { $('rooms-hint').textContent = 'Тебя позвали в комнату ' + r.toUpperCase() + ' — впиши имя и жми «Быстрая игра»'; $('quick').onclick = () => connect(r.toUpperCase()); } }
 // ===== сообщения сервера =====
 function onMsg(m) {
   const now = performance.now();
