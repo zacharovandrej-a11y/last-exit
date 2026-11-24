@@ -409,19 +409,62 @@ void main(){
     return { paint: mergeG(PB), trim: glow(mergeG(T_)), wheels: C.wx.flatMap(x => [-1, 1].map(sd => [x, sd * (hw - 4.5), C.wr / 9.4])) }; }
   // грузовики и автобус (длина 170, ширина 62)
   function makeTruck(kind) { const P = [], T_ = []; let wheels;
-    const cab = (x0, x1, top) => { P.push([extr([[x0, 9], [x1, 9], [x1, 32], [x1 - 4, top - 2], [x0 + 6, top], [x0, top]], 58, 1.5, poly), RX(0, 0, 0, 1, 1, 1)]);
-      T_.push([extr([[x1 - .4, 33], [x1 - 4.2, top - 4], [x1 - 2.8, top - 4], [x1 + .9, 33]], 52, 0, poly), RX(0, 0, 0, 1, 1, 1), 0x24323c]);
-      for (const z of [-1, 1]) T_.push([geo.box, RX((x0 + x1) / 2 + 4, top - 12, z * 29.6, (x1 - x0) * .45, 12, .8), 0x24323c], [geo.box, RX(x1 - 6, top - 10, z * 33, 2, 8, 3), 0x1c1c1c]);
-      T_.push([geo.box, RX(x1 + 1.2, 14, 0, 3.5, 8, 62), 0x2a2a2a], [geo.box, RX(x1 + .3, 22, 0, 1, 9, 30), 0x151515]); for (const z of [-1, 1]) T_.push([geo.box, RX(x1 + .3, 22, z * 22, 1.4, 5, 9), 0xfff4c8]); };
-    if (kind === 'box') { cab(36, 85, 58); T_.push([geo.box, RX(-24, 44, 0, 120, 64, 62), 0xe4e2dc], [geo.box, RX(-24, 30, 0, 120.6, 5, 62.6), 0xb03a2a], [geo.box, RX(-84.4, 44, 0, .8, 58, 56), 0x9a9890], [geo.box, RX(-24, 10, 0, 160, 6, 30), 0x1a1a1a]); wheels = [64, -40, -60]; } // фургон с полосой
-    else if (kind === 'army') { cab(40, 85, 56); const tent = extr(null, 1, 0, sh => { sh.moveTo(-1, 0); sh.absarc(0, 0, 1, Math.PI, 0, true); sh.closePath(); }); tent.rotateY(Math.PI / 2); // полукруглый тент
-      T_.push([geo.box, RX(-22, 24, 0, 122, 14, 62), 0x4a5233], [tent, RX(-22, 38, 0, 120, 26, 31), 0x5a5e3e], [geo.box, RX(-22, 38, 0, 120, 1, 62), 0x50543a]); for (let k = 0; k < 4; k++) T_.push([geo.box, RX(-70 + k * 32, 50, 0, 1.4, 1.4, 63), 0x464a32]); T_.push([geo.box, RX(-24, 10, 0, 160, 6, 30), 0x1a1a1a]); wheels = [64, -40, -62]; } // тент на дугах
-    else { // автобус «ПАЗ»: скруглённая крыша, полоса окон, двери, двухцветная окраска
-      P.push([extr(null, 58, 2, sh => { sh.moveTo(-85, 9); sh.lineTo(85, 9); sh.lineTo(85, 56); sh.quadraticCurveTo(85, 64, 77, 64); sh.lineTo(-77, 64); sh.quadraticCurveTo(-85, 64, -85, 56); sh.closePath(); }), RX(0, 0, 0, 1, 1, 1)]);
-      for (const z of [-1, 1]) T_.push([geo.box, RX(-6, 45, z * 31.2, 150, 15, .8), 0x24323c], [geo.box, RX(-6, 30, z * 31.25, 166, 3, .7), 0xb03a2a], [geo.box, RX(-6, 13, z * 31.1, 166, 7, .6), 0x2a2a2a]);
-      for (const x of [60, -14]) T_.push([geo.box, RX(x, 32, 31.4, 16, 42, .8), 0x1e262c]); for (let k = 0; k < 8; k++) for (const z of [-31.3, 31.3]) T_.push([geo.box, RX(-74 + k * 18, 45, z, 1.6, 15, .9), 0x2a2a2a]);
-      T_.push([geo.box, RX(86.6, 42, 0, 1, 22, 54), 0x24323c], [geo.box, RX(86.7, 58, 0, 1, 4, 30), 0xffd060], [geo.box, RX(87, 12, 0, 3, 7, 62), 0x2a2a2a], [geo.box, RX(-86.6, 44, 0, 1, 14, 46), 0x24323c], [geo.box, RX(-86, 12, 0, 3, 7, 62), 0x2a2a2a]);
-      for (const z of [-1, 1]) T_.push([geo.box, RX(86.4, 18, z * 22, 1.4, 5, 9), 0xfff4c8], [geo.box, RX(-86.4, 20, z * 24, 1.4, 6, 6), 0xc01c1c]); T_.push([geo.box, RX(0, 66, 10, 40, 4, 22), 0x8a8a86]); wheels = [56, -54]; }
+    const S = (fn, depth, bev = 0) => extr(null, depth, bev, fn), B = (c, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0) => T_.push([geo.box, RX(x, y, z, sx, sy, sz, rx, ry, rz), c]);
+    const C = (c, x, y, z, r, l, ax = 'y', seg = 10) => T_.push([seg > 6 ? geo.cyl10 : geo.cyl6, RX(x, y, z, r, l, r, ax === 'z' ? Math.PI / 2 : 0, 0, ax === 'x' ? Math.PI / 2 : 0), c]);
+    const GL = 0x22303a, BK = 0x1c1c1c, CH = 0x9a9ea2, AM = new T.Color(2.2, 1.3, .3), HL = new T.Color(2.4, 2.3, 2), RL = new T.Color(1.8, .15, .1);
+    const arch = (x, r, sd, c = BK) => T_.push([S(sh => { sh.moveTo(x - r - 3, 9); sh.absarc(x, 9, r + 3, Math.PI, 0, true); sh.lineTo(x + r + 3, 9); sh.lineTo(x + r + 1.5, 9); sh.absarc(x, 9, r + 1.5, 0, Math.PI, false); sh.closePath(); }, 14), RX(0, 0, sd * 24, 1, 1, 1), c]);
+    // кабина над двигателем: скруглённые рёбра, наклонное лобовое, двери, подножки, зеркала на кронштейнах, решётка, фары, бампер, козырёк, маркерные огни
+    const cab = (x0, x1, top) => {
+      P.push([S(sh => { sh.moveTo(x0, 10); sh.lineTo(x1 - 1, 10); sh.quadraticCurveTo(x1 + .6, 10, x1 + .6, 13); sh.lineTo(x1 + .6, 32); sh.quadraticCurveTo(x1 + .6, 35, x1 - .4, 36.5); sh.lineTo(x1 - 3.2, top - 4.5);
+        sh.quadraticCurveTo(x1 - 4, top, x1 - 8.5, top); sh.lineTo(x0 + 4, top); sh.quadraticCurveTo(x0, top, x0, top - 4); sh.closePath(); }, 56, 2.4), RX(0, 0, 0, 1, 1, 1)]);
+      T_.push([S(sh => { sh.moveTo(x1 + .2, 37.5); sh.lineTo(x1 - 2.6, top - 5.5); sh.lineTo(x1 - 1.6, top - 5.5); sh.lineTo(x1 + 1.3, 37.5); sh.closePath(); }, 54), RX(0, 0, 0, 1, 1, 1), GL]);
+      B(BK, x1 - 1.4, top - 5.3, 0, 1.4, 1.2, 56); B(0x2a2a2a, x1 - 1.6, top - 2.6, 0, 6, 1, 58, 0, 0, -.25); for (const z of [-18, -6, 6, 18]) B(AM, x1 - 4, top + 2.6, z, 1.6, 1, 2.6);
+      for (const z of [-1, 1]) { const sz = z * 30.6; B(GL, (x0 + x1) / 2 + 6, top - 11, sz, (x1 - x0) * .42, 13, .5); B(BK, (x0 + x1) / 2 + 6, top - 11, sz * 1.003, (x1 - x0) * .44, .8, .3);
+        B(BK, x0 + 13, 30, sz * 1.004, .6, top - 14, .3); B(BK, x1 - 4, 30, sz * 1.004, .6, top - 14, .3); B(CH, x0 + 17, 33, sz * 1.012, 5, 1.4, .8);
+        B(BK, x0 + 20, 13, z * 31, 14, 1.6, 4); B(BK, x0 + 20, 6.5, z * 31, 12, 1.4, 4); // подножки
+        B(BK, x1 + 2, top - 6, z * 31.5, 2, 1.2, 8); B(BK, x1 + 6, top - 9, z * 35, 1.2, 1.2, 1.2); B(0x2a2a2a, x1 + 5.4, top - 16, z * 36, 1.6, 15, 4.8); B(0x6a7680, x1 + 6.25, top - 16, z * 36, .2, 13.6, 4); // зеркала
+        B(HL, x1 + 1.3, 16, z * 21, 1, 5.6, 8.6); B(0x2a2a2a, x1 + 1, 16, z * 21, .8, 6.8, 10); B(AM, x1 + 1.3, 16, z * 26.6, 1, 4.4, 2.6); B(HL, x1 + 3.2, 7, z * 17, 1, 2.6, 4.4); }
+      B(0x2a2a2a, x1 + .9, 25.5, 0, 1, 10, 34); for (let i = 0; i < 6; i++) B(0x111111, x1 + 1.45, 21.5 + i * 1.6, 0, .4, .6, 33); B(CH, x1 + 1.5, 31.6, 0, .5, 1.2, 10);
+      B(BK, x1 + 2.2, 7.6, 0, 4.4, 6.4, 62); B(0xe0dcd0, x1 + 4.45, 7.4, 0, .2, 3, 13); B(0x2a2a2a, x1 + 4.5, 7.4, 0, .1, 3.2, 13.4); for (const z of [-24, 24]) B(0xb03a2a, x1 + 4.6, 5, z, 1.4, 1.4, 2.4);
+      B(0x111111, x0 - .6, top / 2 + 5, 0, 1, top - 12, 52); C(BK, x0 - 3, top - 8, 26, 1.2, 38); C(0x2a2a2a, x0 - 3, top + 11.5, 26, 1.6, 2); C(0x777777, x0 - 3, top + 12.8, 26, 1.5, .5); // выхлоп
+      C(0x7a7c78, x0 + 18, 13.5, -26, 4.2, 22, 'x', 12); for (const x of [x0 + 11, x0 + 25]) B(BK, x, 13.5, -26, 1.2, 9, 9); B(0x2a2a2a, x0 + 18, 13.5, 26, 16, 8, 6);
+    };
+    const frame = (x0, x1) => { for (const z of [-11, 11]) B(0x222222, (x0 + x1) / 2, 10.5, z, x1 - x0, 5.5, 3); for (let x = x0 + 8; x < x1; x += 22) B(0x222222, x, 10.5, 0, 2.5, 4, 22); };
+    const rear = (x, y0) => { B(0x2a2a2a, x - 1, 9, 0, 3, 3, 56); for (const z of [-24, 24]) { B(RL, x - 1.2, 14, z, 1, 3.4, 6); B(AM, x - 1.2, 14, z - Math.sign(z) * 4.4, 1, 3.4, 2.6); B(BK, x + 2, 5, z, .6, 8, 9); } B(0xe0dcd0, x - 1.3, 17.5, 0, .3, 3, 11); };
+    if (kind === 'box') { cab(38, 85, 60); frame(-86, 40);
+      const bx0 = -84, bx1 = 34, L = bx1 - bx0, mx = (bx0 + bx1) / 2;
+      T_.push([geo.box, RX(mx, 45, 0, L, 64, 61), 0xe6e4de]); for (let x = bx0 + 2; x <= bx1 - 2; x += 11.8) for (const z of [-1, 1]) B(0xc8c6c0, x, 45, z * 30.8, 1.6, 63, .8);
+      for (const y of [13.4, 76.6]) for (const z of [-1, 1]) B(0x9a9890, mx, y, z * 30.9, L + 1, 2, 1.2); B(0x9a9890, mx, 77.2, 0, L + 1, 1.2, 62);
+      for (const z of [-1, 1]) { B(0xb03a2a, mx, 32, z * 31.2, L - 6, 6, .3); B(0x1e3a6a, mx + 18, 52, z * 31.2, 34, 9, .3); for (let x = bx0 + 8; x < bx1; x += 24) B(AM, x, 15.5, z * 31.4, 2.4, 1.6, .5); B(0x2a2a2a, mx, 8.5, z * 29, L - 40, 2, 1.4); }
+      B(0xd8d6d0, bx0 - .6, 45, 0, 1.2, 62, 60); B(0x111111, bx0 - 1.3, 45, 0, .3, 62, .5); for (const z of [-15, 15]) for (const y of [24, 66]) B(0x777777, bx0 - 1.6, y, z * 1.85, .8, 3, 3);
+      for (const z of [-9, 9]) { C(0x8a8a8a, bx0 - 2, 45, z, .45, 60); for (const y of [30, 60]) B(0x555555, bx0 - 2, y, z, 1.2, 2.4, 2.4); }
+      B(0x2a2a2a, bx0 - 1, 4.5, 0, 2, 2, 54); for (const z of [-22, 22]) B(0x2a2a2a, bx0 + 1, 7, z, 2, 6, 2); rear(bx0, 0);
+      B(0x9a9890, 34, 70, 0, 8, 14, 58, 0, 0, .7); wheels = [64, -40, -60]; arch(64, 9.5, -1); arch(64, 9.5, 1);
+    } else if (kind === 'army') { cab(42, 86, 57); frame(-86, 44); const OL = 0x4a5233, OL2 = 0x5a5e3e, OD = 0x3a4128;
+      B(OD, -22, 17.5, 0, 126, 3, 62); for (const z of [-1, 1]) for (let i = 0; i < 3; i++) B(i % 2 ? OL : 0x556040, -22, 21 + i * 4.2, z * 30.6, 124, 3.6, 1.6);
+      for (let x = -82; x <= 38; x += 20) for (const z of [-1, 1]) B(OD, x, 25, z * 31, 2.4, 13, 2.2);
+      const bow = S(sh => { sh.moveTo(-1, 0); sh.absarc(0, 0, 1, Math.PI, 0, true); sh.lineTo(.94, 0); sh.absarc(0, 0, .94, 0, Math.PI, false); sh.closePath(); }, 1); bow.rotateY(Math.PI / 2);
+      const tent = S(sh => { sh.moveTo(-1, 0); sh.absarc(0, 0, 1, Math.PI, 0, true); sh.closePath(); }, 1); tent.rotateY(Math.PI / 2);
+      T_.push([tent, RX(-22, 31, 0, 122, 28, 31.5), OL2]); for (let x = -78; x <= 34; x += 18.5) T_.push([bow, RX(x, 31, 0, 2.2, 28.6, 32.2), 0x4e5236]);
+      for (let x = -82; x <= 38; x += 7) for (const z of [-1, 1]) B(0x8a7a58, x, 30.6, z * 31.9, .5, 3.6, .5); for (const z of [-1, 1]) B(0x50543a, -22, 30, z * 31.7, 124, 1.6, .6);
+      B(0x2a2a20, -83.6, 44, 0, .6, 22, 56); B(OL, -84, 24, 0, 2.4, 10, 62); for (const z of [-20, 20]) { C(0x666666, -85.6, 22, z, .3, 8); }
+      for (const z of [-26, -18]) { B(OL, 40, 26, z, 3, 11, 7); B(OD, 40, 32, z, 3.4, 1.4, 4); } C(0x1a1a1a, 40, 32, 10, 9, 5, 'x', 12); C(0x444444, 40, 32, 10, 4, 5.4, 'x', 10);
+      rear(-86, 0); wheels = [64, -40, -60]; arch(64, 9.5, -1); arch(64, 9.5, 1);
+      for (const z of [-1, 1]) for (const x of [-40, -60]) T_.push([S(sh => { sh.moveTo(x - 13, 17); sh.absarc(x, 17, 13, Math.PI, 0, true); sh.lineTo(x + 12, 17); sh.absarc(x, 17, 12, 0, Math.PI, false); sh.closePath(); }, 10), RX(0, 0, z * 26, 1, 1, 1), OD]);
+    } else { // автобус: скруглённое тело, лобовое из двух стёкол с перегородкой, табло маршрута, складная дверь, окна со стойками, люки, арки колёс, бамперы
+      P.push([S(sh => { sh.moveTo(-86, 9); sh.lineTo(84, 9); sh.quadraticCurveTo(87.5, 9, 87.5, 13); sh.lineTo(87.5, 54); sh.quadraticCurveTo(87, 64, 78, 64.5); sh.lineTo(-78, 64.5); sh.quadraticCurveTo(-86, 64, -86, 56); sh.closePath(); }, 58, 2.2), RX(0, 0, 0, 1, 1, 1)]);
+      for (const z of [-1, 1]) { const sz = z * 31.3; B(GL, -8, 45.5, sz, 148, 15, .6); for (let k = 0; k < 9; k++) B(BK, -76 + k * 17.6, 45.5, sz * 1.002, 1.8, 16, .4); B(BK, -8, 37.4, sz * 1.002, 150, 1.2, .4); B(BK, -8, 53.6, sz * 1.002, 150, 1.2, .4);
+        B(0xb03a2a, -6, 31, sz * 1.003, 170, 3, .3); B(0x2a2a2a, -6, 12.5, sz * 1.003, 170, 6, .3); B(0x9a9890, -6, 61, sz * 1.002, 166, 1, .6);
+        for (const x of [55, -55]) T_.push([S(sh => { sh.moveTo(x - 14, 9); sh.absarc(x, 9, 14, Math.PI, 0, true); sh.lineTo(x + 12.2, 9); sh.absarc(x, 9, 12.2, 0, Math.PI, false); sh.closePath(); }, 1.5), RX(0, 0, sz, 1, 1, 1), BK]); }
+      for (const [x, w] of [[64, 14], [-12, 14]]) { B(0x1e262c, x, 33, 31.4, w + 2, 44, .5); B(GL, x - w / 4, 37, 31.55, w / 2 - 1.2, 34, .3); B(GL, x + w / 4, 37, 31.55, w / 2 - 1.2, 34, .3); B(CH, x, 33, 31.6, .5, 42, .3); }
+      B(GL, 87.9, 40, 12.6, .6, 26, 23); B(GL, 87.9, 40, -12.6, .6, 26, 23); B(BK, 88.1, 40, 0, .8, 27, 1.6); B(BK, 88.1, 52.6, 0, .8, 1.4, 52); B(BK, 88.1, 27.6, 0, .8, 1.4, 52);
+      B(0x111111, 88.2, 57.6, 0, .6, 5.6, 34); B(new T.Color(2.4, 1.6, .3), 88.4, 57.6, 0, .3, 3.6, 24);
+      for (const z of [-1, 1]) { B(0x2a2a2a, 88.4, 31, z * 9, .2, 9, .6, 0, 0, .1 * z); B(BK, 90, 48, z * 31, 4, 1, 1); B(BK, 92, 44, z * 33, 1, 10, 1); B(0x2a2a2a, 92.4, 38, z * 33.4, 1.4, 9, 4); B(0x6a7680, 93.15, 38, z * 33.4, .2, 8.4, 3.4);
+        B(HL, 88.6, 19, z * 21, .8, 5, 9); B(AM, 88.6, 19, z * 27, .8, 5, 2.6); B(RL, -86.7, 22, z * 24, .8, 6, 6); B(AM, -86.7, 29, z * 24, .8, 3, 6); }
+      B(0x2a2a2a, 88.4, 22.5, 0, .6, 7, 18); for (let i = 0; i < 4; i++) B(0x111111, 88.8, 20 + i * 1.7, 0, .3, .6, 17); B(BK, 89.4, 11, 0, 3.6, 6, 60); B(0xe0dcd0, 91.25, 11, 0, .2, 3, 12);
+      B(GL, -86.9, 44, 0, .6, 15, 46); B(BK, -86.6, 11.5, 0, 3.4, 6, 60); B(0xe0dcd0, -88.4, 11.5, 0, .2, 3, 12); C(0x2a2a2a, -80, 6, -24, 1.2, 8, 'x');
+      for (const x of [30, -30]) { B(0x8a8a86, x, 66.2, 0, 20, 3, 18); B(0x6a6a66, x, 67.8, 0, 18, .6, 16); }
+      wheels = [55, -55]; }
     return { paint: mergeG(P.map(([g, m]) => [g, m, 0xffffff])), trim: glow(mergeG(T_)), wheels: wheels.flatMap(x => [-1, 1].map(sd => [x, sd * 25, 1.35])) }; }
   // деревья: ствол с корнями и ветками (одна геометрия на вариант), крона из неровных «облаков» листвы
   const hash3 = (x, y, z, s) => { const v = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719 + s * 4.17) * 43758.5453; return v - Math.floor(v); };
@@ -617,8 +660,8 @@ void main(){
       if (kind !== 'sedan') { const V = VEH[kind]; /* кузов-лофт */ return [[V.paint, 'car', M(0, 0, 0, sx, 1, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1, sz)], ...V.wheels.map(([x, z, k]) => [geo.wheel, 0xffffff, M(x * sx, 9.4 * k, z * sz, k, k, k)])]; }
       const V = VEH.sedan; return [[V.paint, 'car', M(0, 0, 0, sx, 1, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1, sz)], ...V.wheels.map(([x, z, k]) => [geo.wheel, 0xffffff, M(x * sx, 9.4 * k, z * sz, k, k, k)])]; },
     truck: (w, h, o) => { const kind = TRUCKK[Math.floor(rh(o ? o.id : 0, 61) * TRUCKK.length)], V = VEH[kind], sx = w / 170, sz = h / 62;
-      return [[V.paint, kind === 'bus' ? 'bus' : 'cab', M(0, 0, 0, sx, 1, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1, sz)], ...V.wheels.map(([x, z, k]) => [geo.wheel, 0xffffff, M(x * sx, 9.4 * k, z * sz, k, k, k)])]; },
-    bus: (w, h, o) => { const V = VEH.bus, sx = w / 170, sz = h / 62; return [[V.paint, 'bus', M(0, 0, 0, sx, 1.08, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1.08, sz)], ...[-.78, -.28, .7].flatMap(x => [-1, 1].map(sd => [geo.wheel, 0xffffff, M(x * w / 2, 12.7, sd * 25 * sz, 1.35, 1.35, 1.35)]))]; }, // большой городской автобус
+      return [[V.paint, kind === 'bus' ? 'bus' : kind === 'army' ? 0x4a5233 : 'cab', M(0, 0, 0, sx, 1, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1, sz)], ...V.wheels.map(([x, z, k]) => [geo.wheel, 0xffffff, M(x * sx, 9.4 * k, z * sz, k, k, k)])]; },
+    bus: (w, h, o) => { const V = VEH.bus, sx = w / 170, sz = h / 62; return [[V.paint, 'bus', M(0, 0, 0, sx, 1.08, sz)], [V.trim, 0xffffff, M(0, 0, 0, sx, 1.08, sz)], ...[55, -46, -64].flatMap(x => [-1, 1].map(sd => [geo.wheel, 0xffffff, M(x * sx, 12.7, sd * 25 * sz, 1.35, 1.35, 1.35)]))]; }, // большой городской автобус
     crate: (w, h, o) => { const vk = o.vk !== undefined ? o.vk : (o.id * 7) % 5 < 3 ? 0 : (o.id * 7) % 5 === 3 ? 1 : 2, g = [PROP.crateW, PROP.crateA, PROP.crateB][vk], ht = [26, 17, 30][vk], r = []; let y = 0;
       if (o.pal) { r.push([PROP.pallet, 0xffffff, M(0, 0, 0, 1, 1, 1)]); y = 4.8; }
       for (let i = 0; i < (o.lv || 1); i++) { const tw = i ? (((o.id + i) * 13) % 7 - 3) * .05 : 0, sx = i ? (((o.id + i) * 5) % 5 - 2) * .6 : 0; r.push([g, 0xffffff, M(sx, y, sx * .5, 1, 1, 1, tw)]); y += ht; }
