@@ -2174,41 +2174,67 @@ void main(){
   }
   const heroJacket = heroCloth([[-.5, 0], [-.5, .38], [-.4, .43], [-.16, .43], [.12, .48], [.32, .51], [.42, .46], [.5, .29], [.5, 0]]);
   const heroSleeve = heroCloth([[-.55, 0], [-.55, .34], [-.47, .41], [-.18, .44], [.11, .49], [.34, .51], [.49, .39], [.54, 0]]);
+  const playableFaceMap = cvTex(128, 128, (ink, w, h) => {
+    ink.fillStyle = '#fff';
+    ink.fillRect(0, 0, w, h);
+    const ellipse = (x, y, rx, ry, shade) => {
+      ink.fillStyle = shade;
+      ink.beginPath();
+      ink.ellipse(x, y, rx, ry, 0, 0, 2 * Math.PI);
+      ink.fill();
+    };
+    for (const side of [-1, 1]) {
+      const x = 64 + side * 20;
+      ellipse(x, 51, 9.6, 3.4, '#9c7d70');
+      ellipse(x, 52, 7.6, 2.2, '#ddd0c0');
+      ellipse(x - side, 52, 2.7, 2.5, '#514738');
+      ellipse(x, 44, 9, 1.7, '#816a5d');
+    }
+    ellipse(64, 86, 8.5, 2.3, '#a98377');
+    ellipse(64, 85, 7.5, 1.05, '#835e51');
+  });
   let playableFace;
   function playableHeadGeometry() {
     if (playableFace) return playableFace;
     const { positions, indices } = RAIDER_SUIT_MODEL;
-    const vertices = [], faces = [], remap = new Map();
+    const vertices = [], faces = [], uv = [], remap = new Map();
     for (let i = 0; i < indices.length; i += 3) {
       const a = indices[i], b = indices[i + 1], c = indices[i + 2];
       if (Math.min(positions[a * 3 + 1], positions[b * 3 + 1], positions[c * 3 + 1]) < 17.7) continue;
       for (const id of [a, b, c]) {
         if (!remap.has(id)) {
           remap.set(id, vertices.length / 3);
-          vertices.push(positions[id * 3] * 1.21, (positions[id * 3 + 1] - 21.22) * 1.14, positions[id * 3 + 2] - .19);
+          const x = positions[id * 3] * 1.21, y = (positions[id * 3 + 1] - 21.22) * 1.14;
+          const z = positions[id * 3 + 2] - .19;
+          vertices.push(x, y, z);
+          uv.push(z > 2.7 ? .5 + x / 7.5 : 0, .5 + y / 7.5);
         }
         faces.push(remap.get(id));
       }
     }
     playableFace = new T.BufferGeometry();
     playableFace.setAttribute('position', new T.Float32BufferAttribute(vertices, 3));
+    playableFace.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
     playableFace.setIndex(faces);
     playableFace.computeVertexNormals();
     return playableFace;
   }
   const darkHair = (() => {
-    // A single swept silhouette with a shorter hairline around the face.
-    const points = [], indices = [], rings = 10, segments = 24;
+    const points = [], indices = [], colors = [], rings = 13, segments = 32;
     for (let ring = 0; ring <= rings; ring++) {
       const u = ring / rings;
       for (let i = 0; i < segments; i++) {
-        const angle = 2 * Math.PI * i / segments, x = Math.sin(angle), z = Math.cos(angle);
-        const drape = (1 - Math.max(0, z) ** 2.4) ** .72;
-        const theta = u * (1.06 + drape * 1.27);
-        const groove = 1 + Math.sin(angle * 9 + u * 4) * .035 * u;
-        points.push(3.65 * x * Math.sin(theta) * groove + u * .27,
-          1.53 + 3.92 * Math.cos(theta) - drape * u ** 3 * 3.7,
-          -.42 + 4.62 * z * Math.sin(theta) * groove);
+        const angle = 2 * Math.PI * i / segments;
+        const side = Math.sin(angle), front = Math.cos(angle);
+        const fall = (1 - Math.max(0, front) ** 3.2) ** .68;
+        const theta = u * (1.30 + fall * .78);
+        const groove = 1 + Math.sin(angle * 11 + u * 4) * .055 * u;
+        const skirt = fall * u ** 3;
+        points.push(side * (3.67 * Math.sin(theta) + .95 * skirt) * groove + u * .23,
+          1.32 + 4.17 * Math.cos(theta) - 6.7 * skirt + Math.sin(angle * 4) * skirt * .35,
+          1.52 + front * (3.99 * Math.sin(theta) + .5 * skirt) * groove);
+        const light = .72 + .20 * Math.sin(angle * 11 + u * 4) ** 2 + .12 * Math.sin(theta);
+        colors.push(light, light * .91, light * .85);
         if (ring) {
           const a = (ring - 1) * segments + i, b = (ring - 1) * segments + (i + 1) % segments;
           indices.push(a, a + segments, b, b, a + segments, b + segments);
@@ -2217,17 +2243,20 @@ void main(){
     }
     const geometry = new T.BufferGeometry();
     geometry.setAttribute('position', new T.Float32BufferAttribute(points, 3));
+    geometry.setAttribute('color', new T.Float32BufferAttribute(colors, 3));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     return geometry;
   })();
+  const heroHairMaterial = charrable(new T.MeshLambertMaterial({ color: 0x3b2b24, vertexColors: true, side: T.DoubleSide }));
   function makeChar(ch) {
     const g = new T.Group(), body = new T.Group(); g.add(body);
     const hero = HERO_MODELS[ch], detailed = ch === 0 || ch === 10;
     const cv = hero || (ch >= CH_SECT ? CIV_S[(ch - CH_SECT) % 4] : ch >= 100 ? CIV[(ch - 100) % CIV.length] : null);
     const refined = ch === CH_SECT, rounded = refined || !cv || !!hero;
     if (STYLE !== 'real') g.scale.setScalar(1.15); // в ярких стилях люди крупнее
-    const cm = camo(ch), mats = cv ? { shirt: charrable(MAT({ color: cv.shirt })), skin: charrable(MAT({ color: cv.skin })), pants: charrable(MAT({ color: cv.pants })) } : { shirt: charrable(MAT({ color: 0xffffff, map: cm })), skin: charrable(MAT({ color: SKIN[ch % 10] })), pants: charrable(MAT({ color: 0xe8e8e8, map: cm })) };
+    const charMaterial = detailed ? o => new T.MeshLambertMaterial(o) : MAT;
+    const cm = camo(ch), mats = cv ? { shirt: charrable(charMaterial({ color: cv.shirt })), skin: charrable(charMaterial({ color: cv.skin })), pants: charrable(charMaterial({ color: cv.pants })) } : { shirt: charrable(charMaterial({ color: 0xffffff, map: cm })), skin: charrable(charMaterial({ color: SKIN[ch % 10] })), pants: charrable(charMaterial({ color: 0xe8e8e8, map: cm })) };
     if (refined) {
       Object.values(mats).forEach(m => m.dispose());
       mats.shirt = charrable(new T.MeshLambertMaterial({ color: 0xc9c3ae })); mats.skin = charrable(new T.MeshLambertMaterial({ color: 0xd4aa88 })); mats.pants = charrable(new T.MeshLambertMaterial({ color: 0x3d4655 }));
@@ -2287,27 +2316,32 @@ void main(){
     if (!cv) part(geo.box, gear, 0, 30, -4.6, 8, 8, 2.4); // рюкзак-подсумок сзади
     part(detailed ? geo.cyl10 : geo.box, mats.skin, 0, 41.5, 0, 3.4, 2.4, 3.4); // шея
     const head = new T.Group(); head.position.set(0, 46.5, 0); body.add(head);
-    if (detailed) part(playableHeadGeometry(), mats.skin, 0, 0, 0, 1, 1, 1, head);
-    else part(geo.sph, mats.skin, 0, 0, .3, 4.1, 4.9, 4.5, head);
+    if (detailed) {
+      const faceMaterial = charrable(new T.MeshLambertMaterial({ color: mats.skin.color, map: playableFaceMap }));
+      faceMaterial.emissive = mats.skin.emissive;
+      part(playableHeadGeometry(), faceMaterial, 0, 0, 0, 1, 1, 1, head);
+    } else part(geo.sph, mats.skin, 0, 0, .3, 4.1, 4.9, 4.5, head);
     if (!rounded) part(geo.box, lam(0x1a1a1a), 0, .7, 4.1, 4.8, .9, .6, head);
-    else {
+    else if (!detailed) {
       const face = part(geo.facePlane, new T.MeshLambertMaterial({ map: faceTex, transparent: true, depthWrite: false, alphaTest: .1 }), 0, .1, 4.83, 5.2, 5.2, 1, head); face.userData.noMerge = face.userData.noOutline = face.userData.noShadow = true;
-      if (!detailed) {
-        part(geo.faceDetail, mats.skin, 0, -.2, 4.7, .75, 1.1, 1, head);
-        for (const side of [-1, 1]) part(geo.faceDetail, mats.skin, side * 4, -.3, .1, .7, 1.2, .7, head);
-      } else {
-        face.position.set(0, -.25, 4.16);
-        face.scale.set(4.2, 4.2, 1);
-      }
+      part(geo.faceDetail, mats.skin, 0, -.2, 4.7, .75, 1.1, 1, head);
+      for (const side of [-1, 1]) part(geo.faceDetail, mats.skin, side * 4, -.3, .1, .7, 1.2, .7, head);
     }
-    if (STYLE !== 'real') head.scale.setScalar(refined ? 1.06 : rounded ? 1.14 : 1.25);
+    if (STYLE !== 'real') head.scale.setScalar(detailed ? 1 : refined ? 1.06 : rounded ? 1.14 : 1.25);
     if (!cv) {
-      head.add(hat(ch));
-      if (ch === 0) part(geo.sph, lam(0x514037), 0, -2.55, 3.85, 3.15, 1.52, 1, head);
+      if (ch === 0) {
+        part(geo.dome, lam(0x52553c), 0, 1.63, 1.25, 4.08, 4.15, 4.62, head);
+        part(geo.cyl10, lam(0x303428), 0, 1.56, 1.25, 8.46, .38, 9.47, head);
+        for (const side of [-1, 1]) {
+          const strap = part(geo.box, lam(0x494438), side * 2.67, -.45, 1.99, .38, 4.0, .42, head);
+          strap.rotation.z = side * -.24;
+          strap.rotation.x = -.29;
+        }
+      } else head.add(hat(ch));
     }
     else { const hm = (gg, c, x, y, z, sx, sy, sz, rx = 0) => { const o = new T.Mesh(gg, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.x = rx; head.add(o); };
       ({ darkhair: () => {
-          hm(darkHair, 0x292127, 0, 0, 0, 1, 1, 1);
+          part(darkHair, heroHairMaterial, 0, 0, 0, 1, 1, 1, head);
         },
         priest: () => {
           hm(geo.dome, 0x665d54, 0, 1.25, -.55, 4.5, 3.5, 4.5);
@@ -2375,7 +2409,7 @@ void main(){
       mergeRigidChar(body, mats.skin, cloth); mats.shirt = mats.pants = cloth; shirt.dispose(); pants.dispose();
       head.traverse(o => { if (o.isMesh) o.userData.noOutline = true; });
     }
-    body.traverse(o => { if (o.isMesh) o.castShadow = !o.userData.noShadow; }); if (STYLE === 'toon') { const ms = []; body.traverse(o => { if (o.isMesh && !o.userData.noOutline) ms.push(o); }); ms.forEach(o => addOutline(o, refined ? OUT_P : OUT_C)); }
+    body.traverse(o => { if (o.isMesh) o.castShadow = !o.userData.noShadow; }); if (STYLE === 'toon') { const ms = []; body.traverse(o => { if (o.isMesh && !o.userData.noOutline) ms.push(o); }); ms.forEach(o => addOutline(o, refined || detailed ? OUT_P : OUT_C)); }
     g.userData = { body, legL, legR, kneeL, kneeR, armL, armR, elL, elR, itemG, civ: !!cv && !hero, sectLook: ch >= CH_SECT, head, torso, vest, gunHold, handHold, gunNode: gunHold, muz: 18, gunKey: '', mats, shadow, ready: 0, fireT: 9 };
     return g;
   }
@@ -2598,8 +2632,10 @@ void main(){
       if (pvChar) pvScene.remove(pvChar);
       if (!previewHeroes.has(ch)) {
         const figure = makeChar(ch), u = figure.userData;
-        u.armL.rotation.set(-.08, 0, -.19); u.armR.rotation.set(-.06, 0, .19);
-        u.elL.rotation.set(-.18, 0, 0); u.elR.rotation.set(-.18, 0, 0);
+        const improved = ch === 0 || ch === 10;
+        const shoulder = improved ? .105 : .19;
+        u.armL.rotation.set(-.07, 0, -shoulder); u.armR.rotation.set(-.07, 0, shoulder);
+        u.elL.rotation.set(-.12, 0, 0); u.elR.rotation.set(-.12, 0, 0);
         previewHeroes.set(ch, figure);
       }
       pvChar = previewHeroes.get(ch);
