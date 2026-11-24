@@ -266,7 +266,7 @@ function genWorld() {
     } return b;
   }
   function manyB(kinds, cen, r, n, tries = 70) { for (let i = 0; i < n; i++) { const kind = kinds[Math.floor(rnd() * kinds.length)], K = BKIND[kind], m = Math.hypot(...(K.yard || [K.w, K.h])) / 2 + 30;
-    for (let k = 0; k < tries; k++) { const rs = k < tries * .8 ? roadSpot(cen, cen ? r + 200 : 0, (K.yard ? K.yard[1] : K.h), cen ? ['main', 'street', 'dirt'] : ['main', 'dirt']) : null, p = rs ? rs[0] : cen ? nearPt(rnd, cen, r) : rndMap(rnd, m);
+    for (let k = 0; k < tries; k++) { const rs = k < tries * .8 ? roadSpot(cen, cen ? r + 200 : 0, (K.yard ? K.yard[1] : K.h) + (kind === 'bunker' ? 160 : 0), cen ? ['main', 'street', 'dirt'] : ['main', 'dirt']) : null, p = rs ? rs[0] : cen ? nearPt(rnd, cen, r) : rndMap(rnd, m);
       if (inMap(p, m) && free(p, rs ? m * .6 : m, rs ? [rs[1], ...(K.yard || [K.w + 40, K.h + 40])] : null) && blds.every(b => BKIND[b.kind].church === undefined || dist(p, b.p) >= 250 + m) && (!rs || blds.every(b => dist(p, b.p) > (b.yard ? Math.hypot(...b.yard) / 2 : b.rad) * .72 + m * .62))) { building(kind, p, rs ? rs[1] : undefined); break; } } } }
   const B = BIOMES;
   building('market', [380, -330], 0); // рынок — на углу центрального перекрёстка, фасадом к трассе

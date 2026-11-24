@@ -1191,6 +1191,99 @@ void main(){
   const roadCap = new T.CircleGeometry(.5, 24); roadCap.rotateX(-Math.PI / 2);
   let streetMeshes = [];
   let streetPlan = null;
+  // ===== уличная обстановка: фонари, светофоры, знаки, остановки, скамейки, урны, отбойники — только визуал, без коллизий =====
+  let SFG = null;
+  const streetFurnGeo = () => SFG || (SFG = (() => {
+    const H = Math.PI / 2, PO = 0x4a4d50, PD = 0x2e3032, RU = 0x6a4a36, C = geo.cyl10;
+    // фонарь ~6 м: бетонное основание, конусный столб, изогнутый вылет над дорогой (+x), плафон
+    const lamp = (() => { const L = [];
+      L.push([C, RX(0, 4, 0, 5.5, 8, 5.5), 0x8a8780]); L.push([C, RX(0, 9, 0, 3.6, 3, 3.6), PD]);
+      for (let i = 0; i < 6; i++) L.push([C, RX(0, 10 + i * 30 + 15, 0, 2.6 - i * .2, 30, 2.6 - i * .2), PO]);
+      const R = 26; for (let i = 0; i < 6; i++) { const a = i / 6 * H, a2 = (i + 1) / 6 * H, x0 = R - Math.cos(a) * R, y0 = 190 + Math.sin(a) * R, x1 = R - Math.cos(a2) * R, y1 = 190 + Math.sin(a2) * R;
+        L.push([C, RX((x0 + x1) / 2, (y0 + y1) / 2, 0, 1.4, Math.hypot(x1 - x0, y1 - y0) + 1, 1.4, 0, 0, -Math.atan2(x1 - x0, y1 - y0)), PO]); }
+      L.push([C, RX(R + 16, 216, 0, 1.4, 34, 1.4, 0, 0, H), PO]);
+      L.push([geo.box, RX(R + 38, 214, 0, 20, 4.5, 9), PD]); L.push([geo.box, RX(R + 38, 211.4, 0, 16, 1.2, 6.4), 0xd8d2b0]); // плафон и мутное стекло
+      L.push([geo.box, RX(2.8, 40, 0, 1, 14, 6), 0x5a5c5e]); // лючок
+      L.push([geo.box, RX(0, 60, 2.8, 4, 5, 1), 0xc8c2b0]); // номер столба
+      return mergeG(L); })();
+    // светофор на мачте: столб, вылет к перекрёстку (+x), подвесная секция, «кнопка» для пешеходов
+    const tlight = (() => { const L = [];
+      L.push([C, RX(0, 3, 0, 5, 6, 5), 0x8a8780]); L.push([C, RX(0, 80, 0, 2.6, 160, 2.6), 0x3c4a3e]);
+      L.push([C, RX(34, 156, 0, 1.6, 70, 1.6, 0, 0, H), 0x3c4a3e]); L.push([C, RX(16, 146, 0, 1, 34, 1, 0, 0, .9), 0x3c4a3e]);
+      for (const x of [62, 30]) { L.push([geo.box, RX(x, 140, 0, 9, 28, 9), 0x1e2220]); L.push([geo.box, RX(x, 140, 0, 11, 30, 2), 0x15181a]);
+        [[0x5a1a14, 149], [0xc8901c, 140], [0x1e3a24, 131]].forEach(([c, y]) => { L.push([C, RX(x - 4.9, y, 0, 3.4, 1, 3.4, 0, 0, H), c]); L.push([geo.box, RX(x - 5.5, y + 3.8, 0, 2.2, .8, 7), 0x15181a]); }); }
+      L.push([geo.box, RX(0, 98, 0, 7, 24, 7), 0x1e2220]); [[0x5a1a14, 104], [0x1e3a24, 92]].forEach(([c, y]) => L.push([C, RX(3.6, y, 0, 2.6, 1, 2.6, 0, 0, H), c]));
+      L.push([geo.box, RX(2.4, 40, 0, 4, 7, 5), 0xc8a830]); return mergeG(L); })();
+    const post = (L, h, x = 0) => L.push([C, RX(x, h / 2, 0, 1.4, h, 1.4), 0x8a8c8e]);
+    // «Стоп»: восьмиугольник с белой каймой
+    const stop = (() => { const L = []; post(L, 78); const o = new T.CylinderGeometry(1, 1, 1, 8); L.push([o, RX(1.2, 78, 0, 11, 1, 11, 0, 0, H).multiply(RX(0, 0, 0, 1, 1, 1, 0, Math.PI / 8)), 0xe8e4dc]); L.push([o, RX(1.8, 78, 0, 9.6, 1, 9.6, 0, 0, H).multiply(RX(0, 0, 0, 1, 1, 1, 0, Math.PI / 8)), 0xa8231c]); L.push([geo.box, RX(2.4, 78, 0, .4, 2.4, 11), 0xe8e4dc]); return mergeG(L); })();
+    // «Уступи дорогу»: треугольник вершиной вниз
+    const yieldS = (() => { const L = []; post(L, 74); const t = new T.CylinderGeometry(1, 1, 1, 3); L.push([t, RX(1.2, 74, 0, 13, 1, 13, 0, 0, H).multiply(RX(0, 0, 0, 1, 1, 1, 0, H)), 0xa8231c]); L.push([t, RX(1.8, 75, 0, 8.6, 1, 8.6, 0, 0, H).multiply(RX(0, 0, 0, 1, 1, 1, 0, H)), 0xe8e4dc]); return mergeG(L); })();
+    // круглый «50» и щит населённого пункта на двух стойках
+    const speed = (() => { const L = []; post(L, 80); L.push([new T.CylinderGeometry(1, 1, 1, 16), RX(1.2, 80, 0, 11, 1, 11, 0, 0, H), 0xa8231c]); L.push([new T.CylinderGeometry(1, 1, 1, 16), RX(1.8, 80, 0, 8.4, 1, 8.4, 0, 0, H), 0xe8e4dc]); for (const z of [-2.6, 2.6]) L.push([geo.box, RX(2.3, 80, z, .3, 7, 3.2), 0x1a1a1a]); return mergeG(L); })();
+    const town = (() => { const L = []; for (const z of [-26, 26]) L.push([C, RX(0, 40, z, 1.6, 80, 1.6), 0x8a8c8e]); L.push([geo.box, RX(1.5, 70, 0, 1.4, 24, 66), 0xe8e4dc]); L.push([geo.box, RX(2.3, 70, 0, .3, 20, 62), 0x2a4a8a]);
+      L.push([geo.box, RX(2.5, 72, 0, .2, 5, 44), 0xe8e4dc]); L.push([geo.box, RX(2.5, 64, 0, .2, 2, 30), 0xe8e4dc]); L.push([geo.box, RX(2.6, 70, 0, .2, 2.2, 62), 0xa8231c]); return mergeG(L); })(); // перечёркнут: город покинут
+    // остановка: навес, задняя стенка из мутного стекла, скамья, табличка на столбике, урна
+    const shelter = (() => { const L = [], F = 0x5a6064;
+      for (const x of [-46, 46]) for (const z of [-14, 14]) L.push([geo.box, RX(x, 38, z, 2.6, 76, 2.6), F]);
+      L.push([geo.box, RX(0, 78, 0, 104, 3, 36), 0x6a7074]); L.push([geo.box, RX(0, 80, 0, 100, 1.6, 32), 0x8a9094]);
+      L.push([geo.box, RX(0, 44, -14, 90, 58, 1.2), 0x9ab4bc]); for (const x of [-46, 46]) L.push([geo.box, RX(x, 44, 0, 1.2, 58, 26), 0x9ab4bc]);
+      L.push([geo.box, RX(0, 44, -13.2, 92, 2.2, 2), F]); L.push([geo.box, RX(-20, 52, -13.6, 30, 34, .4), 0xc8b890]); // рекламный плакат выцвел
+      L.push([geo.box, RX(0, 17, -6, 70, 2.4, 12), 0x6a5038]); for (const x of [-30, 30]) L.push([geo.box, RX(x, 8, -6, 2, 16, 10), F]);
+      L.push([C, RX(64, 42, 16, 1.2, 84, 1.2), 0x8a8c8e]); L.push([geo.box, RX(64, 82, 16, 14, 14, 1), 0x2a6a3a]); L.push([geo.box, RX(64, 82, 16.6, 8, 6, .2), 0xe8e4dc]);
+      L.push([C, RX(-62, 12, 14, 7, 24, 7), 0x3a4a3a]); L.push([C, RX(-62, 24.5, 14, 7.6, 1.5, 7.6), 0x2a2c2a]); return mergeG(L); })();
+    // скамейка (доски на чугунных боковинах) и урна
+    const bench = (() => { const L = []; for (const x of [-20, 20]) { L.push([geo.box, RX(x, 7, 0, 2.4, 14, 12), 0x26282a]); L.push([geo.box, RX(x, 18, -6, 2.4, 14, 2), 0x26282a]); }
+      for (let i = 0; i < 3; i++) L.push([geo.box, RX(0, 14, -4 + i * 4, 48, 1.4, 3.2), [0x6e5236, 0x7a5c3c, 0x5e462e][i]]); for (let i = 0; i < 2; i++) L.push([geo.box, RX(0, 20 + i * 5, -6.6, 48, 3.2, 1.2), 0x6e5236]); return mergeG(L); })();
+    const bin = (() => { const L = []; L.push([C, RX(0, 12, 0, 6.4, 24, 6.4), 0x3a4a3a]); L.push([C, RX(0, 24.6, 0, 7, 1.6, 7), 0x26282a]); L.push([C, RX(0, 6, 0, 6.6, 1.4, 6.6), 0x26282a]); L.push([geo.box, RX(0, 26, 0, 6, 1.2, 4), 0xd8d4c8]); return mergeG(L); })();
+    // отбойник: 2 стойки и W-образная лента, кусок 80
+    const rail = (() => { const L = []; for (const x of [-20, 20]) L.push([geo.box, RX(x, 13, -2, 3, 26, 3), 0x6a6c6e]); L.push([geo.box, RX(0, 21, 0, 82, 7, 1.2), 0x9a9c9e]); for (const y of [18.4, 23.6]) L.push([geo.box, RX(0, y, .9, 82, 1.4, 1), 0xb2b4b6]); return mergeG(L); })();
+    // столб ЛЭП с проводами вдоль трассы: проводов нет (оборваны), но поперечина и изоляторы
+    const pole = (() => { const L = []; L.push([C, RX(0, 120, 0, 3.6, 240, 3.6), 0x5a4632]); L.push([geo.box, RX(0, 226, 0, 4, 4, 60), 0x4a3a2a]); for (const z of [-26, 0, 26]) L.push([C, RX(0, 231, z, 1.6, 6, 1.6), 0x8aa0a0]); return mergeG(L); })();
+    return { lamp, tlight, stop, yieldS, speed, town, shelter, bench, bin, rail, pole };
+  })());
+  function buildStreetFurniture(objs, plan, paths) {
+    const G = streetFurnGeo(), R = mkRng(7070), items = {}; for (const k in G) items[k] = [];
+    const segs = plan.segs, onAsphalt = (p, pad) => segs.some(sg => { const ab = sub(sg[1], sg[0]), t = Math.max(0, Math.min(1, dot(sub(p, sg[0]), ab) / dot(ab, ab))); return dist(p, add(sg[0], ab, t)) < sg[2] / 2 + pad; });
+    const onWalk = p => paths.some(([a, b]) => { const ab = sub(b, a), L2 = Math.max(1, dot(ab, ab)), t = Math.max(0, Math.min(1, dot(sub(p, a), ab) / L2)); return dist(p, add(a, ab, t)) < 22; });
+    const taken = [], ok = (p, r) => inMap(p, 40) && bldAt(objs.blds, p) < 0 && !objs.blds.some(b => b.yard && Math.abs(dot(sub(p, b.p), b.u)) < b.yard[0] / 2 + r && Math.abs(dot(sub(p, b.p), b.v)) < b.yard[1] / 2 + r)
+      && !nearObjs(objs, p, r + 60).some(o => !o.nc && o.type !== 'bush' && objPush(o, p, r)) && !onAsphalt(p, 2) && !onWalk(p) && !taken.some(q => dist(p, q) < r + 14);
+    // поворот: локальная +x модели смотрит в направление dir (на карте)
+    const SY = { lamp: .82, tlight: .85 }; // в изометрии высокие столбы заслоняют игру — чуть ниже реальных
+    const put = (k, p, dir, tilt = 0) => { taken.push(p); items[k].push(new T.Matrix4().compose(new T.Vector3(p[0], 0, p[1]), new T.Quaternion().setFromEuler(new T.Euler(tilt * (R() - .5), Math.atan2(-dir[1], dir[0]), tilt * (R() - .5), 'YXZ')), new T.Vector3(1, SY[k] || 1, 1))); };
+    const inJ = (p, pad) => plan.junctions.some(j => dist(p, j.p) < j.r + pad), urban = p => objs.blds.some(b => dist(b.p, p) < 520);
+    for (const [a, b, w, k] of segs) { const L = dist(a, b), d = norm(sub(b, a)), n = perp(d);
+      if (k !== 'dirt') { // фонари: на улицах всегда, на трассе — только среди домов; шахматный порядок
+        const sp = k === 'street' ? 250 : 300; let side = R() < .5 ? -1 : 1;
+        for (let t = 60; t < L - 40; t += sp + R() * 40) { side = -side; const p = add(add(a, d, t), n, side * (w / 2 + (k === 'street' ? 20 : 26)));
+          if ((k === 'street' || urban(p)) && !inJ(p, 20) && ok(p, 8)) put('lamp', p, mul(n, -side), R() < .12 ? .25 : .03); } }
+      if (k === 'street') for (let t = 90; t < L - 60; t += 70) { if (R() > .2) continue; const side = R() < .5 ? -1 : 1, kind = R() < .45 ? 'bench' : 'bin', p = add(add(a, d, t), n, side * (w / 2 + (kind === 'bench' ? 24 : 18)));
+        if (!inJ(p, 30) && ok(p, kind === 'bench' ? 22 : 8)) put(kind, p, kind === 'bench' ? mul(perp(mul(n, -side)), -1) : d, .02); } // скамья лицом к улице
+      if (k === 'main') { // за городом: отбойники на опасных участках и столбы ЛЭП
+        for (let t = 0; t < L; t += 600) { if (R() < .45) continue; const side = R() < .5 ? -1 : 1, run = 3 + Math.floor(R() * 5);
+          for (let i = 0; i < run; i++) { const p = add(add(a, d, t + i * 81), n, side * (w / 2 + 16)); if (t + i * 81 > L || urban(p) || inJ(p, 60) || !ok(p, 10)) continue; put('rail', p, d, R() < .15 ? .2 : .01); } }
+        for (let t = 120; t < L; t += 420) { const p = add(add(a, d, t), n, w / 2 + 70); if (!urban(p) && dist(p, [40, -20]) > 900 && !inJ(p, 260) && ok(p, 10)) put('pole', p, n, R() < .2 ? .14 : .02); } } }
+    // перекрёстки: светофоры по диагонали на городских, знаки «Стоп»/«Уступи» на примыкающих дорогах
+    for (const j of plan.junctions) { const legs = segs.filter(sg => { const ab = sub(sg[1], sg[0]), t = dot(sub(j.p, sg[0]), ab) / dot(ab, ab); return t > -.05 && t < 1.05 && dist(j.p, add(sg[0], ab, Math.max(0, Math.min(1, t)))) < sg[2] / 2 + 4; });
+      const kinds = new Set(legs.map(l => l[3])); if (legs.length < 2) continue;
+      if (!kinds.has('dirt') && (kinds.has('street') || urban(j.p))) { const A = legs[0], Bv = legs.find(l => l[4] !== A[4]) || legs[1], d1 = norm(sub(A[1], A[0])), d2 = norm(sub(Bv[1], Bv[0]));
+        for (const sg of [1, -1]) { const p = add(add(j.p, d1, sg * (Bv[2] / 2 + 24)), d2, sg * (A[2] / 2 + 24)); if (ok(p, 8)) put('tlight', p, norm(sub(j.p, p)), .02); } }
+      // концы дорог, упирающиеся в другую: знак справа перед перекрёстком
+      for (const l of legs) for (const [e, o] of [[l[0], l[1]], [l[1], l[0]]]) { if (dist(e, j.p) > l[2] / 2 + Math.max(...legs.map(x => x[2])) / 2 + 30) continue; const into = norm(sub(e, o)), back = mul(into, -1), rt = perp(into);
+        const other = legs.find(x => x[4] !== l[4]); if (!other) continue; if (l[3] === 'main' || (l[3] === 'street' && other[3] !== 'main')) continue;
+        const p = add(add(j.p, back, other[2] / 2 + 40), rt, -(l[2] / 2 + 18)); if (ok(p, 8)) put(l[3] === 'dirt' ? 'yieldS' : 'stop', p, back, .03); } }
+    // въезды в город по трассам: щит населённого пункта (перечёркнутый) и «50»
+    const cen = [40, -20]; for (const sg of segs) { if (sg[3] !== 'main') continue; const d = norm(sub(sg[1], sg[0])), n = perp(d);
+      for (const dd of [760, 1700]) { const ab = sub(sg[1], sg[0]); for (let t = 0; t <= 1; t += .01) { const q = add(sg[0], ab, t); if (Math.abs(dist(q, cen) - dd) > 12) continue; const toC = norm(sub(cen, q)), fwd = dot(toC, d) > 0 ? d : mul(d, -1), side = perp(fwd);
+        const p = add(q, side, -(sg[2] / 2 + 30)); if (ok(p, 30)) put(dd > 1000 ? 'town' : 'speed', p, mul(fwd, -1), .02); break; } } }
+    // остановки у автобусов, стоящих у бровки
+    for (const o of objs) { if (o.type !== 'bus') continue; const sg = segs.reduce((best, s) => { const ab = sub(s[1], s[0]), t = Math.max(0, Math.min(1, dot(sub(o.p, s[0]), ab) / dot(ab, ab))), dd = dist(o.p, add(s[0], ab, t)); return !best || dd < best[1] ? [s, dd, add(s[0], ab, t)] : best; }, null);
+      if (!sg || sg[1] < sg[0][2] / 2 - 70) continue; const out = norm(sub(o.p, sg[2])), p = add(sg[2], out, sg[0][2] / 2 + 36), d = norm(sub(sg[0][1], sg[0][0]));
+      if (ok(p, 30)) put('shelter', p, mul(perp(mul(out, -1)), -1), 0); } // открытой стороной (+z) к дороге
+    for (const k in G) { if (!items[k].length) continue; const mesh = new T.InstancedMesh(G[k], worldMat({ vertexColors: true }), items[k].length);
+      items[k].forEach((m, i) => { mesh.setMatrixAt(i, m); mesh.setColorAt(i, new T.Color(0xffffff)); }); mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false; scene.add(mesh); streetMeshes.push(mesh); }
+    return items;
+  }
   function buildStreets(objs) {
     for (const m of streetMeshes) scene.remove(m); streetMeshes = [];
     const plan = planStreets(objs), paths = []; streetPlan = plan;
@@ -1231,6 +1324,7 @@ void main(){
     layer(edges, 3.2, .12, 'asphaltMark', 0xd8d2bf, false);
     layer(zebra, 11, .12, 'asphaltMark', 0xdedad0, false);
     layer(paths, 28, .16, 'paving', 0xb1a995);
+    buildStreetFurniture(objs, plan, paths);
     if (GROUNDED) buildGrassMask(objs, plan.segs, paths);
 
   }
