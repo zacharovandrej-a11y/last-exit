@@ -43,10 +43,8 @@ button.alt{background:#2a1212;border:2px solid #ff3b3b;box-shadow:none}
 .hero-visual{position:relative;min-width:0;margin:0;overflow:hidden;border:1px solid #5c4d42;border-radius:10px;aspect-ratio:1;max-height:clamp(145px,35vh,280px);background:radial-gradient(ellipse at 50% 66%,#58483b,#1c2021 72%)}
 .hero-visual img,#skin{width:100%;height:100%;display:block;object-fit:contain}
 .hero-visual img{object-fit:cover;object-position:center 37%}
-.hero-visual figcaption{position:absolute;left:7px;bottom:6px;font-size:11px;font-weight:700;color:#f0dfca;background:#171712b8;padding:3px 6px;border-radius:4px;pointer-events:none}
-.hero-profile{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:10px 0;min-height:35px}
+.hero-profile{margin:10px 0}
 #hero-name{font-size:20px;color:#ffd8a7}
-#hero-look{color:#c8b8a7;font-size:13px}
 #hero-roster{position:relative;display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x proximity;overscroll-behavior-x:contain;padding-bottom:4px;scrollbar-width:thin;touch-action:pan-x pan-y}
 #hero-roster button{flex:1 0 clamp(66px,12vw,86px);min-width:0;padding:3px;display:grid;gap:3px;justify-items:center;font-size:11px;line-height:1.15;border-radius:7px;border:1px solid #645647;-webkit-tap-highlight-color:transparent;color:#ede2d4;background:#322a25;box-shadow:none;scroll-snap-align:start}
 #hero-roster button[aria-pressed="true"]{border-color:#ffbc7a;background:#5a3e2b;color:#fff5e2}
@@ -70,7 +68,7 @@ button.alt{background:#2a1212;border:2px solid #ff3b3b;box-shadow:none}
   .start-actions button{flex:1 1 auto}
   #start #rooms{width:100%;max-height:28vh}
   .hero-visual{max-height:154px}
-  .hero-profile{min-height:0;margin:6px 0}
+  .hero-profile{margin:6px 0}
   .start-title h1{font-size:32px}
   #hero-roster img{aspect-ratio:1.8}
 }
@@ -87,10 +85,10 @@ button.alt{background:#2a1212;border:2px solid #ff3b3b;box-shadow:none}
         <button id="skn" type="button" aria-label="Следующий персонаж">›</button>
       </div>
       <div class="hero-stage">
-        <figure class="hero-visual"><img id="hero-photo" alt=""><figcaption>Портрет</figcaption></figure>
-        <figure class="hero-visual"><canvas id="skin" width="260" height="260" role="img"></canvas><figcaption>В игре</figcaption></figure>
+        <figure class="hero-visual"><img id="hero-photo" alt=""></figure>
+        <figure class="hero-visual"><canvas id="skin" width="260" height="260" role="img"></canvas></figure>
       </div>
-      <div class="hero-profile" aria-live="polite"><strong id="hero-name"></strong><span id="hero-look"></span></div>
+      <div class="hero-profile" aria-live="polite"><strong id="hero-name"></strong></div>
       <div id="hero-roster" role="group" aria-label="Персонажи"></div>
     </section>
     <div class="start-actions">

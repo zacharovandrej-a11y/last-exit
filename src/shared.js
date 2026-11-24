@@ -503,14 +503,14 @@ const CHARS = [
 ];
 const pickW = (rnd, a) => { let x = rnd() * a.reduce((m, o) => m + o.w, 0); for (let i = 0; i < a.length; i++) { x -= a[i].w; if (x < 0) return i; } return 0; };
 const PLAYABLE_HEROES = [
-  { id: 0, name: 'Военный', look: 'Каска и полевая форма' },
-  { id: 10, name: 'Женщина', look: 'Тёмные распущенные волосы и полевая куртка' },
-  { id: 11, name: 'Батюшка', look: 'Чёрная ряса и золотой крест' },
-  { id: 12, name: 'Монахиня', look: 'Тёмное облачение и покрывало' },
-  { id: 13, name: 'Бабушка', look: 'Платок и тёплая кофта' },
-  { id: 14, name: 'Горожанин', look: 'Красная кепка, белая майка и джинсы' },
-  { id: 15, name: 'Фельдшер', look: 'Бордовая куртка с медицинским знаком' },
-  { id: 16, name: 'Механик', look: 'Синий комбинезон и рабочие перчатки' }
+  { id: 0, name: 'Военный' },
+  { id: 10, name: 'Женщина' },
+  { id: 11, name: 'Батюшка' },
+  { id: 12, name: 'Монахиня' },
+  { id: 13, name: 'Бабушка' },
+  { id: 14, name: 'Горожанин' },
+  { id: 15, name: 'Фельдшер' },
+  { id: 16, name: 'Механик' }
 ];
 function playableSkin(id) {
   return (Number.isInteger(id) && id >= 0 && id <= 9) || PLAYABLE_HEROES.some(hero => hero.id === id) ? id : 0;

@@ -50,7 +50,6 @@ function selectHero(index, reveal) {
   $('hero-photo').src = portraitURL(hero);
   $('hero-photo').alt = 'Портрет — ' + hero.name;
   $('hero-name').textContent = hero.name;
-  $('hero-look').textContent = hero.look;
   $('skin').setAttribute('aria-label', '3D-модель — ' + hero.name);
   heroButtons.forEach((button, i) => button.setAttribute('aria-pressed', i === heroIndex));
   if (reveal) {
