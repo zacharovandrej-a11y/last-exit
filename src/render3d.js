@@ -1282,7 +1282,8 @@ void main(){
       && !nearObjs(objs, p, r + 60).some(o => !o.nc && o.type !== 'bush' && objPush(o, p, r)) && !onAsphalt(p, 2) && !onWalk(p) && !taken.some(q => dist(p, q) < r + 14);
     // поворот: локальная +x модели смотрит в направление dir (на карте)
     const SY = { lamp: .82, tlight: .85 }; // в изометрии высокие столбы заслоняют игру — чуть ниже реальных
-    const put = (k, p, dir, tilt = 0) => { taken.push(p); items[k].push(new T.Matrix4().compose(new T.Vector3(p[0], 0, p[1]), new T.Quaternion().setFromEuler(new T.Euler(tilt * (R() - .5), Math.atan2(-dir[1], dir[0]), tilt * (R() - .5), 'YXZ')), new T.Vector3(1, SY[k] || 1, 1))); };
+    const TALL = { lamp: 1, tlight: 1, pole: 1 }; // высокие столбы не ставим у точки старта: в изометрии они заслоняют героев
+    const put = (k, p, dir, tilt = 0) => { if (TALL[k] && dist(p, ZSPAWN) < 260) return; taken.push(p); items[k].push(new T.Matrix4().compose(new T.Vector3(p[0], 0, p[1]), new T.Quaternion().setFromEuler(new T.Euler(tilt * (R() - .5), Math.atan2(-dir[1], dir[0]), tilt * (R() - .5), 'YXZ')), new T.Vector3(1, SY[k] || 1, 1))); };
     const inJ = (p, pad) => plan.junctions.some(j => dist(p, j.p) < j.r + pad), urban = p => objs.blds.some(b => dist(b.p, p) < 520);
     for (const [a, b, w, k] of segs) { const L = dist(a, b), d = norm(sub(b, a)), n = perp(d);
       if (k !== 'dirt') { // фонари: на улицах всегда, на трассе — только среди домов; шахматный порядок
@@ -2168,7 +2169,26 @@ void main(){
     x.fillStyle = '#f0e3cd'; x.fillRect(14, 21, 11, 5); x.fillRect(39, 21, 11, 5);
     x.fillStyle = '#3e4745'; x.fillRect(19, 21, 4, 5); x.fillRect(41, 21, 4, 5);
     x.strokeStyle = '#956958'; x.lineWidth = 2; x.beginPath(); x.moveTo(23, 46); x.quadraticCurveTo(32, 49, 41, 46); x.stroke(); return new T.CanvasTexture(c); })();
+  // игровые герои: цельное тело со скелетом (HeroBody, src/hero.js) на тех же суставах — анимация общая
+  function makeHero(ch) {
+    const g = new T.Group(), body = new T.Group(); g.add(body);
+    if (STYLE !== 'real') g.scale.setScalar(1.15);
+    const grp = par => { const o = new T.Group(); par.add(o); return o; };
+    const legR = grp(body), kneeR = grp(legR), legL = grp(body), kneeL = grp(legL), armR = grp(body), elR = grp(armR), armL = grp(body), elL = grp(armL), head = grp(body);
+    const hb = HeroBody.attach(T, RAIDER_SUIT_MODEL, ch, { body, head, armR, elR, armL, elL, legR, kneeR, legL, kneeL }), gy = armR.position.y - 39;
+    armR.rotation.set(-.35, 0, .12); elR.rotation.x = -1.25; armL.rotation.set(-1.0, 0, -.45); elL.rotation.set(-.5, 0, .35);
+    const gunHold = grp(body); gunHold.position.set(2.6, 32.5 + gy, 8);
+    const handHold = new T.Group(); handHold.position.set(0, -hb.hand, .5); handHold.rotation.x = Math.PI / 2 - .2; elR.add(handHold);
+    const itemG = grp(elR), vest = grp(body); vest.visible = false; vest.position.y = gy; vest.scale.set(.8, .9, .92);
+    const vp = (c, x, y, z, sx, sy, sz) => { const o = new T.Mesh(geo.box, lam(c)); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.castShadow = true; vest.add(o); };
+    vp(0x6b6248, 0, 31.5, .6, 14.4, 12, 9.4); for (let i = -1; i <= 1; i++) vp(0x585040, i * 4.2, 29.5, 5.6, 3.6, 4.6, 1.6);
+    const shadow = new T.Mesh(new T.CircleGeometry(11, 16), new T.MeshBasicMaterial({ color: 0, transparent: true, opacity: .22, depthWrite: false })); shadow.rotation.x = -Math.PI / 2; shadow.position.y = .6; g.add(shadow);
+    const m = hb.mesh.material, mats = { shirt: m, skin: m, pants: m };
+    g.userData = { body, legL, legR, kneeL, kneeR, armL, armR, elL, elR, itemG, civ: false, sectLook: false, head, torso: null, vest, gunHold, handHold, gunNode: gunHold, muz: 18, gunKey: '', mats, shadow, ready: 0, fireT: 9, hero: 1, arm: hb.arm, gy };
+    return g;
+  }
   function makeChar(ch) {
+    if (HeroBody.has(ch) && typeof RAIDER_SUIT_MODEL !== 'undefined') return makeHero(ch);
     const g = new T.Group(), body = new T.Group(); g.add(body);
     const hero = HERO_MODELS[ch];
     const cv = hero || (ch >= CH_SECT ? CIV_S[(ch - CH_SECT) % 4] : ch >= 100 ? CIV[(ch - 100) % CIV.length] : null);
@@ -2325,8 +2345,8 @@ void main(){
   }
   // руки к точке: плечо + локоть (простая двухзвенная IK), локти смотрят вниз-наружу
   const _ik = { t: new T.Vector3(), h: new T.Vector3(), q: new T.Quaternion(), q2: new T.Quaternion(), p: new T.Vector3() };
-  function reach(sh, el, target, side) {
-    const A = 9.4, Bn = 9.2, t = _ik.t.copy(target).sub(sh.position); let d = t.length(); d = Math.min(A + Bn - .1, Math.max(1.5, d));
+  function reach(sh, el, target, side, A = 9.4, Bn = 9.2) {
+    const t = _ik.t.copy(target).sub(sh.position); let d = t.length(); d = Math.min(A + Bn - .1, Math.max(1.5, d));
     const th = Math.PI - Math.acos(Math.max(-1, Math.min(1, (A * A + Bn * Bn - d * d) / (2 * A * Bn))));
     el.rotation.set(-th, 0, 0);
     _ik.h.set(0, -A - Bn * Math.cos(th), Bn * Math.sin(th)).normalize(); t.normalize();
@@ -2366,7 +2386,7 @@ void main(){
       u.armR.rotation.set(-.4 * (1 - e) + reachR * e, 0, .35 * e); u.elR.rotation.set(-(.35 + .7 * Math.max(0, c2) * cr) * e, 0, 0);
       u.legL.rotation.x = (.1 + s2 * .22 * cr) * e; u.legR.rotation.x = (.1 - s2 * .22 * cr) * e; u.kneeL.rotation.x = (.5 + Math.max(0, s2) * .6 * cr) * e; u.kneeR.rotation.x = (.5 + Math.max(0, -s2) * .6 * cr) * e;
       u.head.rotation.x = -1.0 * e + (cr ? 0 : Math.sin(now * 3) * .08);
-      const pulse = .25 + .25 * Math.sin(now * 7); u.mats.shirt.emissive.setRGB(pulse * .5, 0, 0); u.mats.skin.emissive.setRGB(pulse * .3, 0, 0); u.gunHold.position.set(2.6, 32.5, 8); u.gunHold.rotation.set(0, 0, 0); return;
+      const pulse = .25 + .25 * Math.sin(now * 7); u.mats.shirt.emissive.setRGB(pulse * .5, 0, 0); u.mats.skin.emissive.setRGB(pulse * .3, 0, 0); u.gunHold.position.set(2.6, 32.5 + (u.gy || 0), 8); u.gunHold.rotation.set(0, 0, 0); return;
     }
     if (opt.dead) { // смерть: подкашиваются колени, падает от выстрела, отскок, руки разлетаются
       const t = opt.deadT || 0, f = opt.fall || [-sy, -cy], lf = f[0] * sy + f[1] * cy, lr = f[0] * cy - f[1] * sy;
@@ -2376,7 +2396,7 @@ void main(){
       const sl = Math.min(1, t / .4); c.position.x += f[0] * (1 - Math.pow(1 - sl, 2)) * 12; c.position.z += f[1] * (1 - Math.pow(1 - sl, 2)) * 12;
       u.kneeL.rotation.x = kb * 1.1 * (1 - e * .7); u.kneeR.rotation.x = kb * .8 * (1 - e * .6); u.legL.rotation.x = -kb * .5 * (1 - e) + e * .2; u.legR.rotation.x = -kb * .3 * (1 - e) - e * .15;
       u.armL.rotation.set(-.6 - e * 1.4 * (id % 2 ? 1 : .4), 0, -.3 - e * .7); u.armR.rotation.set(-.4 - e * 1.1 * (id % 2 ? .5 : 1), 0, .3 + e * .8); u.elL.rotation.set(-.3, 0, 0); u.elR.rotation.set(-.4, 0, 0);
-      u.head.rotation.x = -e * .4 * lf; u.mats.shirt.emissive.setScalar(0); u.mats.skin.emissive.setScalar(0); u.gunHold.position.set(2.6, 32.5, 8); u.gunHold.rotation.set(.9, -.3, 0); return;
+      u.head.rotation.x = -e * .4 * lf; u.mats.shirt.emissive.setScalar(0); u.mats.skin.emissive.setScalar(0); u.gunHold.position.set(2.6, 32.5 + (u.gy || 0), 8); u.gunHold.rotation.set(.9, -.3, 0); return;
     }
     // походка: амплитуда от реальной скорости — шаг жителя и бег бойца отличаются
     u.amp += (Math.min(1.2, spd / 150) * (opt.moving || spd > 25 ? 1 : 0) - u.amp) * Math.min(1, dt * 8);
@@ -2402,10 +2422,12 @@ void main(){
       if (r > .5) { u.armL.rotation.set(-1.1 * r, 0, -.35 * r + -.12 * (1 - r)); u.elL.rotation.set(-.8 * r, 0, 0); } // вторая рука подхватывает при стрельбе
     } else if (w) { // длинное оружие: обе руки на оружии; на ходу — стволом вниз поперёк груди, при стрельбе — к плечу
       const r = u.ready, G = u.gunHold;
-      G.position.set(2.2 * r + 1 * (1 - r), (35.5 * r + 31.5 * (1 - r)) + Math.sin(ph * 2) * .7 * a, (4.5 * r + 5.5 * (1 - r)) - u.rec * 3.2);
+      const hz = u.hero ? 2.6 : 0; // у героев руки короче и реалистичнее: оружие ближе к телу, на высоте их плеча
+      G.position.set(2.2 * r + 1 * (1 - r), (35.5 * r + 31.5 * (1 - r)) + (u.gy || 0) + Math.sin(ph * 2) * .7 * a, (4.5 * r + 5.5 * (1 - r)) - hz - u.rec * 3.2);
       G.rotation.set(.5 * (1 - r) - u.rec * .08, -.45 * (1 - r), .25 * (1 - r)); G.updateMatrix();
-      reach(u.armR, u.elR, _ik.p.copy(GRIP).applyMatrix4(G.matrix), 1);
-      reach(u.armL, u.elL, _ik.p.set(0, -2, FORE[w] || 9).applyMatrix4(G.matrix), -1);
+      const AR = u.arm || [9.4, 9.2];
+      reach(u.armR, u.elR, _ik.p.copy(GRIP).applyMatrix4(G.matrix), 1, AR[0], AR[1]);
+      reach(u.armL, u.elL, _ik.p.set(0, -2, (FORE[w] || 9) * (u.hero ? .7 : 1)).applyMatrix4(G.matrix), -1, AR[0], AR[1]);
     }
     // отдача и вздрагивание от попадания (откидывает назад)
     if (opt.hit && !u.wasHit) u.fl = 1; u.wasHit = !!opt.hit; u.fl = Math.max(0, u.fl - dt * 5);
