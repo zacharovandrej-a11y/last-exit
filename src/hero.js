@@ -92,26 +92,30 @@ const HeroBody = (() => {
       const top = [...rw.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4), sum = top.reduce((m, e) => m + e[1], 0);
       for (let k = 0; k < 4; k++) { SKI.push(top[k] ? top[k][0] : 0); SKW.push(top[k] ? top[k][1] / sum : 0); } }
     // ---------- голова из MakeHuman с морфами под героя (tools/build_heads.py): своё лицо, настоящие глаза и ресницы ----------
-    if (typeof HERO_HEADS !== 'undefined' && HERO_HEADS.heroes[id]) {
-      const D = HERO_HEADS, dec = (str, A) => { const b = atob(str), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return new A(u.buffer); };
-      const HO = dec(D.orig, Int16Array), HP = dec(D.heroes[id], Int16Array), HT = dec(D.part, Uint8Array), HI = dec(D.idx, Uint16Array);
-      const keep = []; for (let t = 0; t < I.length; t += 3) { if (ORIG[I[t] * 3 + 1] > 17.85 && ORIG[I[t + 1] * 3 + 1] > 17.85 && ORIG[I[t + 2] * 3 + 1] > 17.85) continue; keep.push(I[t], I[t + 1], I[t + 2]); } I = keep; // голова «костюма» уходит
-      const base = POS.length / 3, sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-      // морф сдвигает голову целиком (у мужчин шея длиннее): низ шеи прижимаем к телу, разницу гасим к срезу
-      const dN = [0, 0, 0]; let nN = 0; for (let v = 0; v < D.n; v++) if (HO[v * 3 + 1] < 17600) { for (let d = 0; d < 3; d++) dN[d] += (HP[v * 3 + d] - HO[v * 3 + d]) / 1000; nN++; } dN.forEach((q, d) => dN[d] = q / Math.max(1, nN));
-      const hc0 = [0, 0, 0], hc1 = [0, 0, 0]; let nc = 0;
-      for (let v = 0; v < D.n; v++) { const ox = HO[v * 3] / 1000, oy = HO[v * 3 + 1] / 1000, oz = HO[v * 3 + 2] / 1000, f = sm(17.2, 18.3, oy);
-        let x = ox + (HP[v * 3] / 1000 - dN[0] - ox) * f, y = oy + (HP[v * 3 + 1] / 1000 - dN[1] - oy) * f, z = oz + (HP[v * 3 + 2] / 1000 - dN[2] - oz) * f;
-        if (L_.old && oy > 16.5) z += .9 * Math.min(1, (oy - 16.5) / 3);
-        if (oy > 20.5 && !HT[v]) { hc0[0] += ox; hc0[1] += oy; hc0[2] += oz; hc1[0] += x; hc1[1] += y; hc1[2] += z; nc++; }
-        const sh = 1 - .05 * sm(18.0, 17.2, oy); x *= sh; z = .3 + (z - .3) * sh; // низ шеи чуть внутрь воротника тела — без шва
-        const r = S(x, y, z), wh = sm(17.3, 18.9, oy), pt = HT[v]; POS.push(r.x, r.y, r.z); ORIG.push(ox, oy, oz); RG.push(pt ? 1 : sm(17.2, 17.9, oy), 0, 0, 0); MAT.push(pt === 1 ? 18 : pt === 2 ? 19 : 0);
-        SKI.push(1, 0, 0, 0); SKW.push(wh, 1 - wh, 0, 0); }
-      for (let k = 0; k < HI.length; k++) I.push(base + HI[k]);
-      // размер и место черепа у героя — по ним ставятся волосы, каска, платок
-      let r0 = 0, r1 = 0; for (let v = 0; v < D.n; v++) { const oy = HO[v * 3 + 1] / 1000; if (oy <= 20.5 || HT[v]) continue; const ox = HO[v * 3] / 1000, oz = HO[v * 3 + 2] / 1000, i = (base + v) * 3;
-        r0 += Math.hypot(ox - hc0[0] / nc, oy - hc0[1] / nc, oz - hc0[2] / nc); r1 += Math.hypot(POS[i] / K - hc1[0] / nc, POS[i + 1] / K - Y0 - hc1[1] / nc, POS[i + 2] / K - hc1[2] / nc); }
-      headFit = { d: V((hc1[0] - hc0[0]) / nc * K, (hc1[1] - hc0[1]) / nc * K, (hc1[2] - hc0[2]) / nc * K), s: r1 / r0 }; }
+    // ---------- голова из ассетов MakeHuman (tools/build_heroes.py): морфы лица, фото-кожа, глаза, брови, ресницы, волосы прядями ----------
+    const HA = HD[id], EXTRA = [];
+    if (HA) {
+      const dec = (str, A) => { const b = atob(str), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return new A(u.buffer); };
+      const keep = []; for (let t = 0; t < I.length; t += 3) { if (Math.max(ORIG[I[t] * 3 + 1], ORIG[I[t + 1] * 3 + 1], ORIG[I[t + 2] * 3 + 1]) > 17.55 && Math.min(RG[I[t] * 4 + 1], RG[I[t + 1] * 4 + 1], RG[I[t + 2] * 4 + 1]) < .3) continue; keep.push(I[t], I[t + 1], I[t + 2]); } I = keep; // голова и шея «костюма» уходят, край прячется под шеей новой головы
+      const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+      const hp = dec(HA.head.pos, Int16Array), ho = dec(HA.head.orig, Int16Array), hn = hp.length / 3;
+      // морф сдвигает голову целиком: низ шеи прижимаем к телу, разницу гасим к срезу
+      const dN = [0, 0, 0]; let nN = 0; for (let v = 0; v < hn; v++) if (ho[v * 3 + 1] < 17600) { for (let d = 0; d < 3; d++) dN[d] += (hp[v * 3 + d] - ho[v * 3 + d]) / 1000; nN++; } dN.forEach((q, d) => dN[d] = q / Math.max(1, nN));
+      const place = (px, py, pz, ox, oy, oz) => { const f = sm(17.2, 18.3, oy); let x = ox + (px - dN[0] - ox) * f, y = oy + (py - dN[1] - oy) * f, z = oz + (pz - dN[2] - oz) * f;
+        if (L_.old && oy > 16.5) z += .9 * Math.min(1, (oy - 16.5) / 3); const sh = 1 - .06 * sm(17.35, 17.0, oy); x *= sh; z = .3 + (z - .3) * sh; return S(x, y, z); };
+      const part = (src, kind, tex, tint) => { const pp = dec(src.pos, Int16Array), po = dec(src.orig, Int16Array), uv = dec(src.uv, Uint16Array), ix = dec(src.idx, Uint16Array), n = pp.length / 3;
+        const P = new Float32Array(n * 3), U = new Float32Array(n * 2), SI = new Uint16Array(n * 4), SW = new Float32Array(n * 4), OY = new Float32Array(n);
+        for (let v = 0; v < n; v++) { const oy = po[v * 3 + 1] / 1000, r = place(pp[v * 3] / 1000, pp[v * 3 + 1] / 1000, pp[v * 3 + 2] / 1000, po[v * 3] / 1000, oy, po[v * 3 + 2] / 1000);
+          P[v * 3] = r.x; P[v * 3 + 1] = r.y; P[v * 3 + 2] = r.z; U[v * 2] = uv[v * 2] / 65535; U[v * 2 + 1] = uv[v * 2 + 1] / 65535; OY[v] = oy; const wh = sm(17.3, 18.9, oy); SI[v * 4] = 1; SW[v * 4] = wh; SW[v * 4 + 1] = 1 - wh; }
+        const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(P, 3)); g.setAttribute('uv', new T.BufferAttribute(U, 2)); g.setAttribute('skinIndex', new T.BufferAttribute(SI, 4)); g.setAttribute('skinWeight', new T.BufferAttribute(SW, 4));
+        g.setIndex(new T.BufferAttribute(new Uint32Array(ix), 1)); g.computeVertexNormals(); EXTRA.push({ g, kind, tex, tint }); return { P, po, n }; };
+      const H_ = part(HA.head, 'skin', HA.skin);
+      for (const q of HA.parts) part(q, q.k, q.tex, q.tint);
+      // размер и место черепа у героя — по ним ставятся каска, платок, кепка
+      const hc0 = [0, 0, 0], hc1 = [0, 0, 0]; let nc = 0; for (let v = 0; v < H_.n; v++) { const oy = H_.po[v * 3 + 1] / 1000; if (oy <= 20.5) continue; for (let d = 0; d < 3; d++) { hc0[d] += H_.po[v * 3 + d] / 1000; hc1[d] += H_.P[v * 3 + d]; } nc++; }
+      const c0 = S(hc0[0] / nc, hc0[1] / nc, hc0[2] / nc), c1 = V(hc1[0] / nc, hc1[1] / nc, hc1[2] / nc); let r0 = 0, r1 = 0;
+      for (let v = 0; v < H_.n; v++) { const oy = H_.po[v * 3 + 1] / 1000; if (oy <= 20.5) continue; r0 += S(H_.po[v * 3] / 1000, oy, H_.po[v * 3 + 2] / 1000).distanceTo(c0); r1 += V(H_.P[v * 3], H_.P[v * 3 + 1], H_.P[v * 3 + 2]).distanceTo(c1); }
+      headFit = { d: c1.clone().sub(c0), s: r1 / r0 }; }
     // ---------- одежда объёмом: ткань отстоит от тела, на локтях и коленях — складки ----------
     const nvBody = POS.length / 3, TH = CLOTH[id] || [0, 0, 0];
     { const tg = new T.BufferGeometry(); tg.setAttribute('position', new T.Float32BufferAttribute(POS, 3)); tg.setIndex(I); tg.computeVertexNormals(); const NN = tg.attributes.normal.array;
@@ -145,6 +149,7 @@ const HeroBody = (() => {
     const Sph = (s = 20, t = 14, tl = Math.PI) => new T.SphereGeometry(1, s, t, 0, Math.PI * 2, 0, tl), Bx = (x, y, z) => new T.BoxGeometry(x, y, z), Cy = (rt, rb, h, s = 16, open = false) => new T.CylinderGeometry(rt, rb, h, s, 1, open);
     const RB = (x, y, z, r = .35) => { const g = new T.BoxGeometry(x, y, z, 3, 3, 3), p = g.attributes.position, hx = x / 2 - r, hy = y / 2 - r, hz = z / 2 - r; for (let i = 0; i < p.count; i++) { const v = V(p.getX(i), p.getY(i), p.getZ(i)), c = V(Math.max(-hx, Math.min(hx, v.x)), Math.max(-hy, Math.min(hy, v.y)), Math.max(-hz, Math.min(hz, v.z))), d = v.sub(c); if (d.length() > 1e-5) d.setLength(r); p.setXYZ(i, c.x + d.x, c.y + d.y, c.z + d.z); } g.computeVertexNormals(); return g; }; // скруглённый ящик
     const k = L_.k;
+    const realHair = HA && HA.parts.some(q => q.k === 'hair');
     // кисти сжаты в кулак (держат оружие): пальцы подгибаются к ладони
     for (const [side, o] of [[1, 0], [-1, 6]]) { const Wr = TA[6 + o], ax_ = TB[6 + o].clone().sub(Wr).normalize(), L6 = len[6 + o];
       for (let v = 0; v < nv; v++) { if (RG[v * 4 + 1] + RG[v * 4 + 2] < .5 || POS[v * 3] * side < 0) continue; const d = V(POS[v * 3], POS[v * 3 + 1], POS[v * 3 + 2]).sub(Wr), t = d.dot(ax_); if (t < .3 * L6 || d.clone().addScaledVector(ax_, -t).length() > 5) continue; // пальцы весят и на предплечье
@@ -176,17 +181,17 @@ const HeroBody = (() => {
       add(RB(7, 7.4, 3.2, .8), at(cb.clone().add(V(0, -.6 * K, -2.4 * K)), 1, 1, 1), 0, 7); // рюкзачок
       const hip = surf(4.6, 2.6, 1); add(RB(1.6, 3.4, 2.4, .3), at(V(hip.x + .8, hip.y - .4, hip.z - 1.2), 1, 1, 1), 0, 12); // кобура
     }
-    if (k === 1) { // женщина: распущенные тёмные волосы, воротник куртки
+    if (k === 1 && !realHair) { // женщина: распущенные тёмные волосы (пока нет настоящих)
       add(Sph(28, 16, Math.PI * .62), Lm(0, headC.y + .1 * K, headC.z - .05 * K, 2.98 * K, 3.38 * K, 3.32 * K, -1.0), 1, 4);
       const back = new T.SphereGeometry(1, 20, 14); add(back, Lm(0, H(0, 17.8, 0).y, H(0, 0, -1.3).z, 2.9 * K, 5.2 * K, 1.35 * K, .1), 1, 4);
       for (const s of [-1, 1]) { add(Sph(16, 12), Lm(s * 2.55 * K, H(0, 19.9, 0).y, H(0, 0, 1.3).z, .95 * K, 3.4 * K, 1.6 * K, .1, 0, s * .1), 1, 4); add(Sph(14, 10), Lm(s * 2.3 * K, H(0, 16.4, 0).y, H(0, 0, .1).z, 1.3 * K, 2.4 * K, 1.3 * K, .3, 0, s * .2), 0, 4); }
       add(Sph(16, 10), Lm(-.8 * K, H(0, 24.3, 0).y, H(0, 0, 3.7).z, 2.1 * K, .75 * K, 1.1 * K, .55, 0, .3), 1, 4); // чёлка набок
-      add(new T.TorusGeometry(1, .32, 8, 24, Math.PI * 1.4), Lm(0, H(0, 17.4, 0).y, H(0, 0, .35).z, 2.6 * K, 2.4 * K, 1.3 * K, Math.PI / 2 + .25, 0, Math.PI * 1.2), 0, 0); // воротник
     }
+    if (k === 1) add(new T.TorusGeometry(1, .32, 8, 24, Math.PI * 1.4), Lm(0, H(0, 17.4, 0).y, H(0, 0, .35).z, 2.6 * K, 2.4 * K, 1.3 * K, Math.PI / 2 + .25, 0, Math.PI * 1.2), 0, 0); // воротник
     if (k === 2) { // батюшка: борода, усы, седые волосы, скуфья, наперсный крест на цепи
       add(Sph(18, 14), Lm(0, H(0, 18.2, 0).y, H(0, 0, 2.85).z, 2.1 * K, 2.7 * K, 1.5 * K, .22), 1, 5); for (const s of [-1, 1]) add(Sph(12, 10), Lm(s * 1.85 * K, H(0, 19.7, 0).y, H(0, 0, 2.3).z, .85 * K, 1.9 * K, 1.2 * K, .1, 0, s * .2), 1, 5);
       add(Sph(14, 8), Lm(0, H(0, 19.85, 0).y, H(0, 0, 4.45).z, 1.3 * K, .38 * K, .5 * K), 1, 5);
-      add(Sph(18, 12), Lm(0, H(0, 20.6, 0).y, H(0, 0, -.5).z, 2.55 * K, 2.6 * K, 1.3 * K, -.2), 1, 4);
+      if (!realHair) add(Sph(18, 12), Lm(0, H(0, 20.6, 0).y, H(0, 0, -.5).z, 2.55 * K, 2.6 * K, 1.3 * K, -.2), 1, 4);
       add(Sph(24, 10, Math.PI * .5), Lm(0, H(0, 23.4, 0).y, headC.z - .15, 2.95 * K, 2.15 * K, 3.1 * K, -.12), 1, 8);
       const cf = surf(0, 10.2, 1); add(Bx(.9, 4.8, .4), at(cf.clone().add(V(0, 0, .5)), 1, 1, 1), 0, 3); add(Bx(3.4, .9, .4), at(cf.clone().add(V(0, 1.1 * K, .5)), 1, 1, 1), 0, 3);
       add(Bx(2.2, .6, .38), at(cf.clone().add(V(0, -1.3 * K, .52)), 1, 1, 1, 0, 0, -.3), 0, 3);
@@ -208,7 +213,7 @@ const HeroBody = (() => {
       add(Cy(1, 1, .2, 24), Lm(0, H(0, 23.35, 0).y, H(0, 0, 4.55).z, 2.3 * K, K, 2.1 * K, -.12), 1, 11);
       add(Sph(8, 6), Lm(0, H(0, 25.6, 0).y, headC.z - .1, .35 * K, .25 * K, .35 * K), 1, 11);
     }
-    if (k === 6 || k === 7) { // короткая мужская стрижка объёмом: шапочка волос чуть над кожей, открытый лоб
+    if ((k === 6 || k === 7) && !realHair) { // короткая мужская стрижка объёмом: шапочка волос чуть над кожей, открытый лоб
       add(Sph(28, 14, Math.PI * .56), Lm(0, headC.y + .15 * K, headC.z - .2 * K, 2.86 * K, 3.22 * K, 3.16 * K, -1.25), 1, 4); }
     if (k === 6) { // фельдшер: сумка через плечо с крестом
       const cb = surf(4.8, 3.5, 1); add(RB(2.6, 4.4, 5.2, .6), at(V(5.6 * K, cb.y - .5, (cb.z + surf(4.8, 3.5, -1).z) / 2), 1, 1, 1), 0, 14);
@@ -225,7 +230,7 @@ const HeroBody = (() => {
     g.setAttribute('rg', new T.Float32BufferAttribute(RG, 4)); g.setAttribute('bmat', new T.Float32BufferAttribute(MAT, 1)); g.setAttribute('ao', new T.Float32BufferAttribute(AO, 1));
     g.setAttribute('skinIndex', new T.Uint16BufferAttribute(SKI, 4)); g.setAttribute('skinWeight', new T.Float32BufferAttribute(SKW, 4));
     g.setIndex(I); g.computeVertexNormals(); g.computeBoundingSphere();
-    return { geometry: g, J, restOf, arm: [len[4] * 1, len[5] + len[6] * .55], hand: len[5] + len[6] * .68, legLen: len[7] };
+    return { geometry: g, extras: EXTRA, skinRGB: HA && HA.skinRGB, J, restOf, arm: [len[4] * 1, len[5] + len[6] * .55], hand: len[5] + len[6] * .68, legLen: len[7] };
   }
   // ---------- одежда шейдером: координаты исходной модели (vO), доли костей (vRg: голова, рука, кисть, стопа), вещь (vM) ----------
   const FRAG = `
@@ -369,13 +374,13 @@ const HeroBody = (() => {
     15: { FEMB: 1, LIPC: 'vec3(.8,.58,.54)', STUBBLE: .5, SHORTHAIR: 1, CUFF: 1, BELTC: 'vec3(.12,.12,.12)', SHOEC: 'vec3(.07,.07,.07)', SOLEC: 'vec3(.05)', LACES: 1 },
     16: { FEMB: 1, LIPC: 'vec3(.8,.58,.54)', STUBBLE: 1, SHORTHAIR: 1, CUFF: 1, BELTC: 'vec3(.2,.14,.09)', SHOEC: 'vec3(.24,.16,.1)', SOLEC: 'vec3(.07)', LACES: 1 },
   };
-  function material(T, id) {
+  function material(T, id, skinRGB) {
     const L_ = LOOK[id], c = CFG[id], col = h => new T.Color(h);
     const mat = new T.MeshPhongMaterial({ color: 0xffffff, specular: 0x302c28, shininess: 30, skinning: true }); // three r128: скиннинг включается флагом материала
-    mat.customProgramCacheKey = () => 'hero' + id;
+    mat.customProgramCacheKey = () => 'hero' + id + (skinRGB ? 'r' : '');
     mat.onBeforeCompile = sh => {
-      Object.assign(sh.uniforms, { uEye: { value: new T.Vector3(Math.abs(RAIDER_SUIT_MODEL.eyes[0][0]), RAIDER_SUIT_MODEL.eyes[0][1], RAIDER_SUIT_MODEL.eyes[0][2]) }, uSkin: { value: col(L_.skin) }, uHair: { value: col(L_.hair) }, uA: { value: col(L_.a) }, uB: { value: col(L_.b) }, uC: { value: col(L_.c) } });
-      const defs = `#define HK ${L_.k}\n#define REALEYES ${typeof HERO_HEADS !== 'undefined' ? '1.' : '0.'}\n#define IRIS ${L_.hair < 0x404040 ? 'vec3(.28,.17,.1)' : 'vec3(.3,.42,.5)'}\n` + Object.entries(c).map(([k, v]) => `#define ${k} ${typeof v === 'number' ? v.toFixed(3) : v}`).join('\n') + '\n';
+      Object.assign(sh.uniforms, { uEye: { value: new T.Vector3(Math.abs(RAIDER_SUIT_MODEL.eyes[0][0]), RAIDER_SUIT_MODEL.eyes[0][1], RAIDER_SUIT_MODEL.eyes[0][2]) }, uSkin: { value: skinRGB ? new T.Color(skinRGB[0], skinRGB[1], skinRGB[2]).multiplyScalar(1.02) : col(L_.skin) }, uHair: { value: col(L_.hair) }, uA: { value: col(L_.a) }, uB: { value: col(L_.b) }, uC: { value: col(L_.c) } });
+      const defs = `#define HK ${L_.k}\n#define REALEYES ${skinRGB ? '1.' : '0.'}\n#define IRIS ${L_.hair < 0x404040 ? 'vec3(.28,.17,.1)' : 'vec3(.3,.42,.5)'}\n` + Object.entries(c).map(([k, v]) => `#define ${k} ${typeof v === 'number' ? v.toFixed(3) : v}`).join('\n') + '\n';
       sh.vertexShader = 'attribute vec3 orig; attribute vec4 rg; attribute float bmat; attribute float ao; varying vec3 vO; varying vec4 vRg; varying float vM; varying float vAO;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvO = orig; vRg = rg; vM = bmat; vAO = ao;');
       sh.fragmentShader = defs + 'uniform vec3 uSkin, uHair, uA, uB, uC, uEye; varying vec3 vO; varying vec4 vRg; varying float vM; varying float vAO;\n' + sh.fragmentShader
         .replace('#include <color_fragment>', '#include <color_fragment>\n' + FRAG)
@@ -390,16 +395,30 @@ const HeroBody = (() => {
   }
   // тело героя на суставах фигуры u (группы body, head, armR, elR, armL, elL, legR, kneeR, legL, kneeL)
   function attach(T, data, id, u) {
-    let b = cache.get(id); if (!b) { b = build(T, data, id); cache.set(id, b); }
+    const key = id + (HD[id] ? 'r' : ''); let b = cache.get(key); if (!b) { b = build(T, data, id); cache.set(key, b); }
     const J = b.J, set = (o, v, par) => o.position.copy(par ? v.clone().sub(par) : v);
     set(u.head, J.neck); set(u.armR, J.shR); set(u.elR, J.elR, J.shR); set(u.armL, J.shL); set(u.elL, J.elL, J.shL);
     set(u.legR, J.hipR); set(u.kneeR, J.knR, J.hipR); set(u.legL, J.hipL); set(u.kneeL, J.knL, J.hipL);
     const groups = [u.body, u.head, u.armR, u.elR, u.armL, u.elL, u.legR, u.kneeR, u.legL, u.kneeL], bones = groups.map(g => { const bn = new T.Bone(); g.add(bn); return bn; });
-    const mesh = new T.SkinnedMesh(b.geometry, material(T, id)); mesh.castShadow = true; mesh.frustumCulled = false; mesh.userData.noOutline = true; mesh.userData.noMerge = true;
+    const mesh = new T.SkinnedMesh(b.geometry, material(T, id, b.skinRGB)); mesh.castShadow = true; mesh.frustumCulled = false; mesh.userData.noOutline = true; mesh.userData.noMerge = true;
     u.body.add(mesh);
     const root = u.body.parent; root.updateMatrixWorld(true); // поза покоя: все суставы без поворота
-    mesh.bind(new T.Skeleton(bones));
-    return { mesh, arm: b.arm, hand: b.hand };
+    const sk = new T.Skeleton(bones); mesh.bind(sk);
+    for (const e of b.extras) { const m = new T.SkinnedMesh(e.g, extraMat(T, e)); m.castShadow = e.kind === 'skin'; m.frustumCulled = false; m.userData.noOutline = true; m.userData.noMerge = true; m.renderOrder = e.kind === 'hair' ? 2 : 1; u.body.add(m); m.bind(sk); }
+    return { mesh, arm: b.arm, hand: b.hand, rich: !!HD[id] };
   }
-  return { has: id => !!LOOK[id], attach };
+  // ---------- загрузка ассетов героя (/hero/<id>.json + текстуры webp): лениво, по требованию ----------
+  const HD = {}, loading = {}, TEX = {};
+  function tex(T, name) { if (!TEX[name]) { const t = new T.TextureLoader().load('/hero/' + name); t.anisotropy = 4; TEX[name] = t; } return TEX[name]; }
+  function extraMat(T, e) {
+    const o = { map: tex(T, e.tex), skinning: true, color: e.tint ? new T.Color(e.tint).multiplyScalar(e.kind === 'hair' ? 2.2 : 1.6) : 0xffffff };
+    if (e.kind === 'skin') return new T.MeshPhongMaterial(Object.assign(o, { color: 0xe6e2de, specular: 0x1a1612, shininess: 14 }));
+    if (e.kind === 'eye') return new T.MeshPhongMaterial(Object.assign(o, { specular: 0x666666, shininess: 90 }));
+    return new T.MeshPhongMaterial(Object.assign(o, { alphaTest: e.kind === 'hair' ? .42 : .3, side: T.DoubleSide, specular: e.kind === 'hair' ? 0x2a2622 : 0, shininess: 22, depthWrite: true }));
+  }
+  function load(id) {
+    if (!LOOK[id] || HD[id] || loading[id] || typeof fetch === 'undefined') return;
+    loading[id] = fetch('/hero/' + id + '.json').then(r => r.ok ? r.json() : null).then(d => { if (d) HD[id] = d; }).catch(() => {});
+  }
+  return { has: id => !!LOOK[id], attach, load, ready: id => !!HD[id] };
 })();

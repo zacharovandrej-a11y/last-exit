@@ -2175,6 +2175,7 @@ void main(){
     if (STYLE !== 'real') g.scale.setScalar(1.15);
     const grp = par => { const o = new T.Group(); par.add(o); return o; };
     const legR = grp(body), kneeR = grp(legR), legL = grp(body), kneeL = grp(legL), armR = grp(body), elR = grp(armR), armL = grp(body), elL = grp(armL), head = grp(body);
+    HeroBody.load(ch); // ассеты головы подгружаются; пока их нет — лёгкая версия, потом фигура пересобирается
     const hb = HeroBody.attach(T, RAIDER_SUIT_MODEL, ch, { body, head, armR, elR, armL, elL, legR, kneeR, legL, kneeL }), gy = armR.position.y - 39;
     armR.rotation.set(-.35, 0, .12); elR.rotation.x = -1.25; armL.rotation.set(-1.0, 0, -.45); elL.rotation.set(-.5, 0, .35);
     const gunHold = grp(body); gunHold.position.set(2.6, 32.5 + gy, 8);
@@ -2184,7 +2185,7 @@ void main(){
     vp(0x6b6248, 0, 31.5, .6, 14.4, 12, 9.4); for (let i = -1; i <= 1; i++) vp(0x585040, i * 4.2, 29.5, 5.6, 3.6, 4.6, 1.6);
     const shadow = new T.Mesh(new T.CircleGeometry(11, 16), new T.MeshBasicMaterial({ color: 0, transparent: true, opacity: .22, depthWrite: false })); shadow.rotation.x = -Math.PI / 2; shadow.position.y = .6; g.add(shadow);
     const m = hb.mesh.material, mats = { shirt: m, skin: m, pants: m };
-    g.userData = { body, legL, legR, kneeL, kneeR, armL, armR, elL, elR, itemG, civ: false, sectLook: false, head, torso: null, vest, gunHold, handHold, gunNode: gunHold, muz: 18, gunKey: '', mats, shadow, ready: 0, fireT: 9, hero: 1, arm: hb.arm, gy };
+    g.userData = { body, legL, legR, kneeL, kneeR, armL, armR, elL, elR, itemG, civ: false, sectLook: false, head, torso: null, vest, gunHold, handHold, gunNode: gunHold, muz: 18, gunKey: '', mats, shadow, ready: 0, fireT: 9, hero: 1, lite: !hb.rich, arm: hb.arm, gy };
     return g;
   }
   function makeChar(ch) {
@@ -2551,9 +2552,10 @@ void main(){
     }
     const now = performance.now();
     const still = previewMotion.matches;
-    if (pvCh === ch && pvStill === still && (still || now - pvLast < 32)) return;
-    if (pvCh !== ch) {
-      if (pvChar) pvScene.remove(pvChar);
+    const stale = previewHeroes.has(ch) && previewHeroes.get(ch).userData.lite && HeroBody.ready(ch); // пришли ассеты головы — пересобрать
+    if (pvCh === ch && !stale && pvStill === still && (still || now - pvLast < 32)) return;
+    if (pvCh !== ch || stale) {
+      if (pvChar) pvScene.remove(pvChar); if (stale) previewHeroes.delete(ch);
       if (!previewHeroes.has(ch)) {
         const figure = makeChar(ch), u = figure.userData;
         u.armL.rotation.set(-.08, 0, -.19); u.armR.rotation.set(-.06, 0, .19);
@@ -2612,7 +2614,7 @@ void main(){
     const seen = new Set();
     for (const e of list) {
       seen.add(e.id); let c = chars[e.id];
-      if (!c || c.userData.ch !== e.ch) { if (c) scene.remove(c); c = chars[e.id] = makeChar(e.ch); c.userData.ch = e.ch; scene.add(c); }
+      if (!c || c.userData.ch !== e.ch || (c.userData.lite && HeroBody.ready(e.ch))) { if (c) scene.remove(c); c = chars[e.id] = makeChar(e.ch); c.userData.ch = e.ch; scene.add(c); }
       c.visible = true; setGun(c, e.wb); poseChar(c, e.p, e.aim, e.walk, e);
       // парашют
       if (e.alt) { if (!c.userData.chute) { const ch = new T.Group(); for (let i = 0; i < 6; i++) { const seg = new T.Mesh(new T.SphereGeometry(24, 6, 4, i * Math.PI / 3, Math.PI / 3, 0, Math.PI / 2), lam(i % 2 ? 0xd8d4c8 : CAMO[e.ch % 10][0])); ch.add(seg); } ch.position.y = 64; c.add(ch); c.userData.chute = ch; } c.userData.chute.visible = true; }
