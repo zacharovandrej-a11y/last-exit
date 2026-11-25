@@ -82,6 +82,7 @@ const HeroBody = (() => {
       TA[7 + o] = H; TB[7 + o] = Kn; TA[8 + o] = Kn; TB[8 + o] = An; TA[9 + o] = An; TB[9 + o] = An.clone().add(SB[9 + o].clone().sub(SA[9 + o])); }
     const ref = i => i === 9 || i === 15 ? down : front;
     const M = MB.map((_, i) => frame(TA[i], TB[i], ref(i), TA[i].distanceTo(TB[i]) / Math.max(1e-4, len[i])).multiply(frame(SA[i], SB[i], ref(i)).invert()));
+    let headFit = null;
     const nv = NP.length / 3, POS = [], ORIG = [], SKI = [], SKW = [], RG = [], MAT = [], AO = [], p_ = V(), acc = V();
     for (let v = 0; v < nv; v++) {
       const s = S(NP[v * 3], NP[v * 3 + 1], NP[v * 3 + 2]); acc.set(0, 0, 0); let ws = 0; const rw = new Map(), rg = [0, 0, 0, 0];
@@ -90,8 +91,29 @@ const HeroBody = (() => {
       acc.multiplyScalar(1 / Math.max(ws, 1e-4)); POS.push(acc.x, acc.y, acc.z); ORIG.push(NO[v * 3], NO[v * 3 + 1], NO[v * 3 + 2]); RG.push(...rg); MAT.push(0);
       const top = [...rw.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4), sum = top.reduce((m, e) => m + e[1], 0);
       for (let k = 0; k < 4; k++) { SKI.push(top[k] ? top[k][0] : 0); SKW.push(top[k] ? top[k][1] / sum : 0); } }
+    // ---------- голова из MakeHuman с морфами под героя (tools/build_heads.py): своё лицо, настоящие глаза и ресницы ----------
+    if (typeof HERO_HEADS !== 'undefined' && HERO_HEADS.heroes[id]) {
+      const D = HERO_HEADS, dec = (str, A) => { const b = atob(str), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return new A(u.buffer); };
+      const HO = dec(D.orig, Int16Array), HP = dec(D.heroes[id], Int16Array), HT = dec(D.part, Uint8Array), HI = dec(D.idx, Uint16Array);
+      const keep = []; for (let t = 0; t < I.length; t += 3) { if (ORIG[I[t] * 3 + 1] > 17.85 && ORIG[I[t + 1] * 3 + 1] > 17.85 && ORIG[I[t + 2] * 3 + 1] > 17.85) continue; keep.push(I[t], I[t + 1], I[t + 2]); } I = keep; // голова «костюма» уходит
+      const base = POS.length / 3, sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+      // морф сдвигает голову целиком (у мужчин шея длиннее): низ шеи прижимаем к телу, разницу гасим к срезу
+      const dN = [0, 0, 0]; let nN = 0; for (let v = 0; v < D.n; v++) if (HO[v * 3 + 1] < 17600) { for (let d = 0; d < 3; d++) dN[d] += (HP[v * 3 + d] - HO[v * 3 + d]) / 1000; nN++; } dN.forEach((q, d) => dN[d] = q / Math.max(1, nN));
+      const hc0 = [0, 0, 0], hc1 = [0, 0, 0]; let nc = 0;
+      for (let v = 0; v < D.n; v++) { const ox = HO[v * 3] / 1000, oy = HO[v * 3 + 1] / 1000, oz = HO[v * 3 + 2] / 1000, f = sm(17.2, 18.3, oy);
+        let x = ox + (HP[v * 3] / 1000 - dN[0] - ox) * f, y = oy + (HP[v * 3 + 1] / 1000 - dN[1] - oy) * f, z = oz + (HP[v * 3 + 2] / 1000 - dN[2] - oz) * f;
+        if (L_.old && oy > 16.5) z += .9 * Math.min(1, (oy - 16.5) / 3);
+        if (oy > 20.5 && !HT[v]) { hc0[0] += ox; hc0[1] += oy; hc0[2] += oz; hc1[0] += x; hc1[1] += y; hc1[2] += z; nc++; }
+        const sh = 1 - .05 * sm(18.0, 17.2, oy); x *= sh; z = .3 + (z - .3) * sh; // низ шеи чуть внутрь воротника тела — без шва
+        const r = S(x, y, z), wh = sm(17.3, 18.9, oy), pt = HT[v]; POS.push(r.x, r.y, r.z); ORIG.push(ox, oy, oz); RG.push(pt ? 1 : sm(17.2, 17.9, oy), 0, 0, 0); MAT.push(pt === 1 ? 18 : pt === 2 ? 19 : 0);
+        SKI.push(1, 0, 0, 0); SKW.push(wh, 1 - wh, 0, 0); }
+      for (let k = 0; k < HI.length; k++) I.push(base + HI[k]);
+      // размер и место черепа у героя — по ним ставятся волосы, каска, платок
+      let r0 = 0, r1 = 0; for (let v = 0; v < D.n; v++) { const oy = HO[v * 3 + 1] / 1000; if (oy <= 20.5 || HT[v]) continue; const ox = HO[v * 3] / 1000, oz = HO[v * 3 + 2] / 1000, i = (base + v) * 3;
+        r0 += Math.hypot(ox - hc0[0] / nc, oy - hc0[1] / nc, oz - hc0[2] / nc); r1 += Math.hypot(POS[i] / K - hc1[0] / nc, POS[i + 1] / K - Y0 - hc1[1] / nc, POS[i + 2] / K - hc1[2] / nc); }
+      headFit = { d: V((hc1[0] - hc0[0]) / nc * K, (hc1[1] - hc0[1]) / nc * K, (hc1[2] - hc0[2]) / nc * K), s: r1 / r0 }; }
     // ---------- одежда объёмом: ткань отстоит от тела, на локтях и коленях — складки ----------
-    const nvBody = nv, TH = CLOTH[id] || [0, 0, 0];
+    const nvBody = POS.length / 3, TH = CLOTH[id] || [0, 0, 0];
     { const tg = new T.BufferGeometry(); tg.setAttribute('position', new T.Float32BufferAttribute(POS, 3)); tg.setIndex(I); tg.computeVertexNormals(); const NN = tg.attributes.normal.array;
       const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
       for (let v = 0; v < nvBody; v++) { const ox = ORIG[v * 3], oy = ORIG[v * 3 + 1], oz = ORIG[v * 3 + 2], ax = Math.abs(ox), arm = RG[v * 4 + 1], hand = RG[v * 4 + 2], foot = RG[v * 4 + 3], head = RG[v * 4];
@@ -113,7 +135,8 @@ const HeroBody = (() => {
     // точка на поверхности тела рядом с (x, y) в координатах исходной модели, самая выступающая в сторону dir
     const surf = (x, y, dir = 1, r = .9) => { let best = -1e9, bi = -1; for (let v = 0; v < nv; v++) { const ox = ORIG[v * 3], oy = ORIG[v * 3 + 1]; if (Math.abs(ox - x) > r || Math.abs(oy - y) > r || RG[v * 4 + 1] > .3) continue; const z = POS[v * 3 + 2] * dir; if (z > best) { best = z; bi = v; } } return bi < 0 ? S(x, y, 0) : V(POS[bi * 3], POS[bi * 3 + 1], POS[bi * 3 + 2]); };
     // ---------- 4) одежда и вещи: геометрия на суставах ----------
-    const add = (geo, m, bone, mat, w2) => { const g = geo.index ? geo.toNonIndexed() : geo.clone(); g.applyMatrix4(m); const p = g.attributes.position, base = POS.length / 3;
+    const add = (geo, m, bone, mat, w2) => { const g = geo.index ? geo.toNonIndexed() : geo.clone(); g.applyMatrix4(m);
+      if (bone === 1 && headFit) { const c = S(0, 22.4, 1.55); g.applyMatrix4(new T.Matrix4().makeTranslation(-c.x, -c.y, -c.z)).applyMatrix4(new T.Matrix4().makeScale(headFit.s, headFit.s, headFit.s)).applyMatrix4(new T.Matrix4().makeTranslation(c.x + headFit.d.x, c.y + headFit.d.y, c.z + headFit.d.z)); } /* вещи на голове — по черепу героя */ const p = g.attributes.position, base = POS.length / 3;
       for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); POS.push(x, y, z); ORIG.push(x / K, y / K - Y0, z / K); RG.push(0, 0, 0, 0); MAT.push(mat); AO.push(1);
         const ws = w2 ? w2(x, y, z) : [[bone, 1]]; for (let k = 0; k < 4; k++) { SKI.push(ws[k] ? ws[k][0] : 0); SKW.push(ws[k] ? ws[k][1] : 0); } I.push(base + i); } };
     const Lm = (x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0) => new T.Matrix4().compose(V(x, y, z), new T.Quaternion().setFromEuler(new T.Euler(rx, ry, rz)), V(sx, sy, sz));
@@ -173,7 +196,6 @@ const HeroBody = (() => {
     if (k === 3) { // монахиня: апостольник вокруг лица, накидка на плечи, белая полоска надо лбом
       add(Sph(28, 18, Math.PI * .74), Lm(0, headC.y - .1 * K, headC.z - .1 * K, 3.15 * K, 3.55 * K, 3.45 * K, -1.22), 1, 8);
       add(Sph(20, 12), Lm(0, H(0, 17.7, 0).y, H(0, 0, 1.6).z, 2.8 * K, 1.8 * K, 2.6 * K), 1, 8); // под подбородком
-      add(new T.TorusGeometry(1, .16, 6, 28, Math.PI), Lm(0, H(0, 24.0, 0).y, H(0, 0, 1.55).z, 2.98 * K, 3.25 * K, 1, Math.PI / 2 - .3), 1, 9);
       const cf = surf(0, 11, 1); add(Bx(.6, 2.8, .3), at(cf.clone().add(V(0, 0, 1.9)), 1, 1, 1), 0, 3); add(Bx(1.8, .55, .3), at(cf.clone().add(V(0, .6 * K, 1.9)), 1, 1, 1), 0, 3);
     }
     if (k === 4) { // бабушка: платок с узлом под подбородком и треугольником на затылке
@@ -219,7 +241,7 @@ const HeroBody = (() => {
       float e = length((q - vec3(.93, 21.85, 3.72)) * vec3(1., 1.75, 1.));
       float lid = smoothstep(.62, .3, e);
       c = mix(c, c * vec3(.78, .7, .68), lid * .55);
-      if (e < .34 && p.z > 3.3) { c = vec3(.86, .83, .78); spec = .8; float ir = length((q.xy - vec2(.95, 21.84)) * vec2(1., 1.1)); if (ir < .17) { c = uHair.r > .45 ? vec3(.32, .42, .48) : vec3(.24, .16, .1); if (ir < .075) c = vec3(.02); } bh = .2; }
+      if (REALEYES < .5 && e < .34 && p.z > 3.3) { c = vec3(.86, .83, .78); spec = .8; float ir = length((q.xy - vec2(.95, 21.84)) * vec2(1., 1.1)); if (ir < .17) { c = uHair.r > .45 ? vec3(.32, .42, .48) : vec3(.24, .16, .1); if (ir < .075) c = vec3(.02); } bh = .2; }
       float brow = (1. - smoothstep(.09, .17, abs(p.y - 22.48 + (ax - .95) * (ax - .95) * .22))) * step(.32, ax) * (1. - step(1.62, ax)) * step(3.05, p.z);
       c = mix(c, uHair * .8, brow * FEMB);
       float lips = (1. - smoothstep(.12, .24, abs(p.y - 19.38 + ax * ax * .12))) * (1. - smoothstep(.62, .86, ax)) * step(3.25, p.z);
@@ -330,7 +352,10 @@ const HeroBody = (() => {
       else if (m < 14.5) { c = vec3(.62, .14, .16) * (.85 + .2 * n2); spec = .4; if (abs(p.x * 0.) < 1. && length(vec2(p.y - (-.5), p.z - 4.)) < 0.) c = vec3(1.); } // сумка
       else if (m < 15.5) { c = vec3(.34, .24, .14) * (.8 + .3 * n2); spec = .35; }                         // кожа
       else if (m < 16.5) { c = SHOEC * (.85 + .25 * n2); spec = .6; bh = .15 * n3; if (LACES > .5 && p.z > 1.6 && fract(p.z * 1.7) < .3 && p.y > -23.2) c = SHOEC * (SHOEC.r > .5 ? .8 : 1.8); } // обувь
-      else { c = SOLEC; spec = .1; } }                                                                         // подошва
+      else if (m < 17.5) { c = SOLEC; spec = .1; }                                                         // подошва
+      else if (m < 18.5) { vec3 ec = vec3(sign(p.x) * uEye.x, uEye.y, uEye.z); vec3 d = normalize(p - ec); float ir = d.z;          // глазное яблоко
+        c = vec3(.88, .84, .8) * (.9 + .1 * ir); spec = 1.6; if (ir > .9) { c = IRIS * (.7 + .5 * smoothstep(.9, .975, ir)); } if (ir > .978) c = vec3(.02); if (ir < .55) c *= .8; }
+      else { c = vec3(.05, .035, .03); spec = .2; } }                                                       // ресницы
     c *= mix(1., vAO, .85); // впадины и складки темнее
     diffuseColor.rgb *= c;
     float heroSpec = spec, heroH = bh;`;
@@ -349,10 +374,10 @@ const HeroBody = (() => {
     const mat = new T.MeshPhongMaterial({ color: 0xffffff, specular: 0x302c28, shininess: 30, skinning: true }); // three r128: скиннинг включается флагом материала
     mat.customProgramCacheKey = () => 'hero' + id;
     mat.onBeforeCompile = sh => {
-      Object.assign(sh.uniforms, { uSkin: { value: col(L_.skin) }, uHair: { value: col(L_.hair) }, uA: { value: col(L_.a) }, uB: { value: col(L_.b) }, uC: { value: col(L_.c) } });
-      const defs = `#define HK ${L_.k}\n` + Object.entries(c).map(([k, v]) => `#define ${k} ${typeof v === 'number' ? v.toFixed(3) : v}`).join('\n') + '\n';
+      Object.assign(sh.uniforms, { uEye: { value: new T.Vector3(Math.abs(RAIDER_SUIT_MODEL.eyes[0][0]), RAIDER_SUIT_MODEL.eyes[0][1], RAIDER_SUIT_MODEL.eyes[0][2]) }, uSkin: { value: col(L_.skin) }, uHair: { value: col(L_.hair) }, uA: { value: col(L_.a) }, uB: { value: col(L_.b) }, uC: { value: col(L_.c) } });
+      const defs = `#define HK ${L_.k}\n#define REALEYES ${typeof HERO_HEADS !== 'undefined' ? '1.' : '0.'}\n#define IRIS ${L_.hair < 0x404040 ? 'vec3(.28,.17,.1)' : 'vec3(.3,.42,.5)'}\n` + Object.entries(c).map(([k, v]) => `#define ${k} ${typeof v === 'number' ? v.toFixed(3) : v}`).join('\n') + '\n';
       sh.vertexShader = 'attribute vec3 orig; attribute vec4 rg; attribute float bmat; attribute float ao; varying vec3 vO; varying vec4 vRg; varying float vM; varying float vAO;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvO = orig; vRg = rg; vM = bmat; vAO = ao;');
-      sh.fragmentShader = defs + 'uniform vec3 uSkin, uHair, uA, uB, uC; varying vec3 vO; varying vec4 vRg; varying float vM; varying float vAO;\n' + sh.fragmentShader
+      sh.fragmentShader = defs + 'uniform vec3 uSkin, uHair, uA, uB, uC, uEye; varying vec3 vO; varying vec4 vRg; varying float vM; varying float vAO;\n' + sh.fragmentShader
         .replace('#include <color_fragment>', '#include <color_fragment>\n' + FRAG)
         .replace('#include <specularmap_fragment>', 'float specularStrength = heroSpec;')
         .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
