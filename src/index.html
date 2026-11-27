@@ -59,6 +59,12 @@ button.alt{background:#2a1212;border:2px solid #ff3b3b;box-shadow:none}
 .start-shell #rooms{width:min(100%,520px)}
 .start-shell .hint{color:#c2af9b;margin:0}
 #err:empty,#rec:empty{display:none}
+#rot{display:none;position:fixed;top:8px;right:8px;z-index:30;width:44px;height:44px;border-radius:22px;border:1px solid #937259;background:rgba(30,26,24,.8);color:#ffe4c8;font-size:22px;padding:0}
+#rotwarn{display:none;position:fixed;inset:0;z-index:40;background:rgba(18,14,12,.94);color:#ffe4c8;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;font-size:18px;padding:24px}
+#rotwarn b{font-size:56px;display:block;animation:rw 1.6s ease-in-out infinite}
+#rotwarn small{color:#c2af9b;font-size:14px}
+@keyframes rw{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+@media (pointer:coarse) and (orientation:portrait){#rot{display:block}body.ingame #rotwarn{display:flex}}
 @media (orientation:landscape) and (max-height:520px){
   .start-shell{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);grid-template-rows:auto auto auto auto 1fr;align-items:start;gap:8px 14px}
   .start-shell>*{grid-column:2}
@@ -74,6 +80,8 @@ button.alt{background:#2a1212;border:2px solid #ff3b3b;box-shadow:none}
 }
 </style></head><body>
 <canvas id="g"></canvas><canvas id="c"></canvas>
+<button id="rot" type="button" aria-label="Горизонтально">⟳</button>
+<div id="rotwarn"><b>📱</b>Поверни телефон горизонтально<small>Нажми сюда — включится сам. На iPhone выключи «Блокировку ориентации» в Пункте управления.</small></div>
 <div id="weapons" role="group" aria-label="Оружие" hidden></div>
 <div id="start" class="scr on">
   <div class="start-shell">

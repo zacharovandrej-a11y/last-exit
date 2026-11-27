@@ -14,7 +14,15 @@ let mySkin = PLAYABLE_HEROES[heroIndex].id;
 $('rec').textContent = +(localStorage.getItem('zbest') || 0) ? '🏆 Твой рекорд: волна ' + localStorage.getItem('zbest') : '';
 $('name').value = localStorage.getItem('zname') || '';
 const myName = () => ($('name').value.trim() || 'Игрок').slice(0, 12);
-function show(id) { for (const s of ['start', 'lobby']) $(s).classList.toggle('on', s === id); }
+function show(id) { for (const s of ['start', 'lobby']) $(s).classList.toggle('on', s === id); document.body.classList.toggle('ingame', !id); }
+// ===== телефон: на весь экран и горизонтально =====
+const PHONE = matchMedia('(pointer:coarse)').matches;
+function goLand() {
+  if (!PHONE) return; const d = document.documentElement, fs = d.requestFullscreen || d.webkitRequestFullscreen;
+  const lock = () => { try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => { }); } catch (e) { } };
+  try { if (fs && !(document.fullscreenElement || document.webkitFullscreenElement)) { const r = fs.call(d, { navigationUI: 'hide' }); r && r.then ? r.then(lock, lock) : lock(); } else lock(); } catch (e) { lock(); }
+}
+document.addEventListener('click', e => { if (e.target.closest('#quick,#create,#go,.room button,#rot,#rotwarn')) goLand(); }, true); // поворот — только по нажатию (так требует браузер)
 // ===== список комнат и вход =====
 async function refreshRooms() {
   if (inRoom) return;
